@@ -1,0 +1,70 @@
+#!/usr/bin/env sh
+# AI CAGE — Pre-commit hook
+# Runs automatically before every git commit.
+# Blocks commit if tests fail or if network primitives are found in core.
+
+set -e
+
+echo "🔒 AI CAGE pre-commit: running checks..."
+
+# ── 1. Run full test suite ────────────────────────────────────────────────
+echo "  → Running pnpm test..."
+pnpm test
+
+# ── 2. Security contract grep ─────────────────────────────────────────────
+# Strip single-line (//) and block (/* */) comments from TS source,
+# then assert no network primitives exist in the caging engine.
+echo "  → Checking for network calls in core packages..."
+
+node --input-type=module << 'EOF'
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, extname } from 'path';
+
+const DIRS = [
+  'packages/presidio-lite/src',
+  'packages/core/src',
+];
+
+const FORBIDDEN = [
+  /\bfetch\s*\(/,
+  /XMLHttpRequest/,
+  /WebSocket/,
+  /navigator\.sendBeacon/,
+  /localStorage/,
+  /indexedDB/,
+];
+
+let violations = 0;
+
+function scan(dir) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) { scan(full); continue; }
+    if (extname(full) !== '.ts') continue;
+
+    const raw = readFileSync(full, 'utf8');
+    // Strip comments
+    const code = raw
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+
+    for (const pattern of FORBIDDEN) {
+      if (pattern.test(code)) {
+        console.error(`SECURITY VIOLATION: ${pattern} found in ${full}`);
+        violations++;
+      }
+    }
+  }
+}
+
+for (const dir of DIRS) scan(dir);
+
+if (violations > 0) {
+  console.error(`\n❌ ${violations} security violation(s) found. Commit blocked.`);
+  process.exit(1);
+}
+
+console.log('  ✅ Security contract: no network calls in core packages.');
+EOF
+
+echo "✅ AI CAGE pre-commit checks passed."

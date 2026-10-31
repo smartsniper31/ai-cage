@@ -1,0 +1,28 @@
+{
+  "name": "@ai-cage/core",
+  "version": "0.3.0",
+  "description": "AI CAGE core: cageText / uncageText / agentCage / mcpMonitor — 100% local, zero network.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@ai-cage/presidio-lite": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4",
+    "vitest": "2.1.8",
+    "rimraf": "6.0.1"
+  }
+}

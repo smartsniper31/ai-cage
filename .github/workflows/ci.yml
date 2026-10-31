@@ -1,0 +1,151 @@
+name: AI CAGE CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs on same branch to save minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 1: Build & Test (TypeScript packages)
+  # ──────────────────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: |
+          pnpm --filter @ai-cage/presidio-lite build
+          pnpm --filter @ai-cage/core build
+          pnpm --filter @ai-cage/extension build
+          pnpm --filter @ai-cage/desktop build
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Security contract check
+        run: |
+          echo "Checking for network calls in core packages..."
+          # Strip comments then grep — must return exit code 1 (not found)
+          ! grep -rn --include="*.ts" \
+            -E "\bfetch\s*\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon" \
+            packages/presidio-lite/src/ packages/core/src/ \
+            | grep -v "// " \
+            | grep -v "\*"
+          echo "✅ No network calls found in core packages."
+
+      - name: Verify extension dist
+        run: |
+          echo "Checking extension dist output..."
+          test -f apps/extension/dist/background.js
+          test -f apps/extension/dist/content.js
+          test -f apps/extension/dist/popup.js
+          test -f apps/extension/dist/manifest.json
+          test -f apps/extension/dist/popup.html
+          echo "✅ Extension dist files present."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 2: Dependency audit
+  # ──────────────────────────────────────────────────────────────────────────
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+        continue-on-error: true  # Don't fail CI on audit warnings in dev deps
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 3: VS Code Extension build
+  # ──────────────────────────────────────────────────────────────────────────
+  vscode-extension:
+    name: VS Code Extension Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages first
+        run: |
+          pnpm --filter @ai-cage/presidio-lite build
+          pnpm --filter @ai-cage/core build
+
+      - name: Build VS Code extension
+        run: pnpm --filter ai-cage-vscode build
+
+      - name: Verify extension output
+        run: |
+          test -f apps/vscode-extension/dist/extension.js
+          echo "✅ VS Code extension built successfully."

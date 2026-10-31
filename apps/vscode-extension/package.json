@@ -1,0 +1,109 @@
+{
+  "name": "ai-cage-vscode",
+  "displayName": "AI CAGE — Code Leak Protection",
+  "description": "Detects PII, secrets and credentials in your code before they leak to AI assistants. 100% local, zero network.",
+  "version": "0.3.0",
+  "publisher": "ai-cage",
+  "icon": "icons/icon128.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "Linters"],
+  "keywords": ["security", "pii", "secrets", "ai", "copilot", "privacy"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ai-cage"
+  },
+  "license": "MIT",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-cage.scanCurrentFile",
+        "title": "AI CAGE: Scan Current File for PII / Secrets",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "ai-cage.cageSelection",
+        "title": "AI CAGE: Cage Selected Text (replace PII with tokens)",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "ai-cage.showAuditLog",
+        "title": "AI CAGE: Show Audit Log",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "ai-cage.clearDiagnostics",
+        "title": "AI CAGE: Clear Diagnostics"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ai-cage.cageSelection",
+          "when": "editorHasSelection",
+          "group": "ai-cage@1"
+        },
+        {
+          "command": "ai-cage.scanCurrentFile",
+          "group": "ai-cage@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ai-cage.scanCurrentFile",
+          "when": "resourceLangId",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI CAGE",
+      "properties": {
+        "aiCage.enableOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan files for PII/secrets on save."
+        },
+        "aiCage.minScore": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0.1,
+          "maximum": 1.0,
+          "description": "Minimum confidence score (0–1) to trigger a warning. Lower = more sensitive."
+        },
+        "aiCage.criticalOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, only show warnings for PRIVATE_KEY and API_KEY (score ≥ 0.88). Reduces noise."
+        },
+        "aiCage.fileGlob": {
+          "type": "string",
+          "default": "**/*.{ts,js,py,env,json,yaml,yml,tf,sh,rb,go,java,cs,php,rs,toml,ini,conf}",
+          "description": "Glob pattern of file types to scan on save."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify=false",
+    "package": "vsce package --no-dependencies",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@ai-cage/core": "workspace:*",
+    "@ai-cage/presidio-lite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.85.0",
+    "esbuild": "0.24.2",
+    "rimraf": "6.0.1",
+    "typescript": "5.5.4",
+    "@vscode/vsce": "3.2.1"
+  }
+}

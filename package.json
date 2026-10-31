@@ -1,0 +1,21 @@
+{
+  "name": "ai-cage",
+  "version": "0.3.0",
+  "private": true,
+  "description": "AI CAGE - Enterprise Grade AI Data Protection. Zero Data Leaves The Cage.",
+  "scripts": {
+    "prepare": "husky || true",
+    "build": "pnpm --filter @ai-cage/presidio-lite build && pnpm --filter @ai-cage/core build && pnpm --filter @ai-cage/extension build && pnpm --filter @ai-cage/desktop build && pnpm --filter ai-cage-vscode build",
+    "test": "pnpm --filter @ai-cage/presidio-lite test && pnpm --filter @ai-cage/core test",
+    "lint": "pnpm --recursive run lint",
+    "clean": "pnpm --recursive run clean"
+  },
+  "devDependencies": {
+    "husky": "9.1.7",
+    "typescript": "5.5.4"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

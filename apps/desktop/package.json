@@ -1,0 +1,23 @@
+{
+  "name": "@ai-cage/desktop",
+  "version": "0.1.0",
+  "description": "AI CAGE Desktop App — Tauri shell embedding the core PII engine.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "tauri": "tauri",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@ai-cage/core": "workspace:*",
+    "@tauri-apps/api": "1.6.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "1.6.3",
+    "rimraf": "6.0.1",
+    "typescript": "5.5.4",
+    "vite": "5.4.11"
+  }
+}

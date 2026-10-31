@@ -1,0 +1,287 @@
+/**
+ * @file detectors.ts
+ * All PII regex detectors for presidio-lite.
+ *
+ * Design rules (non-negotiable):
+ *   1. Every pattern must use the `g` (global) flag.
+ *   2. No network calls. No imports from node:net, node:dns, etc.
+ *   3. Patterns must have a comment explaining what they match.
+ *   4. When a pattern is intentionally broad (lower precision), set defaultScore < 0.8.
+ */
+
+import type { Detector } from './types.js';
+
+// ---------------------------------------------------------------------------
+// Existing detectors (unchanged)
+// ---------------------------------------------------------------------------
+
+/**
+ * Email addresses — RFC 5321 simplified.
+ * e.g. user.name+tag@example.co.uk
+ */
+const emailDetector: Detector = {
+  name: 'Email Address',
+  type: 'EMAIL_ADDRESS',
+  patterns: [
+    /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,
+  ],
+  defaultScore: 0.95,
+};
+
+/**
+ * International phone numbers.
+ * Covers +216 XX XXX XXX (Tunisia), +33 X XX XX XX XX (France),
+ * +1 (NNN) NNN-NNNN (US/CA), and generic international formats.
+ */
+const phoneDetector: Detector = {
+  name: 'Phone Number',
+  type: 'PHONE_NUMBER',
+  patterns: [
+    /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g,
+    /\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}/g,
+  ],
+  defaultScore: 0.75,
+};
+
+/**
+ * IBAN — ISO 13616.
+ * e.g. TN5910006035183598478831 (Tunisia), FR76 3000 6000 0112 3456 7890 189 (France)
+ */
+const ibanDetector: Detector = {
+  name: 'IBAN',
+  type: 'IBAN',
+  patterns: [
+    /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g,
+  ],
+  defaultScore: 0.90,
+};
+
+/**
+ * Tunisian RIB — 20 digits, optionally spaced as 2/3/13/2.
+ */
+const ribTnDetector: Detector = {
+  name: 'Tunisian RIB',
+  type: 'RIB_TN',
+  patterns: [
+    /\b\d{20}\b/g,
+    /\b\d{2}[\s]\d{3}[\s]\d{13}[\s]\d{2}\b/g,
+  ],
+  defaultScore: 0.80,
+};
+
+/**
+ * Tunisian CIN — 8 digits, optionally preceded by "CIN" label.
+ */
+const cinTnDetector: Detector = {
+  name: 'Tunisian CIN',
+  type: 'CIN_TN',
+  patterns: [
+    /\b(?:CIN|N°\s?CIN|Carte\s+Identit[ée])\s*[:\-]?\s*(\d{8})\b/gi,
+    /\b\d{8}\b/g,
+  ],
+  defaultScore: 0.65,
+};
+
+/**
+ * Credit / debit card numbers.
+ * Visa (4xxx), Mastercard (5xxx/2xxx), Amex (3xxx), Discover (6xxx).
+ */
+const creditCardDetector: Detector = {
+  name: 'Credit Card',
+  type: 'CREDIT_CARD',
+  patterns: [
+    /\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}|6(?:011|5\d{2}))[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g,
+    /\b3[47]\d{2}[\s\-]?\d{6}[\s\-]?\d{5}\b/g,
+  ],
+  defaultScore: 0.90,
+};
+
+/**
+ * API keys — AWS, GitHub PAT, Stripe, Bearer tokens, generic key= patterns.
+ */
+const apiKeyDetector: Detector = {
+  name: 'API Key / Secret',
+  type: 'API_KEY',
+  patterns: [
+    /\bAKIA[0-9A-Z]{16}\b/g,
+    /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,255}\b/g,
+    /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g,
+    /\b(?:api[_\-]?key|secret[_\-]?key|access[_\-]?token)\s*[=:]\s*["']?[A-Za-z0-9\-_.+/]{20,}["']?/gi,
+    /Bearer\s+[A-Za-z0-9\-_.+/=]{20,}/g,
+  ],
+  defaultScore: 0.88,
+};
+
+/**
+ * PEM private key headers.
+ */
+const privateKeyDetector: Detector = {
+  name: 'Private Key',
+  type: 'PRIVATE_KEY',
+  patterns: [
+    /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+  ],
+  defaultScore: 1.0,
+};
+
+/**
+ * IPv4 and IPv6 addresses.
+ */
+const ipDetector: Detector = {
+  name: 'IP Address',
+  type: 'IP_ADDRESS',
+  patterns: [
+    /\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g,
+    /\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b/g,
+    /\b(?:[0-9a-fA-F]{1,4}:)*::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4}\b/g,
+  ],
+  defaultScore: 0.85,
+};
+
+/**
+ * Generic secrets — password/token in config patterns.
+ */
+const genericSecretDetector: Detector = {
+  name: 'Generic Secret',
+  type: 'GENERIC_SECRET',
+  patterns: [
+    /\b(?:password|passwd|pwd|mot[_\-]?de[_\-]?passe)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi,
+    /\b(?:token|secret|credential)\s*[=:]\s*["']?[A-Za-z0-9\-_.+/]{16,}["']?/gi,
+  ],
+  defaultScore: 0.82,
+};
+
+/**
+ * International passport — generic letter(s) + digits format.
+ */
+const passportDetector: Detector = {
+  name: 'Passport Number',
+  type: 'PASSPORT',
+  patterns: [
+    /\b[A-Z]{1,2}\d{6,9}\b/g,
+    /\b\d{2}[A-Z]{2}\d{5}\b/g,
+  ],
+  defaultScore: 0.70,
+};
+
+// ---------------------------------------------------------------------------
+// NEW — Phase 2 detectors
+// ---------------------------------------------------------------------------
+
+/**
+ * Tunisian Matricule Fiscal (MF).
+ * Official format: 7 digits + slash + letter + slash + letter + slash + 3 digits.
+ * e.g. 1234567/A/P/000 or 1234567/A/N/000
+ * Ref: Direction Générale des Impôts (DGI) Tunisia.
+ */
+const mfTnDetector: Detector = {
+  name: 'Tunisian Matricule Fiscal',
+  type: 'MF_TN',
+  patterns: [
+    // Standard format with slashes
+    /\b\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/g,
+    // With label
+    /\b(?:MF|Matricule\s+Fiscal)\s*[:\-]?\s*\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/gi,
+    // Compact without label (lower confidence)
+    /\b\d{7}[A-Z]{3}\d{3}\b/g,
+  ],
+  defaultScore: 0.92,
+};
+
+/**
+ * Tunisian passport number.
+ * Format: letter + 7 digits (e.g. A1234567, B7654321).
+ * Distinguished from generic PASSPORT by explicit Tunisian context pattern
+ * and higher specificity (exactly 1 letter + 7 digits).
+ */
+const passportTnDetector: Detector = {
+  name: 'Tunisian Passport',
+  type: 'PASSPORT_TN',
+  patterns: [
+    // Preceded by passport label
+    /\b(?:Passeport|Passport\s+N°?|N°?\s*Passeport)\s*[:\-]?\s*([A-Z]\d{7})\b/gi,
+    // Standalone (exact: 1 uppercase + 7 digits)
+    /\b[A-Z]\d{7}\b/g,
+  ],
+  defaultScore: 0.78,
+};
+
+/**
+ * Titre de séjour / Carte de séjour (French/Tunisian residence permit).
+ *
+ * French format: 2-letter département code + 6 digits + 2-letter suffix.
+ * e.g. 75 123456 01 or 75123456A01
+ * Often referred to by labels: "titre de séjour", "carte de séjour", "récépissé".
+ */
+const carteSejourDetector: Detector = {
+  name: 'Carte de Séjour / Titre de Séjour',
+  type: 'CARTE_SEJOUR',
+  patterns: [
+    // Preceded by label
+    /\b(?:titre\s+de\s+s[eé]jour|carte\s+de\s+s[eé]jour|r[eé]c[eé]piss[eé])\s*[:\-]?\s*([A-Z0-9\s\-]{6,20})\b/gi,
+    // French format: dept (2 digits) + 6 digits + optional 2-digit suffix
+    /\b\d{2}[\s\-]?\d{6}[\s\-]?\d{2}\b/g,
+  ],
+  defaultScore: 0.72,
+};
+
+/**
+ * Person names — Phase 2 improvements.
+ *
+ * Strategy:
+ *   1. High-confidence: name preceded by an explicit label ("Nom:", "Name:").
+ *   2. Arabic name patterns: common Tunisian/Arab first names + "Ben/Bel/El/Al" + family names.
+ *   3. French/European: title-cased word pairs not in a common stop-word list.
+ *
+ * False positive reduction:
+ *   - Require minimum 2 words (no single-word matches).
+ *   - Exclude matches that look like product/company names (ALL-CAPS words).
+ *   - Arabic names use a curated prefix list (Ben, Bel, El, Al, Ould, Bent).
+ */
+const personNameDetector: Detector = {
+  name: 'Person Name',
+  type: 'PERSON_NAME',
+  patterns: [
+    // ── High-confidence: explicit label ──────────────────────────────────
+    // "Nom: Ahmed Ben Ali" / "Name: Marie Dupont"
+    /\b(?:Nom\s+(?:et\s+Pr[eé]nom|Complet)|Full\s+Name|Name|Pr[eé]nom\s+(?:et\s+Nom)?)\s*[:\-]\s*([A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+(?:\s+[A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+){1,3})/gi,
+
+    // ── Arabic-origin Tunisian names ──────────────────────────────────────
+    // Matches: Mohamed Ben Ali, Ahmed El Amri, Fatma Bel Hadj, etc.
+    // First-name list covers top 50 Tunisian first names (male + female).
+    /\b(?:Mohamed?|Mohamad|Muhamed?|Ahmad?|Ahmed?|Ali|Omar|Youssef|Yousef|Khaled|Khalid|Sami|Samir|Rami|Tarek|Tariq|Imed|Wissem|Wassim|Karim|Slim|Hamza|Walid|Fethi|Nabil|Hedi|Lotfi|Mounir|Hatem|Aymen|Bilel|Amine|Hichem|Sofien|Ramzi|Bassem|Maher|Faouzi|Adel|Zied|Chokri|Anis|Riyadh|Mondher|Riadh|Fatma|Ines|Sonia|Emna|Rim|Nour|Olfa|Mariem|Amira|Hela|Wafa|Asma|Manel|Rania|Sirine|Imen|Najet|Lobna|Sabrina|Salma|Yosra)\s+(?:Ben|Bel|El|Al|Ould|Bent|Bint|Bou|Bou\s*|Hadj)\s+[A-ZÀ-Ÿa-zà-ÿ]{2,20}/g,
+
+    // ── French / European name pairs ──────────────────────────────────────
+    // Two or three title-cased words; requires lower-case continuation
+    // to exclude acronyms (e.g. "HTTP Request" won't match because "Request"
+    // is a common English word — but we keep score low for this pattern).
+    /\b(?!(?:The|A|An|In|On|At|By|For|From|With|This|That|These|Those|It|Is|Are|Was|Were|Has|Have|Had|Be|Been|Being|Do|Does|Did|Will|Would|Could|Should|May|Might|Must|Shall|Can|Need|Dare|Used|Ought)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}\s+(?!(?:API|URL|HTTP|SQL|JSON|XML|CSS|HTML|PDF|CSV|AI|ML|UI|UX|ID|DB)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{2,20})?\b/g,
+  ],
+  defaultScore: 0.58,
+};
+
+// ---------------------------------------------------------------------------
+// Ordered detector list
+// ---------------------------------------------------------------------------
+
+/**
+ * All active detectors, ordered highest-confidence first.
+ * The deduplication in scan.ts will prefer the first match in case of overlap.
+ */
+export const ALL_DETECTORS: readonly Detector[] = [
+  privateKeyDetector,    // 1.00
+  mfTnDetector,          // 0.92
+  emailDetector,         // 0.95
+  creditCardDetector,    // 0.90
+  ibanDetector,          // 0.90
+  apiKeyDetector,        // 0.88
+  genericSecretDetector, // 0.82
+  ipDetector,            // 0.85
+  ribTnDetector,         // 0.80
+  passportTnDetector,    // 0.78
+  phoneDetector,         // 0.75
+  carteSejourDetector,   // 0.72
+  passportDetector,      // 0.70
+  cinTnDetector,         // 0.65
+  personNameDetector,    // 0.58
+];
