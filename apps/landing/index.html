@@ -11,7 +11,24 @@
   <meta property="og:type" content="website" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/src/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cage: {
+              green: '#16a34a',
+              'green-dark': '#15803d',
+              'green-bg': '#f0fdf4',
+              red: '#dc2626',
+              amber: '#d97706',
+              dark: '#0f172a',
+            },
+          },
+        },
+      },
+    };
+  </script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased">
 
@@ -396,6 +413,21 @@
     </div>
   </footer>
 
-  <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Smooth scroll for anchor links — no build step needed
+    document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+      anchor.addEventListener('click', function(e) {
+        var href = this.getAttribute('href');
+        if (href && href.length > 1) {
+          var target = document.querySelector(href);
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
+    });
+    console.log('[AI CAGE] Landing page loaded. Use Monster AI. Leak Zero Data.');
+  </script>
 </body>
 </html>
