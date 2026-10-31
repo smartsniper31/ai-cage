@@ -1,6 +1,6 @@
 /**
  * @file index.ts
- * Public API for @ai-cage/core — v0.3.0
+ * Public API for @ai-cage/core — v0.4.0
  *
  * This is the only module consumers (extension, desktop, VS Code, CLI) import.
  */
@@ -75,6 +75,28 @@ export type {
   McpToolCall,
   McpAuditResult,
 } from './mcpMonitor.js';
+
+// ── Licensing engine (Phase 4) ───────────────────────────────────────────
+export {
+  checkLicense,
+  activateLicense,
+  deactivateLicense,
+  generateLicenseKey,
+  parseLicenseKey,
+  generateDemoLicense,
+  getTierFeatures,
+} from './license.js';
+export type {
+  LicenseTier,
+  LicenseStatus,
+  LicenseFeatures,
+  LicensePayload,
+  LicenseInfo,
+} from './license.js';
+
+// ── Cage 5: Voice/Video transcript caging (Phase 4) ──────────────────────
+export { cageTranscript, uncageTranscript } from './cageTranscript.js';
+export type { TranscriptCageResult } from './cageTranscript.js';
 
 // ── Re-export EntityType ──────────────────────────────────────────────────
 export type { EntityType } from '@ai-cage/presidio-lite';

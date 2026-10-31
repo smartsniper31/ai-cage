@@ -261,6 +261,53 @@ const personNameDetector: Detector = {
 };
 
 // ---------------------------------------------------------------------------
+// Phase 4 — Cage 5: Voice/Video transcript detectors
+// ---------------------------------------------------------------------------
+
+/**
+ * Meeting transcript markers — headers, timestamps, and format indicators
+ * that signal this text is a meeting transcript (Cage 5: Voice/Video).
+ * Detecting these triggers the cageTranscript() pipeline which redacts
+ * all participant names before the transcript is uploaded to an AI summariser.
+ */
+const transcriptMarkerDetector: Detector = {
+  name: 'Meeting Transcript Marker',
+  type: 'MEETING_TRANSCRIPT_MARKER',
+  patterns: [
+    // Timestamp line markers: [00:15:32] or (00:15:32) or 00:15:32
+    /\b\d{1,2}:\d{2}(?::\d{2})?\b\s*[-–—:]\s*/g,
+    // Speaker labels: "John:", "Speaker 1:", "Participant 3:"
+    /\b[A-ZÀ-Ÿ][a-zà-ÿ]+:\s/g,
+    /\bSpeaker\s+\d+:\s/gi,
+    /\bParticipant\s+\d+:\s/gi,
+    // Transcript metadata headers
+    /\b(?:Transcript|Meeting\s+(?:Notes?|Summary|Record)|Minutes)\s*(?:of|from|for|—|-)?\s/gi,
+    /\bAttendees?\s*[:=]\s/gi,
+    /\bDate\s*[:=]\s/gi,
+    // AI transcription service watermarks
+    /\b(?:Generated\s+by|Transcribed\s+by|Powered\s+by)\s+(?:Otter|Fireflies|Read\.ai|tl;dv|Fathom|Rev|Sonix|Descript)/gi,
+  ],
+  defaultScore: 0.82,
+};
+
+/**
+ * Meeting participant lines — identifies lines where a named person
+ * is speaking in a transcript. Used by cageTranscript() to know which
+ * lines to redact.
+ */
+const meetingParticipantDetector: Detector = {
+  name: 'Meeting Participant',
+  type: 'MEETING_PARTICIPANT',
+  patterns: [
+    // "John Smith: Hello everyone" — name followed by colon and speech
+    /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
+    // "John said:", "John asked:", "John replied:"
+    /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s+(?:said|asked|replied|noted|added|stated):\s/gi,
+  ],
+  defaultScore: 0.68,
+};
+
+// ---------------------------------------------------------------------------
 // Ordered detector list
 // ---------------------------------------------------------------------------
 
@@ -276,10 +323,12 @@ export const ALL_DETECTORS: readonly Detector[] = [
   ibanDetector,          // 0.90
   apiKeyDetector,        // 0.88
   genericSecretDetector, // 0.82
+  transcriptMarkerDetector, // 0.82 — Cage 5
   ipDetector,            // 0.85
   ribTnDetector,         // 0.80
   passportTnDetector,    // 0.78
   phoneDetector,         // 0.75
+  meetingParticipantDetector, // 0.68 — Cage 5
   carteSejourDetector,   // 0.72
   passportDetector,      // 0.70
   cinTnDetector,         // 0.65

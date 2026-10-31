@@ -80,6 +80,12 @@ async function renderOverview(): Promise<void> {
     }
   }
 
+  // Show watermark if free tier limit reached
+  if ((resp?.monthlyPiiCaged ?? 0) >= 100) {
+    const wm = document.getElementById('watermark');
+    if (wm) (wm as HTMLElement).style.display = 'block';
+  }
+
   // Top sites
   const sitesEl = document.getElementById('top-sites');
   if (sitesEl && resp?.topSites?.length) {

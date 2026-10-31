@@ -25,7 +25,9 @@ export type EntityType =
   | 'URL'
   | 'DATE'
   | 'PASSPORT'
-  | 'GENERIC_SECRET';
+  | 'GENERIC_SECRET'
+  | 'MEETING_TRANSCRIPT_MARKER'  // Cage 5: transcript headers, speaker labels, timestamps
+  | 'MEETING_PARTICIPANT';       // Cage 5: "John said:", "Speaker 1:", participant lines
 
 /**
  * A single PII match found in a text.

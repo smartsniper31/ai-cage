@@ -1,6 +1,6 @@
 {
   "name": "@ai-cage/presidio-lite",
-  "version": "0.3.0",
+  "version": "0.4.5",
   "description": "Lightweight offline PII pattern detection + injection detection. No network calls. Ever.",
   "type": "module",
   "main": "./dist/index.js",

@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:firefox": "vite build && node build-firefox.mjs",
     "dev": "vite build --watch",
     "lint": "eslint src --ext .ts",
     "clean": "rimraf dist"

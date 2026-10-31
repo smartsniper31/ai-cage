@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI CAGE — Cage The Monster AI. Use ChatGPT, Leak Zero Data.</title>
+  <meta name="description" content="The first antivirus that protects companies against Monster AI. Zero data leaves your device. 100% local, offline-first, open-source." />
+  <meta name="keywords" content="AI security, PII protection, ChatGPT privacy, data leak prevention, GDPR compliance" />
+  <meta property="og:title" content="AI CAGE — Use Monster AI. Leak Zero Data." />
+  <meta property="og:description" content="The first antivirus for AI. Cages your PII before it reaches ChatGPT, Claude, Gemini. 100% local." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+
+  <!-- ═══ NAVBAR ═══ -->
+  <nav class="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="#hero" class="flex items-center gap-2 font-bold text-lg">
+        <span class="text-2xl">🔒</span>
+        <span>AI CAGE</span>
+        <span class="text-xs font-normal text-slate-400 hidden sm:inline">v0.4.5</span>
+      </a>
+      <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+        <a href="#how" class="hover:text-cage-green-dark transition">How it works</a>
+        <a href="#cages" class="hover:text-cage-green-dark transition">7 Cages</a>
+        <a href="#pricing" class="hover:text-cage-green-dark transition">Pricing</a>
+        <a href="#privacy" class="hover:text-cage-green-dark transition">Privacy</a>
+        <a href="https://github.com/your-org/ai-cage" class="hover:text-cage-green-dark transition">GitHub</a>
+      </div>
+      <a href="#pricing" class="bg-cage-green text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-cage-green-dark transition">
+        Get Started Free
+      </a>
+    </div>
+  </nav>
+
+  <!-- ═══ HERO ═══ -->
+  <section id="hero" class="pt-32 pb-20 px-4">
+    <div class="max-w-5xl mx-auto text-center">
+      <div class="inline-block bg-cage-green-bg text-cage-green-dark px-4 py-1.5 rounded-full text-sm font-semibold mb-6 border border-green-200">
+        🇹🇳 Made in Tunisia · 100% Offline · Open Source · MIT
+      </div>
+      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
+        Cage The Monster AI.<br />
+        <span class="text-cage-green">Use ChatGPT. Leak Zero Data.</span>
+      </h1>
+      <p class="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-8 leading-relaxed">
+        The first antivirus that protects companies against AI. Your employees use ChatGPT, Claude, Gemini — AI CAGE removes all sensitive data before it leaves their device. 202 tests. Zero network calls. Provable to your auditor.
+      </p>
+
+      <!-- CTA buttons -->
+      <div class="flex flex-wrap items-center justify-center gap-4 mb-12">
+        <a href="#pricing" class="bg-cage-green text-white px-6 py-3 rounded-xl text-base font-bold hover:bg-cage-green-dark transition shadow-lg shadow-green-200">
+          🌐 Install Free for Chrome
+        </a>
+        <a href="#pricing" class="bg-slate-800 text-white px-6 py-3 rounded-xl text-base font-bold hover:bg-slate-900 transition">
+          🦊 Install for Firefox
+        </a>
+        <a href="https://github.com/your-org/ai-cage" class="bg-slate-100 text-slate-800 px-6 py-3 rounded-xl text-base font-bold hover:bg-slate-200 transition border border-slate-300">
+          ⭐ Star on GitHub
+        </a>
+      </div>
+
+      <!-- Demo GIF placeholder (banner on ChatGPT) -->
+      <div class="max-w-3xl mx-auto rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white">
+        <div class="bg-cage-green-dark text-white px-4 py-2.5 flex items-center gap-2 text-sm font-semibold">
+          <span>🔒 AI CAGE Active</span>
+          <span class="ml-auto bg-green-600 text-white px-2 py-0.5 rounded-full text-xs">3 items caged</span>
+        </div>
+        <div class="p-6 text-left font-mono text-sm bg-slate-50 space-y-3">
+          <div class="text-slate-400 text-xs uppercase tracking-wide">Before AI CAGE (what you type):</div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800">
+            Send invoice to ahmed@company.tn, IBAN TN5910006035183598478831, CIN 12345678
+          </div>
+          <div class="text-slate-400 text-xs uppercase tracking-wide">After AI CAGE (what ChatGPT receives):</div>
+          <div class="bg-green-50 border border-green-300 rounded-lg p-3 text-green-800 font-semibold">
+            Send invoice to [CAGED_EMAIL_1], IBAN [CAGED_IBAN_2], CIN [CAGED_CIN_3]
+          </div>
+          <div class="text-center text-xs text-slate-400 pt-2">
+            ↑ PII never leaves your device. The AI processes structure, not your data.
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mt-12">
+        <div class="text-center">
+          <div class="text-3xl font-extrabold text-cage-green">202</div>
+          <div class="text-sm text-slate-500">Tests passing</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-extrabold text-cage-green">47</div>
+          <div class="text-sm text-slate-500">AI endpoints tracked</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-extrabold text-cage-green">6</div>
+          <div class="text-sm text-slate-500">Cages active</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-extrabold text-cage-green">0€</div>
+          <div class="text-sm text-slate-500">Server cost / month</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ HOW IT WORKS ═══ -->
+  <section id="how" class="py-20 bg-white">
+    <div class="max-w-5xl mx-auto px-4">
+      <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-4">How It Works</h2>
+      <p class="text-center text-slate-600 mb-12 max-w-xl mx-auto">Three steps. Zero complexity. Your data never leaves the cage.</p>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <!-- Step 1 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto bg-cage-green-bg rounded-2xl flex items-center justify-center text-3xl mb-4">1️⃣</div>
+          <h3 class="font-bold text-lg mb-2">You type a prompt</h3>
+          <p class="text-slate-600 text-sm">Paste your message into ChatGPT, Claude, or Gemini as usual. It may contain emails, names, IBANs, API keys.</p>
+        </div>
+        <!-- Step 2 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto bg-cage-green-bg rounded-2xl flex items-center justify-center text-3xl mb-4">2️⃣</div>
+          <h3 class="font-bold text-lg mb-2">AI CAGE removes PII</h3>
+          <p class="text-slate-600 text-sm">Before the request is sent, AI CAGE replaces sensitive data with safe tokens like [CAGED_EMAIL_1]. 100% local — no server involved.</p>
+        </div>
+        <!-- Step 3 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto bg-cage-green-bg rounded-2xl flex items-center justify-center text-3xl mb-4">3️⃣</div>
+          <h3 class="font-bold text-lg mb-2">AI responds, you see data</h3>
+          <p class="text-slate-600 text-sm">The AI's response contains tokens. AI CAGE restores the original values locally before displaying. You see the full text. The AI never did.</p>
+        </div>
+      </div>
+
+      <!-- Architecture diagram -->
+      <div class="mt-16 bg-slate-50 rounded-2xl p-8 border border-slate-200">
+        <div class="text-center font-mono text-sm text-slate-700 leading-relaxed">
+          <span class="inline-block bg-blue-100 text-blue-800 px-3 py-2 rounded-lg font-semibold">👤 User</span>
+          <span class="mx-2 text-slate-400">→</span>
+          <span class="inline-block bg-green-100 text-green-800 px-3 py-2 rounded-lg font-semibold">🔒 AI CAGE<br /><span class="text-xs font-normal">cageText() — local</span></span>
+          <span class="mx-2 text-slate-400">→</span>
+          <span class="inline-block bg-red-100 text-red-800 px-3 py-2 rounded-lg font-semibold">🤖 Monster AI<br /><span class="text-xs font-normal">sees [CAGED_EMAIL_1] only</span></span>
+          <span class="mx-2 text-slate-400">←</span>
+          <span class="inline-block bg-green-100 text-green-800 px-3 py-2 rounded-lg font-semibold">🔓 AI CAGE<br /><span class="text-xs font-normal">uncageText() — local</span></span>
+          <span class="mx-2 text-slate-400">←</span>
+          <span class="inline-block bg-blue-100 text-blue-800 px-3 py-2 rounded-lg font-semibold">👤 User<br /><span class="text-xs font-normal">sees original data</span></span>
+        </div>
+        <p class="text-center text-sm text-slate-500 mt-4">
+          PII never crosses the network boundary. The AI provider never sees your data.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 7 CAGES ═══ -->
+  <section id="cages" class="py-20 bg-slate-50">
+    <div class="max-w-5xl mx-auto px-4">
+      <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-4">The 7 Cages</h2>
+      <p class="text-center text-slate-600 mb-12 max-w-xl mx-auto">Seven threat surfaces. Six already caged. One in progress.</p>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Cage 1 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">💬</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 1: Chat Leak</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">PII in prompts sent to ChatGPT, Claude, Gemini. Replaced with tokens before network.</p>
+        </div>
+        <!-- Cage 2 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">👁️</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 2: Shadow AI</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">47 AI endpoints monitored. Notion, Slack, Grammarly calling AI behind your back.</p>
+        </div>
+        <!-- Cage 3 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">🤖</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 3: Agent Rogue</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">Prompt injection detection (15 types), tool policy engine, human-in-the-loop approval.</p>
+        </div>
+        <!-- Cage 4 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">💻</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 4: Code Leak</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">VS Code extension scans code for secrets before you paste to Copilot Chat.</p>
+        </div>
+        <!-- Cage 5 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">🎤</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 5: Voice/Video</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">Meeting transcript caging. Redacts participant names before upload to Otter.ai, Fireflies.</p>
+        </div>
+        <!-- Cage 6 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">🔑</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 6: Credential Hijack</h3>
+            <span class="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">⚡ Partial</span>
+          </div>
+          <p class="text-sm text-slate-600">API keys, .env files, passwords detected and caged. Covered by injection + PII detection.</p>
+        </div>
+        <!-- Cage 7 -->
+        <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-lg transition">
+          <div class="text-3xl mb-3">📋</div>
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold">Cage 7: Compliance</h3>
+            <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">✅ Live</span>
+          </div>
+          <p class="text-sm text-slate-600">Immutable audit log. CSV export for GDPR auditors. Tamper-evidence history.</p>
+        </div>
+        <!-- Summary -->
+        <div class="bg-cage-green-dark text-white rounded-xl p-6 flex flex-col justify-center">
+          <div class="text-3xl mb-3">📊</div>
+          <h3 class="font-bold text-lg mb-2">6 of 7 Cages Live</h3>
+          <p class="text-sm text-green-100">202 tests. 15 PII types. 15 injection types. 47 AI endpoints. 20 MCP tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PRICING ═══ -->
+  <section id="pricing" class="py-20 bg-white">
+    <div class="max-w-5xl mx-auto px-4">
+      <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-4">Pricing</h2>
+      <p class="text-center text-slate-600 mb-12 max-w-xl mx-auto">Start free. Upgrade when your team grows. Cancel anytime. Zero server cost for us means honest pricing for you.</p>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Free -->
+        <div class="bg-slate-50 rounded-2xl p-6 border-2 border-slate-200">
+          <div class="text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Free</div>
+          <div class="text-3xl font-extrabold mb-1">0€<span class="text-base font-normal text-slate-400">/month</span></div>
+          <p class="text-sm text-slate-500 mb-4">For individuals & small teams</p>
+          <ul class="text-sm text-slate-600 space-y-2 mb-6">
+            <li class="flex gap-2">✅ 15 PII types detected</li>
+            <li class="flex gap-2">✅ 100 cages / month</li>
+            <li class="flex gap-2">✅ Shadow AI detection</li>
+            <li class="flex gap-2">✅ Chrome + Firefox</li>
+            <li class="flex gap-2 text-slate-400">❌ Agent Cage</li>
+            <li class="flex gap-2 text-slate-400">❌ Audit CSV export</li>
+          </ul>
+          <a href="#" class="block text-center bg-slate-200 text-slate-800 py-2.5 rounded-lg font-semibold hover:bg-slate-300 transition text-sm">Install Free</a>
+        </div>
+
+        <!-- Pro -->
+        <div class="bg-cage-green-bg rounded-2xl p-6 border-2 border-cage-green relative">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-cage-green text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
+          <div class="text-sm font-bold text-cage-green-dark uppercase tracking-wide mb-1">Pro</div>
+          <div class="text-3xl font-extrabold mb-1">5€<span class="text-base font-normal text-slate-400">/user/mo</span></div>
+          <p class="text-sm text-slate-500 mb-4">For growing teams</p>
+          <ul class="text-sm text-slate-600 space-y-2 mb-6">
+            <li class="flex gap-2">✅ Everything in Free</li>
+            <li class="flex gap-2">✅ Unlimited cages</li>
+            <li class="flex gap-2">✅ Agent Cage + injection detection</li>
+            <li class="flex gap-2">✅ MCP monitoring</li>
+            <li class="flex gap-2">✅ Custom policy</li>
+            <li class="flex gap-2">✅ Audit CSV export</li>
+          </ul>
+          <a href="#" class="block text-center bg-cage-green text-white py-2.5 rounded-lg font-semibold hover:bg-cage-green-dark transition text-sm">Start Pro Trial</a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="bg-slate-50 rounded-2xl p-6 border-2 border-slate-200">
+          <div class="text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Enterprise</div>
+          <div class="text-3xl font-extrabold mb-1">15€<span class="text-base font-normal text-slate-400">/user/mo</span></div>
+          <p class="text-sm text-slate-500 mb-4">Min 10 seats</p>
+          <ul class="text-sm text-slate-600 space-y-2 mb-6">
+            <li class="flex gap-2">✅ Everything in Pro</li>
+            <li class="flex gap-2">✅ SSO (SAML/OIDC)</li>
+            <li class="flex gap-2">✅ SIEM connector</li>
+            <li class="flex gap-2">✅ Centralised policy</li>
+            <li class="flex gap-2">✅ Priority support</li>
+          </ul>
+          <a href="#" class="block text-center bg-slate-800 text-white py-2.5 rounded-lg font-semibold hover:bg-slate-900 transition text-sm">Contact Sales</a>
+        </div>
+
+        <!-- Compliance -->
+        <div class="bg-slate-50 rounded-2xl p-6 border-2 border-slate-200">
+          <div class="text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Compliance</div>
+          <div class="text-3xl font-extrabold mb-1">199€<span class="text-base font-normal text-slate-400">/mo flat</span></div>
+          <p class="text-sm text-slate-500 mb-4">Add-on for auditors</p>
+          <ul class="text-sm text-slate-600 space-y-2 mb-6">
+            <li class="flex gap-2">✅ GDPR Art. 30 reports</li>
+            <li class="flex gap-2">✅ SOC 2 evidence package</li>
+            <li class="flex gap-2">✅ Automated audit export</li>
+            <li class="flex gap-2">✅ Tamper-evidence log</li>
+          </ul>
+          <a href="#" class="block text-center bg-slate-200 text-slate-800 py-2.5 rounded-lg font-semibold hover:bg-slate-300 transition text-sm">Request Demo</a>
+        </div>
+      </div>
+
+      <p class="text-center text-sm text-slate-400 mt-8">
+        All plans: 100% local, zero network calls, open-source auditable. No credit card for Free tier.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ PRIVACY GUARANTEE ═══ -->
+  <section id="privacy" class="py-20 bg-cage-green-dark text-white">
+    <div class="max-w-3xl mx-auto px-4 text-center">
+      <div class="text-5xl mb-6">🔒</div>
+      <h2 class="text-3xl md:text-4xl font-extrabold mb-6">Privacy Guarantee</h2>
+      <blockquote class="text-xl md:text-2xl font-semibold mb-8 leading-relaxed">
+        "No data is sent to any server, including ours.<br />
+        All PII detection happens locally on your device.<br />
+        The code is open-source and auditable by any security engineer."
+      </blockquote>
+
+      <div class="grid md:grid-cols-3 gap-6 mt-12 text-left">
+        <div class="bg-white/10 rounded-xl p-6">
+          <div class="text-2xl mb-2">🔍</div>
+          <h3 class="font-bold mb-1">Verify Yourself</h3>
+          <p class="text-sm text-green-100">Grep for fetch/XHR in the source — zero matches in core.</p>
+        </div>
+        <div class="bg-white/10 rounded-xl p-6">
+          <div class="text-2xl mb-2">🧪</div>
+          <h3 class="font-bold mb-1">Automated Tests</h3>
+          <p class="text-sm text-green-100">202 tests including a security contract test that blocks commits with network calls.</p>
+        </div>
+        <div class="bg-white/10 rounded-xl p-6">
+          <div class="text-2xl mb-2">📋</div>
+          <h3 class="font-bold mb-1">Audit Ready</h3>
+          <p class="text-sm text-green-100">Export a CSV audit log for your GDPR auditor. No PII values stored — only counts and types.</p>
+        </div>
+      </div>
+
+      <a href="https://github.com/your-org/ai-cage/blob/main/docs/PRIVACY_GUARANTEE.md" class="inline-block mt-8 text-green-200 underline hover:text-white transition text-sm">
+        Read the full Privacy Guarantee →
+      </a>
+    </div>
+  </section>
+
+  <!-- ═══ CTA FINAL ═══ -->
+  <section class="py-20 bg-slate-50">
+    <div class="max-w-3xl mx-auto px-4 text-center">
+      <h2 class="text-3xl md:text-4xl font-extrabold mb-4">Your employees use Monster AI already.</h2>
+      <p class="text-lg text-slate-600 mb-8">You can't stop them. But you can cage the data. Install AI CAGE in 30 seconds.</p>
+      <div class="flex flex-wrap items-center justify-center gap-4">
+        <a href="#" class="bg-cage-green text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-cage-green-dark transition shadow-lg shadow-green-200">
+          🌐 Install for Chrome
+        </a>
+        <a href="#" class="bg-slate-800 text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-slate-900 transition">
+          🦊 Install for Firefox
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="bg-slate-900 text-slate-400 py-12">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="grid md:grid-cols-3 gap-8 mb-8">
+        <div>
+          <div class="flex items-center gap-2 font-bold text-white text-lg mb-3">
+            <span class="text-2xl">🔒</span> AI CAGE
+          </div>
+          <p class="text-sm">The first antivirus for AI. Cage The Monster AI. Use Monster AI. Leak Zero Data.</p>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-3 text-sm uppercase tracking-wide">Product</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#how" class="hover:text-white transition">How it works</a></li>
+            <li><a href="#cages" class="hover:text-white transition">7 Cages</a></li>
+            <li><a href="#pricing" class="hover:text-white transition">Pricing</a></li>
+            <li><a href="#privacy" class="hover:text-white transition">Privacy Guarantee</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-3 text-sm uppercase tracking-wide">Resources</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="https://github.com/your-org/ai-cage" class="hover:text-white transition">GitHub (MIT License)</a></li>
+            <li><a href="https://github.com/your-org/ai-cage/blob/main/docs/THREAT_MODEL.md" class="hover:text-white transition">Threat Model</a></li>
+            <li><a href="https://github.com/your-org/ai-cage/blob/main/SECURITY.md" class="hover:text-white transition">Security Policy</a></li>
+            <li><a href="https://github.com/your-org/ai-cage/blob/main/docs/PRIVACY_GUARANTEE.md" class="hover:text-white transition">Privacy Guarantee</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-slate-800 pt-6 text-center text-sm">
+        <p>🇹🇳 Made in Tunisia · 100% Offline · Open Source · MIT License · v0.4.5</p>
+        <p class="mt-2 text-xs text-slate-600">Built with zero budget. Maximum paranoia. Because your data deserves better than a Terms of Service.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

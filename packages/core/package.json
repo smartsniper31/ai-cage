@@ -1,6 +1,6 @@
 {
   "name": "@ai-cage/core",
-  "version": "0.3.0",
+  "version": "0.4.5",
   "description": "AI CAGE core: cageText / uncageText / agentCage / mcpMonitor — 100% local, zero network.",
   "type": "module",
   "main": "./dist/index.js",

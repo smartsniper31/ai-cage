@@ -535,6 +535,66 @@ const VERTEX_AI: AiEndpoint = {
 };
 
 // ---------------------------------------------------------------------------
+// E — AI Meeting / Transcription Services (Phase 4 — Cage 5)
+// ---------------------------------------------------------------------------
+
+const OTTER_AI: AiEndpoint = {
+  id: 'otter-ai',
+  name: 'Otter.ai',
+  category: 'saas-embedded',
+  riskLevel: 'critical',
+  patterns: [
+    /otter\.ai\/api\//i,
+    /api\.otter\.ai/i,
+    /otter\.ai\/v\d+\//i,
+  ],
+};
+
+const FIREFLIES_AI: AiEndpoint = {
+  id: 'fireflies-ai',
+  name: 'Fireflies.ai',
+  category: 'saas-embedded',
+  riskLevel: 'critical',
+  patterns: [
+    /fireflies\.ai\/api\//i,
+    /api\.fireflies\.ai/i,
+  ],
+};
+
+const READ_AI: AiEndpoint = {
+  id: 'read-ai',
+  name: 'Read.ai',
+  category: 'saas-embedded',
+  riskLevel: 'critical',
+  patterns: [
+    /read\.ai\/api\//i,
+    /api\.read\.ai/i,
+  ],
+};
+
+const TLDV_IO: AiEndpoint = {
+  id: 'tldv',
+  name: 'tl;dv',
+  category: 'saas-embedded',
+  riskLevel: 'high',
+  patterns: [
+    /tldv\.io\/api\//i,
+    /api\.tldv\.io/i,
+  ],
+};
+
+const FATHOM_VIDEO: AiEndpoint = {
+  id: 'fathom',
+  name: 'Fathom',
+  category: 'saas-embedded',
+  riskLevel: 'high',
+  patterns: [
+    /fathom\.video\/api\//i,
+    /api\.fathom\.video/i,
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // Master list — exported
 // ---------------------------------------------------------------------------
 
@@ -590,6 +650,12 @@ export const ALL_AI_ENDPOINTS: readonly AiEndpoint[] = [
   AWS_BEDROCK,
   AZURE_AI_STUDIO,
   VERTEX_AI,
+  // AI Meeting / Transcription (Cage 5)
+  OTTER_AI,
+  FIREFLIES_AI,
+  READ_AI,
+  TLDV_IO,
+  FATHOM_VIDEO,
 ];
 
 /**

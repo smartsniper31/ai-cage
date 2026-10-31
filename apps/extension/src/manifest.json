@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI CAGE — Enterprise AI Data Protection",
   "short_name": "AI CAGE",
-  "version": "0.3.0",
+  "version": "0.4.5",
   "description": "Cages PII. Detects Shadow AI. Blocks Agent Rogue attacks. Zero data leaves your device.",
 
   "permissions": [

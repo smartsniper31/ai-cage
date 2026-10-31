@@ -44,6 +44,8 @@ const TYPE_LABEL: Record<EntityType, string> = {
   DATE:           'DATE',
   PASSPORT:       'PASSPORT',
   GENERIC_SECRET: 'SECRET',
+  MEETING_TRANSCRIPT_MARKER: 'TRANSCRIPT',
+  MEETING_PARTICIPANT: 'PARTICIPANT',
 };
 
 /**

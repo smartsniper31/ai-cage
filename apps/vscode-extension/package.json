@@ -2,7 +2,7 @@
   "name": "ai-cage-vscode",
   "displayName": "AI CAGE — Code Leak Protection",
   "description": "Detects PII, secrets and credentials in your code before they leak to AI assistants. 100% local, zero network.",
-  "version": "0.3.0",
+  "version": "0.4.5",
   "publisher": "ai-cage",
   "icon": "icons/icon128.png",
   "engines": {
