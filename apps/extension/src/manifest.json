@@ -30,7 +30,9 @@
         "https://chatgpt.com/*",
         "https://claude.ai/*",
         "https://gemini.google.com/*",
-        "https://copilot.microsoft.com/*"
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://m365.cloud.microsoft/*"
       ],
       "js": ["content.js"],
       "run_at": "document_start",

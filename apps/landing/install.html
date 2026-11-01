@@ -111,6 +111,10 @@
       style="padding:14px 20px; border:none; background:none; font-weight:700; font-size:14px; color:#16a34a; border-bottom:3px solid #16a34a; cursor:pointer;">
       🌐 Google Chrome
     </button>
+    <button id="tab-edge" onclick="showBrowser('edge')"
+      style="padding:14px 20px; border:none; background:none; font-weight:600; font-size:14px; color:#64748b; border-bottom:3px solid transparent; cursor:pointer;">
+      🔷 Microsoft Edge
+    </button>
     <button id="tab-firefox" onclick="showBrowser('firefox')"
       style="padding:14px 20px; border:none; background:none; font-weight:600; font-size:14px; color:#64748b; border-bottom:3px solid transparent; cursor:pointer;">
       🦊 Firefox
@@ -276,6 +280,151 @@
 
     </div>
     <!-- end #guide-chrome -->
+
+    <!-- ====== EDGE GUIDE ====== -->
+    <div id="guide-edge" style="display:none;">
+
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px 18px; margin-bottom:28px; display:flex; gap:12px; align-items:center;">
+        <span style="font-size:24px;">🔷</span>
+        <div>
+          <strong>Great news — AI CAGE works on Edge out of the box!</strong><br/>
+          <span style="font-size:13px; color:#1d4ed8;">Microsoft Edge supports Chrome extensions natively. You use the same ZIP file — same 3 steps.</span>
+        </div>
+      </div>
+
+      <!-- Edge Step 1 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:0;">
+          <div class="step-badge">1</div>
+          <div class="step-line" style="height:180px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 style="font-size:19px; font-weight:800; margin:6px 0 6px;">Download the ZIP file</h2>
+          <p style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            Click the button below. The file <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:13px;">ai-cage-extension-chrome.zip</code> will download — it works for both Chrome and Edge.
+          </p>
+          <a href="https://github.com/smartsniper31/ai-cage/releases/download/v0.4.5/ai-cage-extension-chrome.zip"
+             download
+             style="display:inline-flex; align-items:center; gap:8px; background:#1d4ed8; color:white; padding:12px 22px; border-radius:10px; font-size:15px; font-weight:700; text-decoration:none;">
+            ⬇️ Download AI CAGE for Edge
+          </a>
+          <div class="screenshot" style="margin-top:16px; padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📁 What you will see in your Downloads folder:</div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+              <span style="font-size:28px;">🗜️</span>
+              <div>
+                <div style="font-weight:700; font-size:14px;">ai-cage-extension-chrome.zip</div>
+                <div style="font-size:12px; color:#64748b;">Compressed file · Works on Chrome AND Edge · ~80 KB</div>
+              </div>
+              <span style="margin-left:auto; background:#dbeafe; color:#1d4ed8; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700;">✓ Edge Compatible</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge Step 2 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge" style="background:#1d4ed8;">2</div>
+          <div class="step-line" style="height:260px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 style="font-size:19px; font-weight:800; margin:6px 0 6px;">Open Edge Extension Manager</h2>
+          <p style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            In Edge, paste this address in the address bar and press <strong>Enter</strong>:
+          </p>
+          <div style="background:#1e293b; color:#93c5fd; padding:12px 16px; border-radius:8px; font-family:monospace; font-size:15px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <span>edge://extensions</span>
+            <button onclick="navigator.clipboard.writeText('edge://extensions').then(()=>{ this.textContent='✓ Copied!'; setTimeout(()=>this.textContent='📋 Copy',1500); })"
+              style="background:#334155; color:white; border:none; padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+              📋 Copy
+            </button>
+          </div>
+          <div class="screenshot" style="padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📸 The page that opens looks like this:</div>
+            <div style="background:#1e3a5f; border-radius:8px; padding:10px 14px;">
+              <div style="background:#1e4080; height:28px; border-radius:6px; display:flex; align-items:center; padding:0 12px; gap:8px; margin-bottom:8px;">
+                <span style="color:#93c5fd; font-size:12px;">←  →  ↺</span>
+                <div style="background:#1d3461; flex:1; height:20px; border-radius:4px; display:flex; align-items:center; padding:0 8px;">
+                  <span style="color:#60a5fa; font-size:11px; font-family:monospace;">edge://extensions</span>
+                </div>
+              </div>
+              <div style="background:#1e293b; border-radius:6px; padding:12px;">
+                <div style="color:white; font-weight:700; font-size:14px; margin-bottom:8px;">Extensions</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="background:#334155; border-radius:4px; padding:4px 10px; color:#93c5fd; font-size:11px;">Developer mode</div>
+                  <div style="background:#1d4ed8; border-radius:999px; width:36px; height:20px; position:relative;">
+                    <div style="background:white; border-radius:50%; width:16px; height:16px; position:absolute; right:2px; top:2px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:8px; background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12px; color:#92400e; display:flex; gap:8px; align-items:flex-start;">
+              <span>⚠️</span>
+              <span>Enable <strong>Developer mode</strong> (toggle in the bottom-left corner in Edge). It turns blue when active.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge Step 3 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge" style="background:#1d4ed8;">3</div>
+          <div class="step-line" style="height:240px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 style="font-size:19px; font-weight:800; margin:6px 0 6px;">Load AI CAGE into Edge</h2>
+          <p style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            On the Extensions page, click <strong>"Load unpacked"</strong>. A window opens. Navigate to your <strong>Downloads</strong> folder, select the folder extracted from the ZIP, and click <strong>Select Folder</strong>.
+          </p>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; gap:8px; font-size:13px; color:#7f1d1d; align-items:flex-start;">
+            <span>💡</span>
+            <span><strong>Important:</strong> Unzip the file first. Right-click the ZIP → <em>"Extract All"</em> → OK. Then select the extracted folder.</span>
+          </div>
+          <div class="screenshot" style="padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📸 Click this button in Edge:</div>
+            <div style="background:#1e293b; border-radius:8px; padding:12px;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div style="background:#1d4ed8; color:white; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:700; cursor:default;">
+                  📂 Load unpacked
+                </div>
+                <div style="background:#374151; color:#9ca3af; padding:8px 14px; border-radius:6px; font-size:13px; cursor:default;">Pack extension</div>
+                <div style="background:#374151; color:#9ca3af; padding:8px 14px; border-radius:6px; font-size:13px; cursor:default;">Update</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge Step 4 — Done -->
+      <div style="display:flex; gap:16px;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge" style="background:#0ea5e9;">✓</div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 style="font-size:19px; font-weight:800; margin:6px 0 6px; color:#0ea5e9;">AI CAGE is installed on Edge!</h2>
+          <p style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            A 🔒 icon appears in your Edge toolbar. Go to <strong>chat.openai.com</strong> or <strong>copilot.microsoft.com</strong> — you will see the green banner: <em>"🔒 AI CAGE Active"</em>. Microsoft Copilot is now protected too.
+          </p>
+          <div style="background:#eff6ff; border:2px solid #1d4ed8; border-radius:12px; overflow:hidden;">
+            <div style="background:#1d4ed8; color:white; padding:8px 16px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span>🔒 AI CAGE Active</span>
+              <span style="margin-left:auto; background:#2563eb; padding:2px 10px; border-radius:99px; font-size:11px;">0 items caged</span>
+            </div>
+            <div style="padding:16px; font-size:13px; color:#1e40af;">
+              ✅ Your AI assistant is protected — on Chrome, Edge, <em>and</em> Microsoft Copilot.
+            </div>
+          </div>
+          <div style="margin-top:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 14px; font-size:12px; color:#166534; display:flex; gap:8px; align-items:flex-start;">
+            <span>💡</span>
+            <span><strong>Bonus:</strong> AI CAGE also protects <strong>Microsoft Copilot</strong> (copilot.microsoft.com) which is built into Edge. Your company's Microsoft 365 AI usage is now covered too.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- end #guide-edge -->
 
     <!-- ====== FIREFOX GUIDE ====== -->
     <div id="guide-firefox" style="display:none;">
@@ -513,7 +662,7 @@
 
     /* ── Browser tabs ── */
     function showBrowser(browser) {
-      ['chrome','firefox','desktop'].forEach(b => {
+      ['chrome','edge','firefox','desktop'].forEach(b => {
         const guide = document.getElementById('guide-' + b);
         const tab = document.getElementById('tab-' + b);
         if (guide) guide.style.display = b === browser ? 'block' : 'none';
@@ -526,19 +675,25 @@
 
       // Update main download button
       const urls = {
-        chrome: 'https://github.com/smartsniper31/ai-cage/releases/download/v0.4.5/ai-cage-extension-chrome.zip',
+        chrome:  'https://github.com/smartsniper31/ai-cage/releases/download/v0.4.5/ai-cage-extension-chrome.zip',
+        edge:    'https://github.com/smartsniper31/ai-cage/releases/download/v0.4.5/ai-cage-extension-chrome.zip',
         firefox: 'https://github.com/smartsniper31/ai-cage/releases/download/v0.4.5/ai-cage-extension-firefox.zip',
         desktop: 'https://github.com/smartsniper31/ai-cage/releases/tag/v0.4.5',
       };
       const labels = {
         chrome:  'Download AI CAGE for Chrome',
+        edge:    'Download AI CAGE for Edge',
         firefox: 'Download AI CAGE for Firefox',
         desktop: 'View all installers',
       };
-      document.getElementById('main-dl-btn').href = urls[browser];
-      document.getElementById('main-dl-btn').querySelector('span').textContent = labels[browser].replace('⬇️ ', '');
-      document.querySelector('#main-dl-btn span[id="dl-text"]') &&
-        (document.getElementById('dl-text').textContent = labels[browser].replace('⬇️ ', ''));
+      const mainBtn = document.getElementById('main-dl-btn');
+      if (mainBtn) {
+        mainBtn.href = urls[browser];
+        const sp = mainBtn.querySelector('span');
+        if (sp) sp.textContent = labels[browser];
+      }
+      const dlText = document.getElementById('dl-text');
+      if (dlText) dlText.textContent = labels[browser];
     }
 
     /* FAQ smooth open */
