@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI CAGE</title>
+  <style>
+    :root {
+      --green:      #16a34a;
+      --green-dark: #15803d;
+      --green-bg:   #f0fdf4;
+      --red:        #dc2626;
+      --red-bg:     #fef2f2;
+      --bg:         #f8fafc;
+      --surface:    #ffffff;
+      --text:       #0f172a;
+      --muted:      #64748b;
+      --border:     #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 360px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--green-dark);
+      color: #fff;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-icon { font-size: 20px; }
+    .header-title { font-size: 15px; font-weight: 700; }
+    .header-sub   { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+    .header-version { margin-left: auto; font-size: 10px; opacity: 0.65; }
+
+    /* ── Status pill ── */
+    .status-pill {
+      margin: 10px 12px 0;
+      background: var(--green-bg);
+      color: var(--green-dark);
+      border: 1px solid #bbf7d0;
+      border-radius: 9999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-top: 10px;
+      background: var(--surface);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active {
+      color: var(--green-dark);
+      border-bottom-color: var(--green-dark);
+    }
+    .tab-pane { padding: 10px 12px; }
+
+    /* ── Stats grid ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+    }
+    .stat-number.red { color: var(--red); }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Top sites ── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    #top-sites {
+      list-style: none;
+    }
+    #top-sites li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    #top-sites li:last-child { border-bottom: none; }
+    .site-name  { color: var(--text); }
+    .site-count { color: var(--green); font-weight: 700; font-size: 12px; }
+
+    /* ── Shadow AI list ── */
+    #shadow-list { list-style: none; }
+    .shadow-item {
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .shadow-item:last-child { border-bottom: none; }
+    .shadow-site { font-weight: 700; font-size: 12px; color: var(--red); }
+    .shadow-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    .shadow-detail { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px 0; line-height: 1.6; }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green-bg);
+    }
+    .footer-text { font-size: 10px; color: #166534; flex: 1; }
+    .export-btn {
+      background: var(--green-dark);
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .export-btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span class="header-icon" aria-hidden="true">🔒</span>
+    <div>
+      <div class="header-title">AI CAGE</div>
+      <div class="header-sub">Enterprise AI Data Protection</div>
+    </div>
+    <span class="header-version">v0.2.0</span>
+  </div>
+
+  <div class="status-pill" id="status-text">Loading…</div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn" id="tab-overview" role="tab" aria-selected="true">📊 Overview</button>
+    <button class="tab-btn" id="tab-shadow"   role="tab" aria-selected="false">👁️ Shadow AI</button>
+    <button class="tab-btn" id="tab-agent"    role="tab" aria-selected="false">🤖 Agent</button>
+  </div>
+
+  <!-- Overview pane -->
+  <div class="tab-pane" id="pane-overview">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="monthly-caged">—</div>
+        <div class="stat-label">Caged this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number red" id="monthly-shadow">—</div>
+        <div class="stat-label">Shadow AI calls</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="session-count">—</div>
+        <div class="stat-label">Caged this session</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="tab-count">—</div>
+        <div class="stat-label">Caged this tab</div>
+      </div>
+    </div>
+
+    <div class="section-label">Top AI Sites</div>
+    <ul id="top-sites"><li class="empty">No activity recorded yet.</li></ul>
+  </div>
+
+  <!-- Shadow AI pane -->
+  <div class="tab-pane" id="pane-shadow" style="display:none">
+    <p style="font-size:11px;color:#64748b;margin-bottom:8px;">
+      These SaaS tools made requests to AI APIs from your browser.
+      <strong>88% of AI traffic is invisible</strong> to most companies.
+    </p>
+    <ul id="shadow-list"><li class="empty">Loading…</li></ul>
+  </div>
+
+  <!-- Agent pane -->
+  <div class="tab-pane" id="pane-agent" style="display:none">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number red"   id="agent-blocked">—</div>
+        <div class="stat-label">Injections blocked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" style="color:#d97706" id="agent-exfil">—</div>
+        <div class="stat-label">Exfil attempts</div>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <div class="section-label">Recent Agent Events</div>
+      <ul id="agent-events" style="list-style:none;margin-top:4px"></ul>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:#64748b;line-height:1.5">
+      🤖 <strong>Cage 3: Agent Rogue</strong> monitors AI agent tool calls and
+      blocks prompt injection attacks before they execute.
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-text" aria-hidden="true">✅</span>
+    <span class="footer-text">Zero data leaves your device.</span>
+    <button class="export-btn" id="export-btn" title="Export audit log as CSV for your compliance auditor">
+      📄 Export CSV
+    </button>
+  </div>
+
+  <div id="watermark" style="display:none;padding:6px 12px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;text-align:center;border-top:1px solid #fde68a">
+    🔶 AI CAGE Free — 100 cages/month limit. <a href="#" id="upgrade-link" style="color:#92400e;text-decoration:underline">Upgrade to Pro</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

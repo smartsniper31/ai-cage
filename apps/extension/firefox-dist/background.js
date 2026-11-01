@@ -1,0 +1,796 @@
+(function() {
+  "use strict";
+  function summariseCaged(entities) {
+    return entities.map(({ placeholder, type, score }) => ({
+      placeholder,
+      type,
+      score
+    }));
+  }
+  const OPENAI = {
+    id: "openai",
+    name: "OpenAI (ChatGPT / GPT-4)",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.openai\.com\/v\d+\/(chat\/completions|completions|assistants|threads)/,
+      /api\.openai\.com/,
+      /chat\.openai\.com\/backend-api/,
+      /chatgpt\.com\/backend-api/
+    ]
+  };
+  const ANTHROPIC = {
+    id: "anthropic",
+    name: "Anthropic Claude",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.anthropic\.com\/v\d+\/messages/,
+      /api\.anthropic\.com/,
+      /claude\.ai\/api/
+    ]
+  };
+  const GOOGLE_GEMINI = {
+    id: "google-gemini",
+    name: "Google Gemini / PaLM",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /generativelanguage\.googleapis\.com/,
+      /gemini\.google\.com\/app\/api/,
+      /us-central1-aiplatform\.googleapis\.com/,
+      /aiplatform\.googleapis\.com\/v\d+\/projects/
+    ]
+  };
+  const MICROSOFT_COPILOT = {
+    id: "ms-copilot",
+    name: "Microsoft Copilot / Azure OpenAI",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /copilot\.microsoft\.com\/api/,
+      /sydney\.bing\.com\/sydney\/ChatHub/,
+      /openai\.azure\.com\/openai\/deployments/,
+      /\.openai\.azure\.com/
+    ]
+  };
+  const COHERE = {
+    id: "cohere",
+    name: "Cohere",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.cohere\.ai\/v\d+\/(generate|chat|summarize)/,
+      /api\.cohere\.ai/
+    ]
+  };
+  const MISTRAL = {
+    id: "mistral",
+    name: "Mistral AI",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.mistral\.ai\/v\d+\/(chat\/completions|completions)/,
+      /api\.mistral\.ai/
+    ]
+  };
+  const GROQ = {
+    id: "groq",
+    name: "Groq",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.groq\.com\/openai\/v\d+/,
+      /api\.groq\.com/
+    ]
+  };
+  const PERPLEXITY = {
+    id: "perplexity",
+    name: "Perplexity AI",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.perplexity\.ai\/chat\/completions/,
+      /www\.perplexity\.ai\/socket\.io/,
+      /perplexity\.ai\/api/
+    ]
+  };
+  const TOGETHER_AI = {
+    id: "together-ai",
+    name: "Together AI",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.together\.xyz\/v\d+\/completions/,
+      /api\.together\.ai/
+    ]
+  };
+  const REPLICATE = {
+    id: "replicate",
+    name: "Replicate",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.replicate\.com\/v\d+\/predictions/
+    ]
+  };
+  const GITHUB_COPILOT = {
+    id: "github-copilot",
+    name: "GitHub Copilot",
+    category: "dev-tool",
+    riskLevel: "critical",
+    patterns: [
+      /copilot-proxy\.githubusercontent\.com/,
+      /api\.githubcopilot\.com/,
+      /githubcopilot\.com/
+    ]
+  };
+  const CURSOR = {
+    id: "cursor",
+    name: "Cursor AI",
+    category: "dev-tool",
+    riskLevel: "critical",
+    patterns: [
+      /api2\.cursor\.sh/,
+      /\.cursor\.sh\/api/,
+      /cursor\.sh\/api/
+    ]
+  };
+  const CODEIUM = {
+    id: "codeium",
+    name: "Codeium",
+    category: "dev-tool",
+    riskLevel: "high",
+    patterns: [
+      /server\.codeium\.com/,
+      /web-backend\.codeium\.com/
+    ]
+  };
+  const TABNINE = {
+    id: "tabnine",
+    name: "Tabnine",
+    category: "dev-tool",
+    riskLevel: "high",
+    patterns: [
+      /api\.tabnine\.com/,
+      /\.tabnine\.com\/api/
+    ]
+  };
+  const NOTION_AI = {
+    id: "notion-ai",
+    name: "Notion AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /notion\.so\/api\/v3\/runInferenceModel/,
+      /notion\.so\/api\/v3\/getCompletion/,
+      /api\.notion\.com.*ai/i
+    ]
+  };
+  const SLACK_AI = {
+    id: "slack-ai",
+    name: "Slack AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /slack\.com\/api\/assistant\./,
+      /slack\.com\/api\/ai\./,
+      /slack\.com\/api\/canvases\.ai/
+    ]
+  };
+  const HUBSPOT_AI = {
+    id: "hubspot-ai",
+    name: "HubSpot AI (Content Assistant)",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api\.hubapi\.com\/ai/i,
+      /app\.hubspot\.com\/api.*copilot/i
+    ]
+  };
+  const SALESFORCE_EINSTEIN = {
+    id: "salesforce-einstein",
+    name: "Salesforce Einstein AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /\.salesforce\.com\/services\/data.*einstein/i,
+      /einstein\.salesforce\.com/,
+      /api\.salesforce\.com\/einstein/i
+    ]
+  };
+  const ZENDESK_AI = {
+    id: "zendesk-ai",
+    name: "Zendesk AI (Intelligent Triage)",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /\.zendesk\.com\/api\/v2\/macros\/suggest/,
+      /\.zendesk\.com\/api.*ai/i,
+      /zendesk\.com\/api\/v2\/tickets.*intelligent/i
+    ]
+  };
+  const INTERCOM_AI = {
+    id: "intercom-ai",
+    name: "Intercom Fin AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api-iam\.intercom\.io.*fin/i,
+      /api\.intercom\.io\/ai/i,
+      /api\.intercom\.io\/conversations.*ai/i
+    ]
+  };
+  const GRAMMARLY = {
+    id: "grammarly",
+    name: "Grammarly",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /capi\.grammarly\.com/,
+      /extension-api\.grammarly\.com/,
+      /\.grammarly\.com\/api/
+    ]
+  };
+  const JASPER_AI = {
+    id: "jasper-ai",
+    name: "Jasper AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api\.jasper\.ai/,
+      /app\.jasper\.ai\/api/
+    ]
+  };
+  const COPY_AI = {
+    id: "copy-ai",
+    name: "Copy.ai",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /api\.copy\.ai/,
+      /app\.copy\.ai\/api/
+    ]
+  };
+  const WRITESONIC = {
+    id: "writesonic",
+    name: "Writesonic",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /api\.writesonic\.com/
+    ]
+  };
+  const ZAPIER_AI = {
+    id: "zapier-ai",
+    name: "Zapier AI (Copilot)",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api\.zapier\.com.*ai/i,
+      /zapier\.com\/api.*copilot/i
+    ]
+  };
+  const MAKE_AI = {
+    id: "make-ai",
+    name: "Make (Integromat) AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api\.make\.com.*ai/i,
+      /eu1\.make\.com.*ai/i
+    ]
+  };
+  const MONDAY_AI = {
+    id: "monday-ai",
+    name: "Monday.com AI",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /api\.monday\.com.*ai/i,
+      /auth\.monday\.com.*ai/i
+    ]
+  };
+  const CLICKUP_AI = {
+    id: "clickup-ai",
+    name: "ClickUp AI",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /api\.clickup\.com.*ai/i,
+      /app\.clickup\.com\/api.*ai/i
+    ]
+  };
+  const JIRA_AI = {
+    id: "jira-ai",
+    name: "Jira / Atlassian Intelligence",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /api\.atlassian\.com.*intelligence/i,
+      /\.atlassian\.net\/gateway\/api\/assist/i
+    ]
+  };
+  const CONFLUENCE_AI = {
+    id: "confluence-ai",
+    name: "Confluence AI",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /\.atlassian\.net\/wiki\/api.*ai/i,
+      /api\.atlassian\.com.*confluence.*ai/i
+    ]
+  };
+  const GOOGLE_WORKSPACE_AI = {
+    id: "google-workspace-ai",
+    name: "Google Workspace AI (Duet)",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /docs\.googleapis\.com.*ai/i,
+      /workspaceevents\.googleapis\.com/,
+      /cloudaicompanion\.googleapis\.com/
+    ]
+  };
+  const MICROSOFT_365_AI = {
+    id: "ms365-copilot",
+    name: "Microsoft 365 Copilot",
+    category: "saas-embedded",
+    riskLevel: "critical",
+    patterns: [
+      /substrate\.office\.com.*copilot/i,
+      /api\.office\.com.*copilot/i,
+      /graph\.microsoft\.com.*copilot/i
+    ]
+  };
+  const ADOBE_FIREFLY = {
+    id: "adobe-firefly",
+    name: "Adobe Firefly / Sensei",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /firefly-api\.adobe\.io/,
+      /sensei\.adobe\.io/,
+      /stock\.adobe\.io.*ai/i
+    ]
+  };
+  const CANVA_AI = {
+    id: "canva-ai",
+    name: "Canva Magic AI",
+    category: "saas-embedded",
+    riskLevel: "medium",
+    patterns: [
+      /api\.canva\.com.*ai/i,
+      /canva\.com\/api.*magic/i
+    ]
+  };
+  const LANGCHAIN_SMITH = {
+    id: "langsmith",
+    name: "LangSmith (LangChain)",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /api\.smith\.langchain\.com/,
+      /eu\.api\.smith\.langchain\.com/
+    ]
+  };
+  const HELICONE = {
+    id: "helicone",
+    name: "Helicone AI Proxy",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /oai\.hconeai\.com/,
+      /api\.helicone\.ai/
+    ]
+  };
+  const PORTKEY_AI = {
+    id: "portkey",
+    name: "Portkey AI Gateway",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /api\.portkey\.ai/,
+      /portkey\.ai\/api/
+    ]
+  };
+  const OPENROUTER = {
+    id: "openrouter",
+    name: "OpenRouter",
+    category: "infra",
+    riskLevel: "critical",
+    patterns: [
+      /openrouter\.ai\/api/,
+      /api\.openrouter\.ai/
+    ]
+  };
+  const HUGGINGFACE = {
+    id: "huggingface",
+    name: "Hugging Face Inference API",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /api-inference\.huggingface\.co/,
+      /huggingface\.co\/api\/inference/i
+    ]
+  };
+  const AWS_BEDROCK = {
+    id: "aws-bedrock",
+    name: "AWS Bedrock",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /bedrock(-runtime)?\.[\w-]+\.amazonaws\.com/,
+      /bedrock\.amazonaws\.com/
+    ]
+  };
+  const AZURE_AI_STUDIO = {
+    id: "azure-ai-studio",
+    name: "Azure AI Studio",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /\.inference\.ml\.azure\.com/,
+      /\.api\.cognitive\.microsoft\.com/,
+      /language\.cognitive\.azure\.com/
+    ]
+  };
+  const VERTEX_AI = {
+    id: "vertex-ai",
+    name: "Google Vertex AI",
+    category: "infra",
+    riskLevel: "high",
+    patterns: [
+      /us-central1-aiplatform\.googleapis\.com/,
+      /[\w-]+-aiplatform\.googleapis\.com/,
+      /vertexai\.googleapis\.com/
+    ]
+  };
+  const OTTER_AI = {
+    id: "otter-ai",
+    name: "Otter.ai",
+    category: "saas-embedded",
+    riskLevel: "critical",
+    patterns: [
+      /otter\.ai\/api\//i,
+      /api\.otter\.ai/i,
+      /otter\.ai\/v\d+\//i
+    ]
+  };
+  const FIREFLIES_AI = {
+    id: "fireflies-ai",
+    name: "Fireflies.ai",
+    category: "saas-embedded",
+    riskLevel: "critical",
+    patterns: [
+      /fireflies\.ai\/api\//i,
+      /api\.fireflies\.ai/i
+    ]
+  };
+  const READ_AI = {
+    id: "read-ai",
+    name: "Read.ai",
+    category: "saas-embedded",
+    riskLevel: "critical",
+    patterns: [
+      /read\.ai\/api\//i,
+      /api\.read\.ai/i
+    ]
+  };
+  const TLDV_IO = {
+    id: "tldv",
+    name: "tl;dv",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /tldv\.io\/api\//i,
+      /api\.tldv\.io/i
+    ]
+  };
+  const FATHOM_VIDEO = {
+    id: "fathom",
+    name: "Fathom",
+    category: "saas-embedded",
+    riskLevel: "high",
+    patterns: [
+      /fathom\.video\/api\//i,
+      /api\.fathom\.video/i
+    ]
+  };
+  const ALL_AI_ENDPOINTS = [
+    // Critical — Direct LLM APIs
+    OPENAI,
+    ANTHROPIC,
+    GOOGLE_GEMINI,
+    MICROSOFT_COPILOT,
+    COHERE,
+    MISTRAL,
+    GROQ,
+    PERPLEXITY,
+    TOGETHER_AI,
+    REPLICATE,
+    // Developer tools
+    GITHUB_COPILOT,
+    CURSOR,
+    CODEIUM,
+    TABNINE,
+    // SaaS embedded AI
+    NOTION_AI,
+    SLACK_AI,
+    HUBSPOT_AI,
+    SALESFORCE_EINSTEIN,
+    ZENDESK_AI,
+    INTERCOM_AI,
+    GRAMMARLY,
+    JASPER_AI,
+    COPY_AI,
+    WRITESONIC,
+    ZAPIER_AI,
+    MAKE_AI,
+    MONDAY_AI,
+    CLICKUP_AI,
+    JIRA_AI,
+    CONFLUENCE_AI,
+    GOOGLE_WORKSPACE_AI,
+    MICROSOFT_365_AI,
+    ADOBE_FIREFLY,
+    CANVA_AI,
+    // Infrastructure
+    LANGCHAIN_SMITH,
+    HELICONE,
+    PORTKEY_AI,
+    OPENROUTER,
+    HUGGINGFACE,
+    AWS_BEDROCK,
+    AZURE_AI_STUDIO,
+    VERTEX_AI,
+    // AI Meeting / Transcription (Cage 5)
+    OTTER_AI,
+    FIREFLIES_AI,
+    READ_AI,
+    TLDV_IO,
+    FATHOM_VIDEO
+  ];
+  function matchAiEndpoint(url) {
+    return ALL_AI_ENDPOINTS.filter(
+      (endpoint) => endpoint.patterns.some((pattern) => pattern.test(url))
+    );
+  }
+  const LOG_KEY = "ai-cage:audit-log";
+  const COUNTER_KEY = "ai-cage:audit-id-counter";
+  async function logEvent(event, storage) {
+    const [rawLog, rawCounter] = await Promise.all([
+      storage.getItem(LOG_KEY),
+      storage.getItem(COUNTER_KEY)
+    ]);
+    const log = rawLog ? JSON.parse(rawLog) : { entries: [], version: 1 };
+    const id = rawCounter ? parseInt(rawCounter, 10) + 1 : 1;
+    const entry = {
+      id,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      ...event
+    };
+    log.entries.push(entry);
+    await Promise.all([
+      storage.setItem(LOG_KEY, JSON.stringify(log)),
+      storage.setItem(COUNTER_KEY, String(id))
+    ]);
+    return entry;
+  }
+  async function getAuditLog(storage) {
+    const raw = await storage.getItem(LOG_KEY);
+    if (!raw) return [];
+    const log = JSON.parse(raw);
+    return log.entries ?? [];
+  }
+  async function getAuditSummary(storage, fromDate, toDate) {
+    const entries = await getAuditLog(storage);
+    const from = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1);
+    const to = /* @__PURE__ */ new Date();
+    const inRange = entries.filter((e) => {
+      const t = new Date(e.timestamp);
+      return t >= from && t <= to;
+    });
+    let totalCaged = 0;
+    let totalShadowAi = 0;
+    const siteMap = /* @__PURE__ */ new Map();
+    const byType = {};
+    for (const e of inRange) {
+      byType[e.type] = (byType[e.type] ?? 0) + 1;
+      if (e.type === "PII_CAGED") {
+        totalCaged += e.totalCount;
+      }
+      if (e.type === "SHADOW_AI_DETECTED") {
+        totalShadowAi += e.totalCount;
+      }
+      siteMap.set(e.site, (siteMap.get(e.site) ?? 0) + e.totalCount);
+    }
+    const topSites = [...siteMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([site, count]) => ({ site, count }));
+    return { totalCaged, totalShadowAi, topSites, byType };
+  }
+  async function exportAuditLogCSV(storage) {
+    const entries = await getAuditLog(storage);
+    if (entries.length === 0) return "";
+    const allCountKeys = /* @__PURE__ */ new Set();
+    for (const e of entries) {
+      for (const k of Object.keys(e.counts)) {
+        allCountKeys.add(k);
+      }
+    }
+    const countCols = [...allCountKeys].sort();
+    const header = [
+      "id",
+      "timestamp",
+      "type",
+      "site",
+      "totalCount",
+      "detail",
+      ...countCols
+    ].join(",");
+    const rows = entries.map((e) => {
+      const base = [
+        e.id,
+        `"${e.timestamp}"`,
+        e.type,
+        `"${e.site}"`,
+        e.totalCount,
+        `"${(e.detail ?? "").replace(/"/g, '""')}"`
+      ];
+      const counts = countCols.map((k) => e.counts[k] ?? 0);
+      return [...base, ...counts].join(",");
+    });
+    return [header, ...rows].join("\n");
+  }
+  const chromeStorageAdapter = {
+    async getItem(key) {
+      const result = await chrome.storage.local.get(key);
+      const val = result[key];
+      return typeof val === "string" ? val : null;
+    },
+    async setItem(key, value) {
+      await chrome.storage.local.set({ [key]: value });
+    }
+  };
+  let sessionCageCount = 0;
+  let sessionShadowCount = 0;
+  const tabCageCounts = /* @__PURE__ */ new Map();
+  async function handleCageReport(msg, tabId) {
+    const count = msg.entities.length;
+    sessionCageCount += count;
+    tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
+    await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
+    const counts = {};
+    for (const e of msg.entities) {
+      counts[e.type] = (counts[e.type] ?? 0) + 1;
+    }
+    await logEvent(
+      {
+        type: "PII_CAGED",
+        site: msg.site,
+        counts,
+        totalCount: count
+      },
+      chromeStorageAdapter
+    );
+    const summary = summariseCaged(msg.entities);
+    console.warn(`[AI CAGE] 🔒 Caged ${count} item(s) on ${msg.site}:`, summary);
+  }
+  async function detectShadowAIRequest(details) {
+    var _a;
+    const matches = matchAiEndpoint(details.url);
+    if (matches.length === 0) return;
+    const initiator = details.initiator ?? "unknown";
+    sessionShadowCount += 1;
+    const counts = {};
+    for (const m of matches) {
+      counts[m.id] = (counts[m.id] ?? 0) + 1;
+    }
+    await logEvent(
+      {
+        type: "SHADOW_AI_DETECTED",
+        site: new URL(details.url).hostname,
+        counts,
+        totalCount: matches.length,
+        detail: `Initiated by: ${initiator} | Risk: ${((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown"}`
+      },
+      chromeStorageAdapter
+    );
+    console.warn(
+      `[AI CAGE] ⚠️ Shadow AI detected: ${details.url} from ${initiator}`,
+      matches.map((m) => m.name)
+    );
+    void updateGlobalBadge();
+  }
+  function registerShadowAiObserver() {
+    if (!chrome.webRequest) {
+      console.warn("[AI CAGE] webRequest API not available — Shadow AI detection disabled.");
+      return;
+    }
+    chrome.webRequest.onCompleted.addListener(
+      (details) => {
+        void detectShadowAIRequest(details);
+      },
+      { urls: ["<all_urls>"] },
+      ["responseHeaders"]
+    );
+  }
+  async function updateBadge(tabId, count) {
+    const text = count > 0 ? String(count) : "";
+    try {
+      await chrome.action.setBadgeText({ tabId, text });
+      await chrome.action.setBadgeBackgroundColor({ tabId, color: "#16a34a" });
+    } catch {
+    }
+  }
+  async function updateGlobalBadge() {
+    const total = sessionCageCount + sessionShadowCount;
+    const text = total > 0 ? String(total) : "";
+    try {
+      await chrome.action.setBadgeText({ text });
+      await chrome.action.setBadgeBackgroundColor({
+        color: sessionShadowCount > 0 ? "#dc2626" : "#16a34a"
+      });
+    } catch {
+    }
+  }
+  chrome.runtime.onMessage.addListener(
+    (message, sender, sendResponse) => {
+      var _a;
+      const msg = message;
+      if (msg.type === "CAGE_REPORT") {
+        const tabId = ((_a = sender.tab) == null ? void 0 : _a.id) ?? msg.tabId;
+        void handleCageReport(msg, tabId).then(() => {
+          sendResponse({ ok: true, sessionTotal: sessionCageCount });
+        });
+        return true;
+      }
+      if (msg.type === "GET_STATS") {
+        const tabId = msg.tabId ?? 0;
+        void getAuditSummary(chromeStorageAdapter).then((summary) => {
+          sendResponse({
+            sessionCageCount,
+            sessionShadowCount,
+            tabCount: tabCageCounts.get(tabId) ?? 0,
+            monthlyPiiCaged: summary.totalCaged,
+            monthlyShadowAi: summary.totalShadowAi,
+            topSites: summary.topSites
+          });
+        });
+        return true;
+      }
+      if (msg.type === "GET_SHADOW_LOG") {
+        void getAuditLog(chromeStorageAdapter).then((entries) => {
+          const shadowEntries = entries.filter((e) => e.type === "SHADOW_AI_DETECTED").slice(-100);
+          sendResponse({ entries: shadowEntries });
+        });
+        return true;
+      }
+      if (msg.type === "GET_AUDIT_LOG") {
+        void getAuditLog(chromeStorageAdapter).then((entries) => {
+          sendResponse({ entries: entries.slice(-200) });
+        });
+        return true;
+      }
+      if (msg.type === "EXPORT_AUDIT_CSV") {
+        void exportAuditLogCSV(chromeStorageAdapter).then((csv) => {
+          sendResponse({ csv });
+        });
+        return true;
+      }
+    }
+  );
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    tabCageCounts.delete(tabId);
+  });
+  registerShadowAiObserver();
+  void logEvent(
+    {
+      type: "EXTENSION_STARTED",
+      site: "background",
+      counts: {},
+      totalCount: 0
+    },
+    chromeStorageAdapter
+  );
+  console.warn("[AI CAGE] Background service worker v0.2.0 started. Cage 1 + Cage 2 active.");
+})();
