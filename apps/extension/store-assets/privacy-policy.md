@@ -41,7 +41,7 @@ AI CAGE does not use any third-party services. No analytics. No telemetry. No cr
 
 ## Open Source
 
-The entire codebase is published at https://github.com/your-org/ai-cage under the MIT license. Any security engineer can verify these claims by reading the source code.
+The entire codebase is published at https://github.com/smartsniper31/ai-cage under the MIT license. Any security engineer can verify these claims by reading the source code.
 
 ## Contact
 

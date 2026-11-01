@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Install AI CAGE — Step-by-Step Guide</title>
+  <meta name="description" content="Install AI CAGE in 3 minutes. Simple guide, no developer skills needed." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cage: {
+              green: '#16a34a',
+              'green-dark': '#15803d',
+              'green-bg': '#f0fdf4',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Step number badge */
+    .step-badge {
+      width: 40px; height: 40px; min-width: 40px;
+      background: #16a34a; color: white;
+      border-radius: 50%; font-weight: 800; font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* Connector line between steps */
+    .step-line {
+      width: 2px; background: #bbf7d0;
+      flex-shrink: 0; margin-left: 19px;
+    }
+    /* Screenshot placeholder */
+    .screenshot {
+      background: #f8fafc; border: 2px solid #e2e8f0;
+      border-radius: 12px; overflow: hidden;
+    }
+    /* Animated pulse on main CTA */
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
+      50% { box-shadow: 0 0 0 12px rgba(22,163,74,0); }
+    }
+    .btn-pulse { animation: pulse-green 2s infinite; }
+
+    /* Tab active */
+    .tab-btn.active { background: #16a34a; color: white; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900" style="font-family: system-ui, -apple-system, sans-serif;">
+
+  <!-- ─── NAVBAR ─── -->
+  <nav style="background:#15803d; color:white; padding:12px 20px; display:flex; align-items:center; gap:12px;">
+    <a href="index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:white;">
+      <span style="font-size:24px;">🔒</span>
+      <span style="font-weight:800;font-size:16px;">AI CAGE</span>
+    </a>
+    <span style="margin-left:auto;font-size:12px;opacity:0.8;">Installation Guide · v0.4.5</span>
+  </nav>
+
+  <!-- ─── HERO ─── -->
+  <div style="background:linear-gradient(135deg,#15803d,#16a34a); color:white; padding:40px 20px; text-align:center;">
+    <div style="font-size:48px; margin-bottom:12px;">🔒</div>
+    <h1 style="font-size:clamp(24px,5vw,36px); font-weight:800; margin-bottom:8px;">
+      Install AI CAGE in 3 minutes
+    </h1>
+    <p style="font-size:16px; opacity:0.9; max-width:520px; margin:0 auto 20px;">
+      No developer skills required. Follow the steps below.
+      Each step has a visual guide.
+    </p>
+    <!-- Language selector -->
+    <div style="display:inline-flex; border:1px solid rgba(255,255,255,0.3); border-radius:999px; overflow:hidden; margin-bottom:24px;">
+      <button id="btn-en" class="tab-btn active" onclick="setLang('en')"
+        style="padding:6px 18px; font-size:13px; font-weight:600; border:none; cursor:pointer; transition:all 0.2s;">
+        🇬🇧 English
+      </button>
+      <button id="btn-fr" class="tab-btn" onclick="setLang('fr')"
+        style="padding:6px 18px; font-size:13px; font-weight:600; border:none; cursor:pointer; transition:all 0.2s; background:rgba(255,255,255,0.15); color:white;">
+        🇫🇷 Français
+      </button>
+    </div>
+
+    <!-- Download button — THE main CTA -->
+    <div>
+      <a id="main-dl-btn"
+        href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-extension-chrome.zip"
+        download
+        class="btn-pulse"
+        style="display:inline-flex; align-items:center; gap:10px;
+               background:white; color:#15803d;
+               padding:16px 32px; border-radius:14px;
+               font-size:18px; font-weight:800;
+               text-decoration:none;
+               box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+        <span style="font-size:24px;">⬇️</span>
+        <span id="dl-text">Download AI CAGE for Chrome</span>
+      </a>
+      <p id="dl-sub" style="margin-top:10px; font-size:12px; opacity:0.75;">
+        ZIP file · Free · 100% secure · No sign-up required
+      </p>
+    </div>
+  </div>
+
+  <!-- ─── BROWSER TABS ─── -->
+  <div style="background:white; border-bottom:2px solid #e2e8f0; padding:0 16px; display:flex; gap:0; max-width:700px; margin:0 auto;">
+    <button id="tab-chrome" onclick="showBrowser('chrome')"
+      style="padding:14px 20px; border:none; background:none; font-weight:700; font-size:14px; color:#16a34a; border-bottom:3px solid #16a34a; cursor:pointer;">
+      🌐 Google Chrome
+    </button>
+    <button id="tab-firefox" onclick="showBrowser('firefox')"
+      style="padding:14px 20px; border:none; background:none; font-weight:600; font-size:14px; color:#64748b; border-bottom:3px solid transparent; cursor:pointer;">
+      🦊 Firefox
+    </button>
+    <button id="tab-desktop" onclick="showBrowser('desktop')"
+      style="padding:14px 20px; border:none; background:none; font-weight:600; font-size:14px; color:#64748b; border-bottom:3px solid transparent; cursor:pointer;">
+      🖥️ Desktop App
+    </button>
+  </div>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <div style="max-width:700px; margin:0 auto; padding:24px 16px 60px;">
+
+    <!-- ====== CHROME GUIDE ====== -->
+    <div id="guide-chrome">
+
+      <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px 18px; margin-bottom:28px; display:flex; gap:12px; align-items:center;">
+        <span style="font-size:24px;">✅</span>
+        <div>
+          <strong id="msg-title-chrome">Free installation — 3 steps only</strong><br/>
+          <span id="msg-sub-chrome" style="font-size:13px; color:#4b7c59;">No sign-up. No credit card. Works immediately.</span>
+        </div>
+      </div>
+
+      <!-- STEP 1 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:0;">
+          <div class="step-badge">1</div>
+          <div class="step-line" style="height:200px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 id="s1-title" style="font-size:19px; font-weight:800; margin:6px 0 6px;">Download the ZIP file</h2>
+          <p id="s1-desc" style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            Click the green button below. A file called
+            <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:13px;">ai-cage-extension-chrome.zip</code>
+            will download to your <strong>Downloads</strong> folder.
+          </p>
+          <a href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-extension-chrome.zip"
+             download
+             style="display:inline-flex; align-items:center; gap:8px;
+                    background:#16a34a; color:white;
+                    padding:12px 22px; border-radius:10px;
+                    font-size:15px; font-weight:700;
+                    text-decoration:none;">
+            ⬇️ <span id="s1-btn">Download now</span>
+          </a>
+          <!-- Screenshot mockup -->
+          <div class="screenshot" style="margin-top:16px; padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📁 What you will see in your Downloads folder:</div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+              <span style="font-size:28px;">🗜️</span>
+              <div>
+                <div style="font-weight:700; font-size:14px;">ai-cage-extension-chrome.zip</div>
+                <div style="font-size:12px; color:#64748b;">Compressed file · ~80 KB</div>
+              </div>
+              <span style="margin-left:auto; background:#dcfce7; color:#16a34a; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700;">✓ Safe</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge">2</div>
+          <div class="step-line" style="height:260px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 id="s2-title" style="font-size:19px; font-weight:800; margin:6px 0 6px;">Open Chrome Extension Manager</h2>
+          <p id="s2-desc" style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            In Chrome, paste this address in the address bar at the top and press <strong>Enter</strong>:
+          </p>
+          <div style="background:#1e293b; color:#7dd3fc; padding:12px 16px; border-radius:8px; font-family:monospace; font-size:15px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <span id="s2-url">chrome://extensions</span>
+            <button onclick="navigator.clipboard.writeText('chrome://extensions').then(()=>{ this.textContent='✓ Copied!'; setTimeout(()=>this.textContent='📋 Copy',1500); })"
+              style="background:#334155; color:white; border:none; padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+              📋 <span id="s2-copy">Copy</span>
+            </button>
+          </div>
+          <!-- Screenshot mockup -->
+          <div class="screenshot" style="padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📸 The page that opens looks like this:</div>
+            <div style="background:#3b4455; border-radius:8px; padding:10px 14px;">
+              <div style="background:#4b5563; height:28px; border-radius:6px; display:flex; align-items:center; padding:0 12px; gap:8px; margin-bottom:8px;">
+                <span style="color:#9ca3af; font-size:12px;">←  →  ↺</span>
+                <div style="background:#374151; flex:1; height:20px; border-radius:4px; display:flex; align-items:center; padding:0 8px;">
+                  <span style="color:#6ee7b7; font-size:11px; font-family:monospace;">chrome://extensions</span>
+                </div>
+              </div>
+              <div style="background:#1f2937; border-radius:6px; padding:12px;">
+                <div style="color:white; font-weight:700; font-size:14px; margin-bottom:8px;">Extensions</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="background:#374151; border-radius:4px; padding:4px 10px; color:#9ca3af; font-size:11px;">Developer mode</div>
+                  <div style="background:#16a34a; border-radius:999px; width:36px; height:20px; position:relative;">
+                    <div style="background:white; border-radius:50%; width:16px; height:16px; position:absolute; right:2px; top:2px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:8px; background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12px; color:#92400e; display:flex; gap:8px; align-items:flex-start;">
+              <span>⚠️</span>
+              <span id="s2-warning">Enable <strong>Developer Mode</strong> (toggle in the top-right corner). Just click it — it turns blue/green.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div style="display:flex; gap:16px; margin-bottom:0;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge">3</div>
+          <div class="step-line" style="height:280px;"></div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 id="s3-title" style="font-size:19px; font-weight:800; margin:6px 0 6px;">Load AI CAGE into Chrome</h2>
+          <p id="s3-desc" style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            On the Extensions page, click <strong>"Load unpacked"</strong>.
+            A window opens. Navigate to your <strong>Downloads</strong> folder,
+            select the folder you extracted from the ZIP, and click <strong>Select Folder</strong>.
+          </p>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; gap:8px; font-size:13px; color:#7f1d1d; align-items:flex-start;">
+            <span>💡</span>
+            <span id="s3-tip"><strong>Important:</strong> First unzip the file. Right-click the ZIP → <em>"Extract All"</em> → OK. Then select the extracted folder.</span>
+          </div>
+          <div class="screenshot" style="padding:12px;">
+            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">📸 Click this button:</div>
+            <div style="background:#1f2937; border-radius:8px; padding:12px;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div style="background:#16a34a; color:white; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:700; cursor:default;">
+                  📂 <span id="s3-load-btn">Load unpacked</span>
+                </div>
+                <div style="background:#374151; color:#9ca3af; padding:8px 14px; border-radius:6px; font-size:13px; cursor:default;">Pack extension</div>
+                <div style="background:#374151; color:#9ca3af; padding:8px 14px; border-radius:6px; font-size:13px; cursor:default;">Update</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 — Confirmation -->
+      <div style="display:flex; gap:16px;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div class="step-badge" style="background:#0ea5e9;">✓</div>
+        </div>
+        <div style="padding-bottom:24px; flex:1;">
+          <h2 id="s4-title" style="font-size:19px; font-weight:800; margin:6px 0 6px; color:#0ea5e9;">AI CAGE is installed!</h2>
+          <p id="s4-desc" style="color:#475569; font-size:14px; margin-bottom:16px; line-height:1.6;">
+            A 🔒 icon appears in your Chrome toolbar.
+            Go to <strong>chat.openai.com</strong> — you will see a green banner at the top:
+            <em>"🔒 AI CAGE Active"</em>. Your protection is live.
+          </p>
+          <div style="background:#f0fdf4; border:2px solid #16a34a; border-radius:12px; overflow:hidden;">
+            <div style="background:#15803d; color:white; padding:8px 16px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span>🔒 AI CAGE Active</span>
+              <span style="margin-left:auto; background:#16a34a; padding:2px 10px; border-radius:99px; font-size:11px;">0 items caged</span>
+            </div>
+            <div style="padding:16px; font-size:13px; color:#166534;">
+              ✅ <span id="s4-success">Your AI assistant is protected. Type normally — your data is automatically caged before sending.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- end #guide-chrome -->
+
+    <!-- ====== FIREFOX GUIDE ====== -->
+    <div id="guide-firefox" style="display:none;">
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:14px 18px; margin-bottom:28px; display:flex; gap:12px; align-items:center;">
+        <span style="font-size:24px;">🦊</span>
+        <div>
+          <strong id="ff-msg-title">Firefox Guide — Submission in progress</strong><br/>
+          <span id="ff-msg-sub" style="font-size:13px; color:#9a3412;">While waiting for the Firefox Add-ons listing, here is how to install manually.</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:16px; margin-bottom:24px;">
+        <div class="step-badge" style="margin-top:4px;">1</div>
+        <div>
+          <h3 id="ff-s1" style="font-size:18px; font-weight:800; margin:0 0 8px;">Download the Firefox version</h3>
+          <a href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-extension-firefox.zip"
+             download
+             style="display:inline-flex; align-items:center; gap:8px; background:#ea580c; color:white; padding:11px 20px; border-radius:10px; font-size:14px; font-weight:700; text-decoration:none;">
+            ⬇️ <span id="ff-dl-btn">Download for Firefox</span>
+          </a>
+        </div>
+      </div>
+      <div style="display:flex; gap:16px; margin-bottom:24px;">
+        <div class="step-badge" style="margin-top:4px;">2</div>
+        <div>
+          <h3 id="ff-s2-title" style="font-size:18px; font-weight:800; margin:0 0 8px;">Open the Firefox debug manager</h3>
+          <div style="background:#1e293b; color:#7dd3fc; padding:11px 16px; border-radius:8px; font-family:monospace; font-size:14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+            <span>about:debugging#/runtime/this-firefox</span>
+            <button onclick="navigator.clipboard.writeText('about:debugging#/runtime/this-firefox').then(()=>{ this.textContent='✓'; setTimeout(()=>this.textContent='📋',1500); })"
+              style="background:#334155; color:white; border:none; padding:4px 10px; border-radius:5px; cursor:pointer; font-size:12px;">📋</button>
+          </div>
+          <p id="ff-s2-desc" style="font-size:14px; color:#475569; line-height:1.6;">Click <strong>"Load Temporary Add-on"</strong> and select the downloaded ZIP file.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:16px;">
+        <div class="step-badge" style="background:#0ea5e9; margin-top:4px;">✓</div>
+        <div>
+          <h3 id="ff-s3-title" style="font-size:18px; font-weight:800; margin:0 0 8px; color:#0ea5e9;">Installed! Test it on ChatGPT</h3>
+          <p id="ff-s3-desc" style="font-size:14px; color:#475569; line-height:1.6;">Go to <strong>claude.ai</strong> or <strong>chat.openai.com</strong>. The green banner <em>"🔒 AI CAGE Active"</em> confirms you are protected.</p>
+        </div>
+      </div>
+    </div>
+    <!-- end #guide-firefox -->
+
+    <!-- ====== DESKTOP APP GUIDE ====== -->
+    <div id="guide-desktop" style="display:none;">
+      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:14px 18px; margin-bottom:28px; display:flex; gap:12px; align-items:center;">
+        <span style="font-size:24px;">🖥️</span>
+        <div>
+          <strong id="desk-msg-title">Desktop App — For Windows / macOS / Linux</strong><br/>
+          <span id="desk-msg-sub" style="font-size:13px; color:#0369a1;">Full tool with Agent Cage panel, Audit Log and Shadow AI.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:16px; margin-bottom:24px;">
+        <div class="step-badge" style="margin-top:4px;">1</div>
+        <div>
+          <h3 id="desk-s1" style="font-size:18px; font-weight:800; margin:0 0 8px;">Download the installer</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <a href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-desktop-windows.exe"
+               download
+               style="display:inline-flex; align-items:center; gap:6px; background:#1e40af; color:white; padding:11px 18px; border-radius:10px; font-size:13px; font-weight:700; text-decoration:none;">
+              🪟 Windows (.exe)
+            </a>
+            <a href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-desktop-macos.dmg"
+               download
+               style="display:inline-flex; align-items:center; gap:6px; background:#374151; color:white; padding:11px 18px; border-radius:10px; font-size:13px; font-weight:700; text-decoration:none;">
+              🍎 macOS (.dmg)
+            </a>
+            <a href="https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-desktop-linux.AppImage"
+               download
+               style="display:inline-flex; align-items:center; gap:6px; background:#374151; color:white; padding:11px 18px; border-radius:10px; font-size:13px; font-weight:700; text-decoration:none;">
+              🐧 Linux (.AppImage)
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:16px; margin-bottom:24px;">
+        <div class="step-badge" style="margin-top:4px;">2</div>
+        <div>
+          <h3 id="desk-s2" style="font-size:18px; font-weight:800; margin:0 0 8px;">Run the installer</h3>
+          <p id="desk-s2-desc" style="font-size:14px; color:#475569; line-height:1.6;">
+            Double-click the downloaded file. Click <strong>"Install"</strong> or <strong>"Open"</strong>
+            when prompted. The AI CAGE application opens automatically.
+          </p>
+          <div style="background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12px; color:#92400e; display:flex; gap:8px;">
+            <span>💡</span>
+            <span id="desk-tip"><strong>Windows:</strong> If a "Unknown app" alert appears, click <em>"More info"</em> then <em>"Run anyway"</em>. This is normal for open-source applications.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:16px;">
+        <div class="step-badge" style="background:#0ea5e9; margin-top:4px;">✓</div>
+        <div>
+          <h3 id="desk-s3" style="font-size:18px; font-weight:800; margin:0 0 8px; color:#0ea5e9;">The app is ready!</h3>
+          <p id="desk-s3-desc" style="font-size:14px; color:#475569; line-height:1.6;">Paste your text in the left panel, click <strong>"🔒 Cage PII"</strong>, then copy the result into ChatGPT. All your sensitive data is protected.</p>
+        </div>
+      </div>
+    </div>
+    <!-- end #guide-desktop -->
+
+    <!-- ─── FAQ ─── -->
+    <div style="margin-top:40px; border-top:2px solid #e2e8f0; padding-top:32px;">
+      <h2 id="faq-title" style="font-size:22px; font-weight:800; margin-bottom:20px;">❓ Frequently Asked Questions</h2>
+
+      <details style="border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+        <summary id="faq-q1" style="padding:14px 16px; font-weight:700; cursor:pointer; background:white; font-size:14px;">Does AI CAGE send my data anywhere?</summary>
+        <div id="faq-a1" style="padding:14px 16px; background:#f8fafc; font-size:14px; color:#475569; line-height:1.7; border-top:1px solid #e2e8f0;">
+          <strong>No. Never.</strong> All sensitive data detection happens inside your browser, on your own computer. No data leaves your device. AI CAGE has no servers. The full source code is public on GitHub for anyone to verify.
+        </div>
+      </details>
+
+      <details style="border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+        <summary id="faq-q2" style="padding:14px 16px; font-weight:700; cursor:pointer; background:white; font-size:14px;">Does it work without an internet connection?</summary>
+        <div id="faq-a2" style="padding:14px 16px; background:#f8fafc; font-size:14px; color:#475569; line-height:1.7; border-top:1px solid #e2e8f0;">
+          <strong>Yes, completely.</strong> The detection of sensitive data requires no internet connection. It uses only rules stored inside the extension itself.
+        </div>
+      </details>
+
+      <details style="border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+        <summary id="faq-q3" style="padding:14px 16px; font-weight:700; cursor:pointer; background:white; font-size:14px;">What types of data does it protect?</summary>
+        <div id="faq-a3" style="padding:14px 16px; background:#f8fafc; font-size:14px; color:#475569; line-height:1.7; border-top:1px solid #e2e8f0;">
+          AI CAGE protects: email addresses, credit card numbers, IBANs, Tunisian CIN, Matricule Fiscal, API keys, passwords, IP addresses, phone numbers, person names, passports, residence permits, and more — <strong>15 types of sensitive data</strong> in total.
+        </div>
+      </details>
+
+      <details style="border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+        <summary id="faq-q4" style="padding:14px 16px; font-weight:700; cursor:pointer; background:white; font-size:14px;">Is it free?</summary>
+        <div id="faq-a4" style="padding:14px 16px; background:#f8fafc; font-size:14px; color:#475569; line-height:1.7; border-top:1px solid #e2e8f0;">
+          <strong>Yes, the basic version is completely free.</strong> It protects 15 data types, up to 100 operations per month, and includes Shadow AI detection. A Pro version (€5/user/month) is available for teams with advanced needs.
+        </div>
+      </details>
+
+      <details style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+        <summary id="faq-q5" style="padding:14px 16px; font-weight:700; cursor:pointer; background:white; font-size:14px;">I have a problem. Who should I contact?</summary>
+        <div id="faq-a5" style="padding:14px 16px; background:#f8fafc; font-size:14px; color:#475569; line-height:1.7; border-top:1px solid #e2e8f0;">
+          Send an email to <a href="mailto:support@ai-cage.io" style="color:#16a34a; font-weight:700;">support@ai-cage.io</a> describing the problem. We respond within 24 hours.
+        </div>
+      </details>
+    </div>
+
+    <!-- ─── SUPPORT CTA ─── -->
+    <div style="margin-top:36px; background:linear-gradient(135deg,#15803d,#16a34a); color:white; border-radius:16px; padding:28px 24px; text-align:center;">
+      <div style="font-size:32px; margin-bottom:8px;">🤝</div>
+      <h2 id="support-title" style="font-size:20px; font-weight:800; margin-bottom:8px;">Need help?</h2>
+      <p id="support-desc" style="font-size:14px; opacity:0.9; margin-bottom:16px;">Our team responds within 24 hours. No question is too simple.</p>
+      <a href="mailto:support@ai-cage.io"
+         style="display:inline-block; background:white; color:#15803d; padding:12px 28px; border-radius:10px; font-weight:800; font-size:15px; text-decoration:none;">
+        ✉️ <span id="support-btn">Contact Support</span>
+      </a>
+    </div>
+
+  </div><!-- end main content -->
+
+  <!-- ─── FOOTER ─── -->
+  <footer style="background:#0f172a; color:#94a3b8; text-align:center; padding:20px 16px; font-size:12px;">
+    <p>🔒 AI CAGE v0.4.5 · <a href="index.html" style="color:#4ade80; text-decoration:none;">Home</a> · <a href="https://github.com/smartsniper31/ai-cage" style="color:#4ade80; text-decoration:none;">GitHub</a> · MIT License</p>
+    <p style="margin-top:6px; opacity:0.6;">🇹🇳 Made in Tunisia · 100% Offline · Open Source · Zero data sent</p>
+  </footer>
+
+  <script>
+    /* ── Language toggle ── */
+    const translations = {
+      fr: {
+        'dl-text': 'Télécharger AI CAGE pour Chrome',
+        'dl-sub': 'Fichier ZIP · Gratuit · 100% sécurisé · Aucune inscription requise',
+        's1-title': 'Téléchargez le fichier ZIP',
+        's1-desc': 'Cliquez sur le bouton vert ci-dessous. Un fichier appelé <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;">ai-cage-extension-chrome.zip</code> va se télécharger dans votre dossier <strong>Téléchargements</strong>.',
+        's1-btn': 'Télécharger maintenant',
+        's2-title': 'Ouvrez le gestionnaire d\'extensions Chrome',
+        's2-desc': 'Dans Chrome, copiez cette adresse dans la barre en haut et appuyez sur <strong>Entrée</strong> :',
+        's2-warning': 'Activez le <strong>Mode développeur</strong> (bouton en haut à droite). Il suffit de cliquer dessus — ça devient bleu/vert.',
+        's2-copy': 'Copier',
+        's3-title': 'Chargez AI CAGE dans Chrome',
+        's3-desc': 'Sur la page des Extensions, cliquez sur <strong>"Charger l\'extension non empaquetée"</strong> (ou "Load unpacked"). Une fenêtre s\'ouvre. Naviguez jusqu\'à votre dossier <strong>Téléchargements</strong>, sélectionnez le dossier extrait du ZIP et cliquez <strong>Sélectionner</strong>.',
+        's3-tip': '<strong>Important :</strong> Avant de cliquer, décompressez le ZIP d\'abord. Clic droit sur le fichier ZIP → <em>"Extraire tout"</em> → OK. Puis sélectionnez le dossier créé.',
+        's3-load-btn': 'Charger l\'extension non empaquetée',
+        's4-title': 'AI CAGE est installé !',
+        's4-desc': 'Une icône 🔒 apparaît dans votre barre d\'outils Chrome. Allez sur <strong>chat.openai.com</strong> — vous verrez un bandeau vert en haut : <em>"🔒 AI CAGE Active"</em>. Votre protection est active.',
+        's4-success': 'Votre assistant IA est protégé. Tapez normalement — vos données sont cagées automatiquement avant envoi.',
+        'faq-title': '❓ Questions fréquentes',
+        'support-title': 'Besoin d\'aide ?',
+        'support-desc': 'Notre équipe répond dans les 24h. Aucune question n\'est trop simple.',
+        'support-btn': 'Contacter le support',
+      },
+      en: {
+        'dl-text': 'Download AI CAGE for Chrome',
+        'dl-sub': 'ZIP file · Free · 100% secure · No sign-up required',
+        's1-title': 'Download the ZIP file',
+        's1-desc': 'Click the green button below. A file called <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;">ai-cage-extension-chrome.zip</code> will download to your <strong>Downloads</strong> folder.',
+        's1-btn': 'Download now',
+        's2-title': 'Open Chrome Extension Manager',
+        's2-desc': 'In Chrome, paste this address in the top bar and press <strong>Enter</strong>:',
+        's2-warning': 'Enable <strong>Developer Mode</strong> (toggle in the top right). Just click it — it turns blue/green.',
+        's2-copy': 'Copy',
+        's3-title': 'Load AI CAGE into Chrome',
+        's3-desc': 'On the Extensions page, click <strong>"Load unpacked"</strong>. A window opens. Navigate to your <strong>Downloads</strong> folder, select the folder you extracted from the ZIP and click <strong>Select</strong>.',
+        's3-tip': '<strong>Important:</strong> Before clicking, unzip the file first. Right-click the ZIP → <em>"Extract All"</em> → OK. Then select the extracted folder.',
+        's3-load-btn': 'Load unpacked',
+        's4-title': 'AI CAGE is installed!',
+        's4-desc': 'A 🔒 icon appears in your Chrome toolbar. Go to <strong>chat.openai.com</strong> — you will see a green banner: <em>"🔒 AI CAGE Active"</em>. Your protection is live.',
+        's4-success': 'Your AI assistant is protected. Type normally — your data is automatically caged before sending.',
+        'faq-title': '❓ Frequently Asked Questions',
+        'support-title': 'Need help?',
+        'support-desc': 'Our team responds within 24h. No question is too simple.',
+        'support-btn': 'Contact support',
+      }
+    };
+
+    function setLang(lang) {
+      document.getElementById('btn-en').className = lang === 'en' ? 'tab-btn active' : 'tab-btn';
+      document.getElementById('btn-fr').className = lang === 'fr' ? 'tab-btn active' : 'tab-btn';
+      document.getElementById('btn-en').style.background = lang === 'en' ? '#16a34a' : 'rgba(255,255,255,0.15)';
+      document.getElementById('btn-en').style.color = 'white';
+      document.getElementById('btn-fr').style.background = lang === 'fr' ? '#16a34a' : 'rgba(255,255,255,0.15)';
+      document.getElementById('btn-fr').style.color = 'white';
+
+      const t = translations[lang];
+      Object.entries(t).forEach(([id, html]) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+      });
+
+      const dlSpan = document.getElementById('dl-text');
+      if (dlSpan) dlSpan.textContent = lang === 'fr' ? 'Download AI CAGE for Chrome' : 'Download AI CAGE for Chrome';
+    }
+
+    /* Boot in English */
+    setLang('en');
+
+    /* ── Browser tabs ── */
+    function showBrowser(browser) {
+      ['chrome','firefox','desktop'].forEach(b => {
+        const guide = document.getElementById('guide-' + b);
+        const tab = document.getElementById('tab-' + b);
+        if (guide) guide.style.display = b === browser ? 'block' : 'none';
+        if (tab) {
+          tab.style.color = b === browser ? '#16a34a' : '#64748b';
+          tab.style.borderBottom = b === browser ? '3px solid #16a34a' : '3px solid transparent';
+          tab.style.fontWeight = b === browser ? '700' : '600';
+        }
+      });
+
+      // Update main download button
+      const urls = {
+        chrome: 'https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-extension-chrome.zip',
+        firefox: 'https://github.com/smartsniper31/ai-cage/releases/latest/download/ai-cage-extension-firefox.zip',
+        desktop: 'https://github.com/smartsniper31/ai-cage/releases/latest',
+      };
+      const labels = {
+        chrome:  'Download AI CAGE for Chrome',
+        firefox: 'Download AI CAGE for Firefox',
+        desktop: 'View all installers',
+      };
+      document.getElementById('main-dl-btn').href = urls[browser];
+      document.getElementById('main-dl-btn').querySelector('span').textContent = labels[browser].replace('⬇️ ', '');
+      document.querySelector('#main-dl-btn span[id="dl-text"]') &&
+        (document.getElementById('dl-text').textContent = labels[browser].replace('⬇️ ', ''));
+    }
+
+    /* FAQ smooth open */
+    document.querySelectorAll('details summary').forEach(s => {
+      s.addEventListener('click', () => {
+        const d = s.parentElement;
+        document.querySelectorAll('details').forEach(o => { if(o!==d) o.removeAttribute('open'); });
+      });
+    });
+  </script>
+</body>
+</html>
