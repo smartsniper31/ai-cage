@@ -392,6 +392,25 @@
     'button[class*="submit"]',
     'button[class*="Send"]'
   ];
+  function shareEntitiesWithPage(entities) {
+    window.postMessage({
+      type: "AI_CAGE_ENTITIES",
+      entities: entities.map((e) => ({
+        placeholder: e.placeholder,
+        originalValue: e.originalValue
+      }))
+    }, "*");
+  }
+  window.addEventListener("message", (event) => {
+    var _a, _b;
+    if (event.source !== window) return;
+    if (((_a = event.data) == null ? void 0 : _a.type) === "AI_CAGE_CAGED") {
+      updateBanner(sessionCageTotal, false);
+    }
+    if (((_b = event.data) == null ? void 0 : _b.type) === "AI_CAGE_RESTORED") {
+      updateBanner(sessionCageTotal, true);
+    }
+  });
   const sessionEntityMap = [];
   let sessionCageTotal = 0;
   function injectBanner() {
@@ -511,6 +530,7 @@
     writeText(el, cagedText);
     sessionEntityMap.push(entities);
     if (sessionEntityMap.length > 10) sessionEntityMap.shift();
+    shareEntitiesWithPage(entities);
     sessionCageTotal += totalCaged;
     updateBanner(sessionCageTotal, false);
     try {

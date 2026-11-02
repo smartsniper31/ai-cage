@@ -72,6 +72,24 @@ export default defineConfig({
           },
         });
 
+        // Build injected.ts — runs in PAGE context (not extension context)
+        // This intercepts fetch/XHR at the network level, bypassing React state
+        await build({
+          configFile: false,
+          resolve: { alias },
+          build: {
+            outDir: distDir,
+            emptyOutDir: false,
+            minify: false,
+            lib: {
+              entry: resolve(__dirname, 'src/injected.ts'),
+              name: 'AiCageInjected',
+              formats: ['iife'],
+              fileName: () => 'injected.js',
+            },
+          },
+        });
+
         // Copy static assets
         mkdirSync(distDir, { recursive: true });
 

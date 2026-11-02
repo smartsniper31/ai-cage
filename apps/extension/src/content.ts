@@ -143,6 +143,48 @@ const RESPONSE_SELECTORS: string[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PAGE SCRIPT INJECTION
+// Injects the fetch/XHR interceptor into the page's JavaScript context.
+// This bypasses the extension isolation and intercepts React's network calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function injectPageScript(): void {
+  try {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('injected.js');
+    script.onload = function () {
+      (this as HTMLScriptElement).remove();
+    };
+    (document.head || document.documentElement).appendChild(script);
+    console.warn('[AI CAGE] Page-context script injected.');
+  } catch (e) {
+    console.warn('[AI CAGE] Could not inject page script:', e);
+  }
+}
+
+// Share entities with the injected page script
+function shareEntitiesWithPage(entities: CagedEntity[]): void {
+  window.postMessage({
+    type: 'AI_CAGE_ENTITIES',
+    entities: entities.map((e) => ({
+      placeholder: e.placeholder,
+      originalValue: e.originalValue,
+    })),
+  }, '*');
+}
+
+// Listen for events from the injected page script
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+  if (event.data?.type === 'AI_CAGE_CAGED') {
+    updateBanner(sessionCageTotal, false);
+  }
+  if (event.data?.type === 'AI_CAGE_RESTORED') {
+    updateBanner(sessionCageTotal, true);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SESSION STATE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -291,6 +333,9 @@ function cagePrompt(el: HTMLElement): boolean {
   sessionEntityMap.push(entities);
   // Keep only last 10 interactions to avoid memory growth
   if (sessionEntityMap.length > 10) sessionEntityMap.shift();
+
+  // Share entities with the page-context script (for fetch/XHR interception)
+  shareEntitiesWithPage(entities);
 
   sessionCageTotal += totalCaged;
   updateBanner(sessionCageTotal, false);

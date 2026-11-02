@@ -78,10 +78,12 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "popup.html"
+        "popup.html",
+        "injected.js"
       ],
       "matches": [
-        "<all_urls>"
+        "https://*/*",
+        "http://*/*"
       ]
     }
   ],
