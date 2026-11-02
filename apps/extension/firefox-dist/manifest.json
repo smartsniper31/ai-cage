@@ -24,39 +24,25 @@
   "content_scripts": [
     {
       "matches": [
-        "https://chat.openai.com/*",
-        "https://chatgpt.com/*",
-        "https://claude.ai/*",
-        "https://gemini.google.com/*",
-        "https://copilot.microsoft.com/*",
-        "https://www.bing.com/chat*",
-        "https://m365.cloud.microsoft/*",
-        "https://copilot.cloud.microsoft/*",
-        "https://huggingface.co/chat*",
-        "https://chat.mistral.ai/*",
-        "https://groq.com/*",
-        "https://poe.com/*",
-        "https://perplexity.ai/*",
-        "https://www.perplexity.ai/*",
-        "https://pi.ai/*",
-        "https://you.com/*",
-        "https://phind.com/*",
-        "https://chat.deepseek.com/*",
-        "https://duckduckgo.com/*",
-        "https://cohere.com/*",
-        "https://coral.cohere.com/*",
-        "https://character.ai/*",
-        "https://www.character.ai/*",
-        "https://meta.ai/*",
-        "https://www.meta.ai/*",
-        "https://grok.x.com/*",
-        "https://x.com/i/grok*",
-        "https://kagi.com/*"
+        "<all_urls>"
+      ],
+      "exclude_matches": [
+        "chrome://*/*",
+        "chrome-extension://*/*",
+        "about://*/*",
+        "edge://*/*",
+        "moz-extension://*/*",
+        "https://mail.google.com/*",
+        "https://docs.google.com/*",
+        "https://sheets.google.com/*",
+        "https://drive.google.com/*",
+        "https://github.com/*",
+        "https://gitlab.com/*"
       ],
       "js": [
         "content.js"
       ],
-      "run_at": "document_start",
+      "run_at": "document_idle",
       "all_frames": false
     }
   ],

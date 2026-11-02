@@ -320,91 +320,94 @@
       totalCaged: entities.length
     };
   }
-  const BANNER_ID = "ai-cage-banner";
-  const CAGED_ATTR = "data-ai-cage-processed";
+  function uncageText(cagedResponse, entities) {
+    let result = cagedResponse;
+    for (const entity of entities) {
+      const escaped = entity.placeholder.replace(/[[\]]/g, "\\$&");
+      const pattern = new RegExp(escaped, "g");
+      result = result.replace(pattern, entity.originalValue);
+    }
+    return result;
+  }
+  const BANNER_ID = "ai-cage-banner-v2";
+  const CAGED_ATTR = "data-ai-cage-done";
   const PROMPT_SELECTORS = [
-    // ChatGPT (2024+) — contenteditable div
+    // ── ChatGPT / OpenAI (2023–2025+) ──────────────────────────────────────
     "#prompt-textarea",
-    "div#prompt-textarea",
-    // ChatGPT generic contenteditable
-    'div[contenteditable="true"][data-id]',
-    // Claude
-    'div[contenteditable="true"].ProseMirror',
-    // Gemini
+    "div#prompt-textarea[contenteditable]",
+    // ── Claude (Anthropic) ──────────────────────────────────────────────────
+    'div.ProseMirror[contenteditable="true"]',
+    // ── Gemini (Google) ─────────────────────────────────────────────────────
     "rich-textarea .ql-editor",
     'div.ql-editor[contenteditable="true"]',
-    // Mistral / Le Chat
-    'textarea[placeholder*="Envoyer" i]',
-    'textarea[placeholder*="Message" i]',
-    // Perplexity
-    'textarea[placeholder*="Ask" i]',
-    // Poe / Phind / generic
-    'textarea[data-testid*="chat" i]',
-    'textarea[data-testid*="input" i]',
-    // DeepSeek
-    "textarea#chat-input",
-    // Meta AI
-    'div[aria-label*="message" i][contenteditable="true"]',
-    // Grok (X/Twitter)
-    'div[data-testid="tweetTextarea_0"]',
-    // Copilot / Edge
+    // ── Copilot / Bing Chat / Edge ───────────────────────────────────────────
+    "textarea#searchbox",
     "cib-text-input textarea",
-    'textarea[id*="userInput"]',
-    // HuggingFace
-    'textarea[placeholder*="Type" i]',
-    // Generic fallbacks (last resort)
+    'div[class*="copilot"][contenteditable="true"]',
+    // ── Mistral / Le Chat ────────────────────────────────────────────────────
+    'textarea[placeholder*="Envoyer un message"]',
+    // ── Perplexity ──────────────────────────────────────────────────────────
+    'textarea[placeholder*="Ask anything"]',
+    'textarea[placeholder*="Search the internet"]',
+    // ── DeepSeek ────────────────────────────────────────────────────────────
+    "textarea#chat-input",
+    // ── Poe ─────────────────────────────────────────────────────────────────
+    'textarea[class*="GrowingTextArea"]',
+    // ── Meta AI ─────────────────────────────────────────────────────────────
+    'div[aria-label*="Message"][contenteditable="true"]',
+    // ── Grok (X/Twitter) ────────────────────────────────────────────────────
+    'div[data-testid="tweetTextarea_0"][contenteditable]',
+    // ── HuggingFace Chat ────────────────────────────────────────────────────
+    'textarea[placeholder*="Ask anything"]',
+    // ── Cohere / Coral ──────────────────────────────────────────────────────
+    'textarea[placeholder*="Send a message"]',
+    // ── You.com / Phind / Pi.ai ─────────────────────────────────────────────
+    'textarea[placeholder*="Type a message"]',
+    'textarea[placeholder*="Reply to"]',
+    // ── UNIVERSAL FALLBACKS (work on any AI not yet listed) ─────────────────
+    // Large contenteditable divs with aria attributes typical of chat
+    'div[contenteditable="true"][aria-multiline="true"]',
+    'div[contenteditable="true"][role="textbox"]',
     'div[contenteditable="true"][aria-label]',
-    'div[contenteditable="true"][aria-multiline]',
-    'textarea[placeholder*="chat" i]',
-    'div[contenteditable="true"]',
-    "textarea"
+    // Standard textarea (works on 90% of AI chat interfaces)
+    "textarea[rows]",
+    "textarea",
+    // Last resort contenteditable
+    'div[contenteditable="true"]'
   ];
-  const SEND_BUTTON_SELECTORS = [
-    // ChatGPT 2025
-    'button[data-testid="send-button"]',
-    'button[aria-label="Send prompt"]',
-    'button[aria-label="Send message"]',
-    // Claude
-    'button[aria-label="Send Message"]',
-    'button[data-testid="send-button"]',
-    // Gemini
-    'button[aria-label="Send message"]',
-    "button.send-button",
-    // Mistral
+  const SEND_SELECTORS = [
+    // Data attribute patterns
+    'button[data-testid*="send"]',
+    'button[data-testid*="submit"]',
+    // Aria label patterns
+    'button[aria-label*="Send"]',
+    'button[aria-label*="send"]',
+    'button[aria-label*="Submit"]',
+    'button[aria-label*="Envoyer"]',
+    'button[aria-label*="Soumettre"]',
+    // SVG arrow buttons near inputs
     'button[type="submit"]',
-    // Perplexity
-    'button[aria-label*="submit" i]',
-    // Copilot / Edge
-    'button[aria-label*="send" i]',
-    'button[aria-label*="envoyer" i]',
-    "cib-typing-indicator + div button",
-    // Poe
-    'button[class*="SendButton"]',
-    // Meta AI
-    'div[aria-label="Send"][role="button"]',
-    // Grok
-    'button[data-testid="tweetButton"]',
-    // Generic
-    'button[type="submit"]',
-    "form button:last-of-type"
+    // Class-based (common patterns)
+    'button[class*="send"]',
+    'button[class*="submit"]',
+    'button[class*="Send"]'
   ];
-  let sessionEntities = [];
+  const sessionEntityMap = [];
   let sessionCageTotal = 0;
   function injectBanner() {
     if (!document.body) return false;
     if (document.getElementById(BANNER_ID)) return true;
-    const banner = document.createElement("div");
-    banner.id = BANNER_ID;
-    banner.setAttribute("role", "status");
-    banner.setAttribute("aria-live", "polite");
-    banner.style.cssText = [
+    const b = document.createElement("div");
+    b.id = BANNER_ID;
+    b.setAttribute("role", "status");
+    b.style.cssText = [
       "position:fixed",
       "top:0",
       "left:0",
       "right:0",
       "z-index:2147483647",
       "background:#15803d",
-      "color:#ffffff",
+      "color:#fff",
       "font-family:system-ui,sans-serif",
       "font-size:13px",
       "font-weight:600",
@@ -413,43 +416,52 @@
       "align-items:center",
       "gap:8px",
       "box-shadow:0 2px 8px rgba(0,0,0,.25)",
-      "user-select:none"
+      "user-select:none",
+      "transition:background .3s"
     ].join(";");
-    banner.innerHTML = `
-    <span aria-hidden="true">🔒</span>
+    b.innerHTML = `
+    <span style="font-size:16px">🔒</span>
     <span>AI CAGE Active</span>
-    <span id="ai-cage-counter" style="margin-left:auto;opacity:.85;font-weight:400">
-      Ready to cage PII
+    <span id="ai-cage-ctr" style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">
+      Monitoring…
     </span>
   `;
     try {
-      document.body.prepend(banner);
+      document.body.prepend(b);
       return true;
     } catch {
       return false;
     }
   }
-  function updateBannerCounter(total) {
-    const counter = document.getElementById("ai-cage-counter");
-    if (counter) {
-      counter.textContent = total === 0 ? "Ready to cage PII" : total === 1 ? "1 item caged" : `${total} items caged`;
-      counter.style.color = total > 0 ? "#86efac" : "";
+  function updateBanner(caged, uncaged = false) {
+    const ctr = document.getElementById("ai-cage-ctr");
+    const banner = document.getElementById(BANNER_ID);
+    if (!ctr || !banner) return;
+    if (caged === 0) {
+      ctr.textContent = "Monitoring…";
+      banner.style.background = "#15803d";
+    } else if (uncaged) {
+      ctr.textContent = `${caged} item${caged > 1 ? "s" : ""} caged ✓ Restored`;
+      banner.style.background = "#0369a1";
+    } else {
+      ctr.textContent = `${caged} item${caged > 1 ? "s" : ""} caged — waiting for AI…`;
+      banner.style.background = "#b45309";
     }
   }
   function findPromptElement() {
-    for (const selector of PROMPT_SELECTORS) {
+    for (const sel of PROMPT_SELECTORS) {
       try {
-        const el = document.querySelector(selector);
-        if (el && isVisible(el)) return el;
+        const el = document.querySelector(sel);
+        if (el && isUsableInput(el)) return el;
       } catch {
       }
     }
     return null;
   }
-  function isVisible(el) {
+  function isUsableInput(el) {
     try {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
+      const r = el.getBoundingClientRect();
+      return r.width > 50 && r.height > 20;
     } catch {
       return false;
     }
@@ -458,51 +470,49 @@
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
       return el.value;
     }
-    return el.innerText ?? el.textContent ?? "";
+    return (el.innerText ?? el.textContent ?? "").trim();
   }
   function writeText(el, text) {
-    var _a, _b;
+    var _a;
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-      const start = el.selectionStart ?? text.length;
-      const end = el.selectionEnd ?? text.length;
-      const nativeInputValueSetter = ((_a = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        "value"
-      )) == null ? void 0 : _a.set) ?? ((_b = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value"
-      )) == null ? void 0 : _b.set);
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(el, text);
+      const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      const nativeSetter = (_a = Object.getOwnPropertyDescriptor(proto, "value")) == null ? void 0 : _a.set;
+      if (nativeSetter) {
+        nativeSetter.call(el, text);
       } else {
         el.value = text;
       }
-      el.setSelectionRange(start, end);
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
     } else {
       el.focus();
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      selection == null ? void 0 : selection.removeAllRanges();
-      selection == null ? void 0 : selection.addRange(range);
+      document.execCommand("selectAll", false);
       document.execCommand("insertText", false, text);
-      if (el.innerText !== text) {
+      if (readText(el) !== text) {
         el.innerText = text;
-        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
+        try {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(el);
+          range.collapse(false);
+          sel == null ? void 0 : sel.removeAllRanges();
+          sel == null ? void 0 : sel.addRange(range);
+        } catch {
+        }
       }
     }
   }
-  function interceptPrompt(el) {
-    const raw = readText(el).trim();
-    if (!raw) return false;
+  function cagePrompt(el) {
+    const raw = readText(el);
+    if (!raw || raw.length < 3) return false;
     const { cagedText, entities, totalCaged } = cageText(raw);
     if (totalCaged === 0) return false;
     writeText(el, cagedText);
-    sessionEntities = [...sessionEntities, ...entities];
+    sessionEntityMap.push(entities);
+    if (sessionEntityMap.length > 10) sessionEntityMap.shift();
     sessionCageTotal += totalCaged;
-    updateBannerCounter(sessionCageTotal);
+    updateBanner(sessionCageTotal, false);
     try {
       void chrome.runtime.sendMessage({
         type: "CAGE_REPORT",
@@ -512,64 +522,166 @@
       });
     } catch {
     }
-    console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) before send.`);
+    console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) on ${window.location.hostname}`);
     return true;
   }
+  function tryUncageNode(node) {
+    if (sessionEntityMap.length === 0) return false;
+    const allEntities = sessionEntityMap.flat();
+    if (allEntities.length === 0) return false;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const original = node.textContent ?? "";
+      if (!original.includes("[CAGED_")) return false;
+      const restored = uncageText(original, allEntities);
+      if (restored !== original) {
+        node.textContent = restored;
+        updateBanner(sessionCageTotal, true);
+        return true;
+      }
+    } else if (node instanceof Element) {
+      const html = node.innerHTML;
+      if (!html.includes("[CAGED_")) return false;
+      const restored = uncageText(html, allEntities);
+      if (restored !== html) {
+        node.innerHTML = restored;
+        updateBanner(sessionCageTotal, true);
+        return true;
+      }
+    }
+    return false;
+  }
+  function uncageSubtree(root) {
+    var _a;
+    if (sessionEntityMap.length === 0) return;
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode: (node2) => {
+          var _a2;
+          if (node2 instanceof Element) {
+            const tag = (_a2 = node2.tagName) == null ? void 0 : _a2.toLowerCase();
+            if (tag === "script" || tag === "style" || tag === "noscript") {
+              return NodeFilter.FILTER_REJECT;
+            }
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+    let node;
+    while ((node = walker.nextNode()) !== null) {
+      if (node.nodeType === Node.TEXT_NODE && ((_a = node.textContent) == null ? void 0 : _a.includes("[CAGED_"))) {
+        tryUncageNode(node);
+      }
+    }
+  }
+  const responseObserver = new MutationObserver((mutations) => {
+    var _a;
+    if (sessionEntityMap.length === 0) return;
+    for (const mutation of mutations) {
+      mutation.addedNodes.forEach((node) => {
+        var _a2, _b;
+        if (node.nodeType === Node.TEXT_NODE) {
+          if ((_a2 = node.textContent) == null ? void 0 : _a2.includes("[CAGED_")) {
+            tryUncageNode(node);
+          }
+        } else if (node instanceof Element) {
+          if ((_b = node.innerHTML) == null ? void 0 : _b.includes("[CAGED_")) {
+            uncageSubtree(node);
+          }
+        }
+      });
+      if (mutation.type === "characterData") {
+        const t = mutation.target;
+        if ((_a = t.textContent) == null ? void 0 : _a.includes("[CAGED_")) {
+          tryUncageNode(t);
+        }
+      }
+    }
+  });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey) return;
     const target = e.target;
-    const isPrompt = PROMPT_SELECTORS.some((sel) => {
+    const isInput = PROMPT_SELECTORS.some((sel) => {
       try {
-        return target.matches(sel) || target.closest(sel) !== null;
+        return target.matches(sel) || !!target.closest(sel);
       } catch {
         return false;
       }
     });
-    if (!isPrompt) return;
-    interceptPrompt(target);
+    if (!isInput) return;
+    cagePrompt(target);
   }, true);
-  function attachSendButtonListeners() {
-    for (const sel of SEND_BUTTON_SELECTORS) {
+  function hookSendButtons() {
+    for (const sel of SEND_SELECTORS) {
       document.querySelectorAll(sel).forEach((btn) => {
-        if (btn.getAttribute(CAGED_ATTR)) return;
-        btn.setAttribute(CAGED_ATTR, "true");
+        if (btn.getAttribute(CAGED_ATTR) === "1") return;
+        btn.setAttribute(CAGED_ATTR, "1");
         btn.addEventListener("click", () => {
           const prompt = findPromptElement();
-          if (prompt) interceptPrompt(prompt);
+          if (prompt) cagePrompt(prompt);
         }, true);
       });
     }
   }
-  const observer = new MutationObserver(() => {
-    attachSendButtonListeners();
-    if (!document.getElementById(BANNER_ID)) injectBanner();
-  });
   document.addEventListener("submit", (e) => {
     const form = e.target;
-    const textarea = form.querySelector(PROMPT_SELECTORS.join(","));
-    if (textarea) interceptPrompt(textarea);
+    const sel = PROMPT_SELECTORS.join(",");
+    try {
+      const input = form.querySelector(sel);
+      if (input) cagePrompt(input);
+    } catch {
+    }
   }, true);
+  let lastInputValue = "";
+  document.addEventListener("input", (e) => {
+    const target = e.target;
+    const isInput = PROMPT_SELECTORS.some((sel) => {
+      try {
+        return target.matches(sel) || !!target.closest(sel);
+      } catch {
+        return false;
+      }
+    });
+    if (!isInput) return;
+    const val = readText(target);
+    if (lastInputValue.length > 5 && val.length === 0) ;
+    lastInputValue = val;
+  }, true);
+  const domObserver = new MutationObserver(() => {
+    hookSendButtons();
+    if (!document.getElementById(BANNER_ID)) injectBanner();
+  });
   function boot() {
-    console.warn("[AI CAGE] Content script v0.4.5 booting on", window.location.hostname);
+    console.warn(`[AI CAGE] 🔒 Universal content script v0.4.5 active on ${window.location.hostname}`);
     if (!injectBanner()) {
-      const bodyWatcher = new MutationObserver(() => {
-        if (document.body && injectBanner()) {
-          bodyWatcher.disconnect();
-        }
+      const w = new MutationObserver(() => {
+        if (document.body && injectBanner()) w.disconnect();
       });
-      bodyWatcher.observe(document.documentElement, { childList: true });
+      w.observe(document.documentElement, { childList: true });
     }
     if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true });
+      domObserver.observe(document.body, { childList: true, subtree: true });
+      responseObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
     }
-    attachSendButtonListeners();
-    console.warn("[AI CAGE] 🔒 Active — intercepting prompts on", window.location.hostname);
+    hookSendButtons();
   }
   boot();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      attachSendButtonListeners();
+      hookSendButtons();
       if (!document.getElementById(BANNER_ID)) injectBanner();
+      if (!responseObserver) return;
+      responseObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
     });
   }
 })();
