@@ -323,151 +323,253 @@
   const BANNER_ID = "ai-cage-banner";
   const CAGED_ATTR = "data-ai-cage-processed";
   const PROMPT_SELECTORS = [
-    // ChatGPT
+    // ChatGPT (2024+) — contenteditable div
     "#prompt-textarea",
-    'textarea[data-id="root"]',
+    "div#prompt-textarea",
+    // ChatGPT generic contenteditable
+    'div[contenteditable="true"][data-id]',
     // Claude
     'div[contenteditable="true"].ProseMirror',
     // Gemini
     "rich-textarea .ql-editor",
-    // Copilot / generic fallback
-    'textarea[placeholder*="message" i]',
-    'textarea[placeholder*="prompt" i]',
+    'div.ql-editor[contenteditable="true"]',
+    // Mistral / Le Chat
+    'textarea[placeholder*="Envoyer" i]',
+    'textarea[placeholder*="Message" i]',
+    // Perplexity
+    'textarea[placeholder*="Ask" i]',
+    // Poe / Phind / generic
+    'textarea[data-testid*="chat" i]',
+    'textarea[data-testid*="input" i]',
+    // DeepSeek
+    "textarea#chat-input",
+    // Meta AI
+    'div[aria-label*="message" i][contenteditable="true"]',
+    // Grok (X/Twitter)
+    'div[data-testid="tweetTextarea_0"]',
+    // Copilot / Edge
+    "cib-text-input textarea",
+    'textarea[id*="userInput"]',
+    // HuggingFace
+    'textarea[placeholder*="Type" i]',
+    // Generic fallbacks (last resort)
+    'div[contenteditable="true"][aria-label]',
+    'div[contenteditable="true"][aria-multiline]',
+    'textarea[placeholder*="chat" i]',
+    'div[contenteditable="true"]',
     "textarea"
   ];
+  const SEND_BUTTON_SELECTORS = [
+    // ChatGPT 2025
+    'button[data-testid="send-button"]',
+    'button[aria-label="Send prompt"]',
+    'button[aria-label="Send message"]',
+    // Claude
+    'button[aria-label="Send Message"]',
+    'button[data-testid="send-button"]',
+    // Gemini
+    'button[aria-label="Send message"]',
+    "button.send-button",
+    // Mistral
+    'button[type="submit"]',
+    // Perplexity
+    'button[aria-label*="submit" i]',
+    // Copilot / Edge
+    'button[aria-label*="send" i]',
+    'button[aria-label*="envoyer" i]',
+    "cib-typing-indicator + div button",
+    // Poe
+    'button[class*="SendButton"]',
+    // Meta AI
+    'div[aria-label="Send"][role="button"]',
+    // Grok
+    'button[data-testid="tweetButton"]',
+    // Generic
+    'button[type="submit"]',
+    "form button:last-of-type"
+  ];
+  let sessionEntities = [];
+  let sessionCageTotal = 0;
   function injectBanner() {
-    if (document.getElementById(BANNER_ID)) return;
+    if (!document.body) return false;
+    if (document.getElementById(BANNER_ID)) return true;
     const banner = document.createElement("div");
     banner.id = BANNER_ID;
     banner.setAttribute("role", "status");
     banner.setAttribute("aria-live", "polite");
     banner.style.cssText = [
-      "position: fixed",
-      "top: 0",
-      "left: 0",
-      "right: 0",
-      "z-index: 2147483647",
-      "background: #15803d",
-      "color: #ffffff",
-      "font-family: system-ui, sans-serif",
-      "font-size: 13px",
-      "font-weight: 600",
-      "padding: 6px 16px",
-      "display: flex",
-      "align-items: center",
-      "gap: 8px",
-      "box-shadow: 0 2px 8px rgba(0,0,0,0.25)",
-      "user-select: none"
-    ].join("; ");
+      "position:fixed",
+      "top:0",
+      "left:0",
+      "right:0",
+      "z-index:2147483647",
+      "background:#15803d",
+      "color:#ffffff",
+      "font-family:system-ui,sans-serif",
+      "font-size:13px",
+      "font-weight:600",
+      "padding:6px 16px",
+      "display:flex",
+      "align-items:center",
+      "gap:8px",
+      "box-shadow:0 2px 8px rgba(0,0,0,.25)",
+      "user-select:none"
+    ].join(";");
     banner.innerHTML = `
     <span aria-hidden="true">🔒</span>
     <span>AI CAGE Active</span>
-    <span id="ai-cage-counter" style="margin-left:auto;opacity:0.85;font-weight:400">
-      0 items caged this session
+    <span id="ai-cage-counter" style="margin-left:auto;opacity:.85;font-weight:400">
+      Ready to cage PII
     </span>
   `;
-    document.body.prepend(banner);
+    try {
+      document.body.prepend(banner);
+      return true;
+    } catch {
+      return false;
+    }
   }
   function updateBannerCounter(total) {
     const counter = document.getElementById("ai-cage-counter");
     if (counter) {
-      counter.textContent = total === 1 ? "1 item caged" : `${String(total)} items caged`;
+      counter.textContent = total === 0 ? "Ready to cage PII" : total === 1 ? "1 item caged" : `${total} items caged`;
+      counter.style.color = total > 0 ? "#86efac" : "";
     }
   }
-  let sessionEntities = [];
-  let sessionCageTotal = 0;
   function findPromptElement() {
     for (const selector of PROMPT_SELECTORS) {
-      const el = document.querySelector(selector);
-      if (el && isVisible(el)) return el;
+      try {
+        const el = document.querySelector(selector);
+        if (el && isVisible(el)) return el;
+      } catch {
+      }
     }
     return null;
   }
   function isVisible(el) {
-    const rect = el.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    try {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    } catch {
+      return false;
+    }
   }
-  function readPromptText(el) {
+  function readText(el) {
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
       return el.value;
     }
-    return el.innerText;
+    return el.innerText ?? el.textContent ?? "";
   }
-  function writePromptText(el, text) {
+  function writeText(el, text) {
+    var _a, _b;
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
       const start = el.selectionStart ?? text.length;
       const end = el.selectionEnd ?? text.length;
-      el.value = text;
+      const nativeInputValueSetter = ((_a = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        "value"
+      )) == null ? void 0 : _a.set) ?? ((_b = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value"
+      )) == null ? void 0 : _b.set);
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(el, text);
+      } else {
+        el.value = text;
+      }
       el.setSelectionRange(start, end);
-      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
     } else {
-      el.innerText = text;
-      el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      el.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      selection == null ? void 0 : selection.removeAllRanges();
+      selection == null ? void 0 : selection.addRange(range);
+      document.execCommand("insertText", false, text);
+      if (el.innerText !== text) {
+        el.innerText = text;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     }
   }
   function interceptPrompt(el) {
-    const raw = readPromptText(el);
-    if (!raw.trim()) return false;
+    const raw = readText(el).trim();
+    if (!raw) return false;
     const { cagedText, entities, totalCaged } = cageText(raw);
     if (totalCaged === 0) return false;
-    writePromptText(el, cagedText);
+    writeText(el, cagedText);
     sessionEntities = [...sessionEntities, ...entities];
     sessionCageTotal += totalCaged;
     updateBannerCounter(sessionCageTotal);
-    void chrome.runtime.sendMessage({
-      type: "CAGE_REPORT",
-      tabId: 0,
-      entities
-    });
+    try {
+      void chrome.runtime.sendMessage({
+        type: "CAGE_REPORT",
+        tabId: 0,
+        site: window.location.hostname,
+        entities
+      });
+    } catch {
+    }
+    console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) before send.`);
     return true;
   }
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (event.key !== "Enter" || event.shiftKey) return;
-      const target = event.target;
-      const isPrompt = PROMPT_SELECTORS.some((sel) => target.matches(sel));
-      if (!isPrompt) return;
-      interceptPrompt(target);
-    },
-    true
-    // capture phase — run before page handlers
-  );
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const target = e.target;
+    const isPrompt = PROMPT_SELECTORS.some((sel) => {
+      try {
+        return target.matches(sel) || target.closest(sel) !== null;
+      } catch {
+        return false;
+      }
+    });
+    if (!isPrompt) return;
+    interceptPrompt(target);
+  }, true);
   function attachSendButtonListeners() {
-    const sendButtonSelectors = [
-      'button[data-testid="send-button"]',
-      'button[aria-label*="send" i]',
-      'button[aria-label*="envoyer" i]',
-      'button[type="submit"]'
-    ];
-    for (const selector of sendButtonSelectors) {
-      document.querySelectorAll(selector).forEach((btn) => {
+    for (const sel of SEND_BUTTON_SELECTORS) {
+      document.querySelectorAll(sel).forEach((btn) => {
         if (btn.getAttribute(CAGED_ATTR)) return;
         btn.setAttribute(CAGED_ATTR, "true");
-        btn.addEventListener(
-          "click",
-          () => {
-            const promptEl = findPromptElement();
-            if (promptEl) interceptPrompt(promptEl);
-          },
-          true
-          // capture
-        );
+        btn.addEventListener("click", () => {
+          const prompt = findPromptElement();
+          if (prompt) interceptPrompt(prompt);
+        }, true);
       });
     }
   }
   const observer = new MutationObserver(() => {
     attachSendButtonListeners();
+    if (!document.getElementById(BANNER_ID)) injectBanner();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener("submit", (e) => {
+    const form = e.target;
+    const textarea = form.querySelector(PROMPT_SELECTORS.join(","));
+    if (textarea) interceptPrompt(textarea);
+  }, true);
   function boot() {
-    injectBanner();
+    console.warn("[AI CAGE] Content script v0.4.5 booting on", window.location.hostname);
+    if (!injectBanner()) {
+      const bodyWatcher = new MutationObserver(() => {
+        if (document.body && injectBanner()) {
+          bodyWatcher.disconnect();
+        }
+      });
+      bodyWatcher.observe(document.documentElement, { childList: true });
+    }
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
     attachSendButtonListeners();
-    console.warn("[AI CAGE] Content script active. PII caging enabled.");
+    console.warn("[AI CAGE] 🔒 Active — intercepting prompts on", window.location.hostname);
   }
+  boot();
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
+    document.addEventListener("DOMContentLoaded", () => {
+      attachSendButtonListeners();
+      if (!document.getElementById(BANNER_ID)) injectBanner();
+    });
   }
 })();

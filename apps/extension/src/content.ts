@@ -1,26 +1,23 @@
+// Copyright (c) 2026 Frikha, Tunisia. All rights reserved.
+// AI CAGE — Enterprise AI Data Protection
+// Licensed under Business Source License 1.1 — see LICENSE
+// Commercial use: contact@ai-cage.io
+
 /**
  * @file content.ts
- * AI CAGE — Content Script injected into AI chat pages.
+ * AI CAGE — Content Script v0.4.5
  *
- * WHAT IT DOES:
- *   1. Injects the "🔒 AI CAGE Active" security banner into the page.
- *   2. Intercepts form submit & textarea keydown (Enter) to cage PII
- *      in the prompt before it is sent to the AI provider.
- *   3. Reports caged entities to background.ts (no original values sent —
- *      only the summarised metadata).
+ * CRITICAL FIX (Nov 2026):
+ *   - ChatGPT now uses div[contenteditable] not textarea for the prompt
+ *   - Intercept via MutationObserver on the full document to catch
+ *     all submit events regardless of element type
+ *   - Banner injection retried until document.body is ready
  *
- * SUPPORTED TARGETS (V1 — Cage 1: Chat Leak):
- *   - chat.openai.com (ChatGPT)
+ * SUPPORTED TARGETS:
+ *   - chat.openai.com / chatgpt.com (ChatGPT)
  *   - claude.ai (Anthropic Claude)
  *   - gemini.google.com (Google Gemini)
- *   - copilot.microsoft.com
- *
- * SECURITY CONTRACT:
- *   - cageText() runs LOCALLY in this script, BEFORE any network call.
- *   - The original text is never sent anywhere — only the caged version
- *     is written back into the input element.
- *   - The entities array (which contains original values) lives only in
- *     this script's closure and is cleared after uncaging the response.
+ *   - copilot.microsoft.com + bing.com/chat (Microsoft Copilot)
  */
 
 import { cageText, uncageText } from '@ai-cage/core';
@@ -30,251 +27,326 @@ import type { CagedEntity } from '@ai-cage/core';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BANNER_ID = 'ai-cage-banner';
-const CAGED_ATTR = 'data-ai-cage-processed';
+const BANNER_ID   = 'ai-cage-banner';
+const CAGED_ATTR  = 'data-ai-cage-processed';
 
 /**
- * CSS selectors for the prompt textarea on each supported platform.
- * Ordered by specificity — first match wins.
+ * Selectors for the prompt input — ordered by specificity.
+ * Covers ALL major AI chat platforms (2025+).
  */
 const PROMPT_SELECTORS = [
-  // ChatGPT
+  // ChatGPT (2024+) — contenteditable div
   '#prompt-textarea',
-  'textarea[data-id="root"]',
+  'div#prompt-textarea',
+  // ChatGPT generic contenteditable
+  'div[contenteditable="true"][data-id]',
   // Claude
   'div[contenteditable="true"].ProseMirror',
   // Gemini
   'rich-textarea .ql-editor',
-  // Copilot / generic fallback
-  'textarea[placeholder*="message" i]',
-  'textarea[placeholder*="prompt" i]',
+  'div.ql-editor[contenteditable="true"]',
+  // Mistral / Le Chat
+  'textarea[placeholder*="Envoyer" i]',
+  'textarea[placeholder*="Message" i]',
+  // Perplexity
+  'textarea[placeholder*="Ask" i]',
+  // Poe / Phind / generic
+  'textarea[data-testid*="chat" i]',
+  'textarea[data-testid*="input" i]',
+  // DeepSeek
+  'textarea#chat-input',
+  // Meta AI
+  'div[aria-label*="message" i][contenteditable="true"]',
+  // Grok (X/Twitter)
+  'div[data-testid="tweetTextarea_0"]',
+  // Copilot / Edge
+  'cib-text-input textarea',
+  'textarea[id*="userInput"]',
+  // HuggingFace
+  'textarea[placeholder*="Type" i]',
+  // Generic fallbacks (last resort)
+  'div[contenteditable="true"][aria-label]',
+  'div[contenteditable="true"][aria-multiline]',
+  'textarea[placeholder*="chat" i]',
+  'div[contenteditable="true"]',
   'textarea',
 ];
+
+/**
+ * Send button selectors — ALL major AI platforms.
+ */
+const SEND_BUTTON_SELECTORS = [
+  // ChatGPT 2025
+  'button[data-testid="send-button"]',
+  'button[aria-label="Send prompt"]',
+  'button[aria-label="Send message"]',
+  // Claude
+  'button[aria-label="Send Message"]',
+  'button[data-testid="send-button"]',
+  // Gemini
+  'button[aria-label="Send message"]',
+  'button.send-button',
+  // Mistral
+  'button[type="submit"]',
+  // Perplexity
+  'button[aria-label*="submit" i]',
+  // Copilot / Edge
+  'button[aria-label*="send" i]',
+  'button[aria-label*="envoyer" i]',
+  'cib-typing-indicator + div button',
+  // Poe
+  'button[class*="SendButton"]',
+  // Meta AI
+  'div[aria-label="Send"][role="button"]',
+  // Grok
+  'button[data-testid="tweetButton"]',
+  // Generic
+  'button[type="submit"]',
+  'form button:last-of-type',
+];
+
+// ---------------------------------------------------------------------------
+// Session state
+// ---------------------------------------------------------------------------
+
+let sessionEntities: CagedEntity[] = [];
+let sessionCageTotal = 0;
 
 // ---------------------------------------------------------------------------
 // Banner
 // ---------------------------------------------------------------------------
 
-/**
- * Injects the AI CAGE security banner at the top of the page.
- * Safe to call multiple times — idempotent.
- */
-function injectBanner(): void {
-  if (document.getElementById(BANNER_ID)) return;
+function injectBanner(): boolean {
+  if (!document.body) return false;
+  if (document.getElementById(BANNER_ID)) return true;
 
   const banner = document.createElement('div');
   banner.id = BANNER_ID;
   banner.setAttribute('role', 'status');
   banner.setAttribute('aria-live', 'polite');
   banner.style.cssText = [
-    'position: fixed',
-    'top: 0',
-    'left: 0',
-    'right: 0',
-    'z-index: 2147483647',
-    'background: #15803d',
-    'color: #ffffff',
-    'font-family: system-ui, sans-serif',
-    'font-size: 13px',
-    'font-weight: 600',
-    'padding: 6px 16px',
-    'display: flex',
-    'align-items: center',
-    'gap: 8px',
-    'box-shadow: 0 2px 8px rgba(0,0,0,0.25)',
-    'user-select: none',
-  ].join('; ');
+    'position:fixed', 'top:0', 'left:0', 'right:0',
+    'z-index:2147483647',
+    'background:#15803d', 'color:#ffffff',
+    'font-family:system-ui,sans-serif',
+    'font-size:13px', 'font-weight:600',
+    'padding:6px 16px',
+    'display:flex', 'align-items:center', 'gap:8px',
+    'box-shadow:0 2px 8px rgba(0,0,0,.25)',
+    'user-select:none',
+  ].join(';');
 
   banner.innerHTML = `
     <span aria-hidden="true">🔒</span>
     <span>AI CAGE Active</span>
-    <span id="ai-cage-counter" style="margin-left:auto;opacity:0.85;font-weight:400">
-      0 items caged this session
+    <span id="ai-cage-counter" style="margin-left:auto;opacity:.85;font-weight:400">
+      Ready to cage PII
     </span>
   `;
 
-  document.body.prepend(banner);
+  try {
+    document.body.prepend(banner);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Updates the session counter displayed in the banner.
- *
- * @param total - Running total of caged entities this page session.
- */
 function updateBannerCounter(total: number): void {
   const counter = document.getElementById('ai-cage-counter');
   if (counter) {
-    counter.textContent =
-      total === 1 ? '1 item caged' : `${String(total)} items caged`;
+    counter.textContent = total === 0
+      ? 'Ready to cage PII'
+      : total === 1 ? '1 item caged' : `${total} items caged`;
+    counter.style.color = total > 0 ? '#86efac' : '';
   }
 }
 
 // ---------------------------------------------------------------------------
-// Session state — lives only in this content script's memory
+// Prompt element finder
 // ---------------------------------------------------------------------------
 
-/** All entities caged during this page session, for potential uncaging. */
-let sessionEntities: CagedEntity[] = [];
-let sessionCageTotal = 0;
-
-// ---------------------------------------------------------------------------
-// Intercept helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Finds the active prompt input element on the page.
- *
- * @returns The textarea / contenteditable element, or null if not found.
- */
 function findPromptElement(): HTMLElement | null {
   for (const selector of PROMPT_SELECTORS) {
-    const el = document.querySelector<HTMLElement>(selector);
-    if (el && isVisible(el)) return el;
+    try {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el && isVisible(el)) return el;
+    } catch { /* invalid selector — skip */ }
   }
   return null;
 }
 
-/**
- * Returns true if an element is visible and interactable.
- */
 function isVisible(el: HTMLElement): boolean {
-  const rect = el.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
+  try {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Reads the current text value from a prompt element regardless of type.
- */
-function readPromptText(el: HTMLElement): string {
+function readText(el: HTMLElement): string {
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
     return el.value;
   }
-  return el.innerText;
+  // contenteditable div
+  return el.innerText ?? el.textContent ?? '';
 }
 
-/**
- * Writes caged text back into the prompt element.
- * Preserves caret position for textareas.
- */
-function writePromptText(el: HTMLElement, text: string): void {
+function writeText(el: HTMLElement, text: string): void {
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
     const start = el.selectionStart ?? text.length;
-    const end = el.selectionEnd ?? text.length;
-    el.value = text;
-    // Restore caret
+    const end   = el.selectionEnd   ?? text.length;
+
+    // Native input setter — needed for React synthetic events
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, 'value'
+    )?.set ?? Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    )?.set;
+
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(el, text);
+    } else {
+      el.value = text;
+    }
+
     el.setSelectionRange(start, end);
-    // Trigger React/Vue synthetic event
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
-    el.innerText = text;
-    el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    // contenteditable div — ChatGPT 2025+
+    el.focus();
+
+    // Select all content and replace
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.execCommand('insertText', false, text);
+
+    // Also set innerText as fallback
+    if (el.innerText !== text) {
+      el.innerText = text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
 }
 
-/**
- * Core interception: cage PII in the prompt element, then notify background.
- *
- * @param el - The prompt element to process.
- * @returns true if any PII was found and caged.
- */
+// ---------------------------------------------------------------------------
+// Core cage logic
+// ---------------------------------------------------------------------------
+
 function interceptPrompt(el: HTMLElement): boolean {
-  const raw = readPromptText(el);
-  if (!raw.trim()) return false;
+  const raw = readText(el).trim();
+  if (!raw) return false;
 
   const { cagedText, entities, totalCaged } = cageText(raw);
-
   if (totalCaged === 0) return false;
 
-  // Write sanitised text back — this is what reaches the AI provider
-  writePromptText(el, cagedText);
+  writeText(el, cagedText);
 
-  // Store entities for potential response uncaging
   sessionEntities = [...sessionEntities, ...entities];
   sessionCageTotal += totalCaged;
-
   updateBannerCounter(sessionCageTotal);
 
-  // Report to background (summary only — no original values)
-  void chrome.runtime.sendMessage({
-    type: 'CAGE_REPORT',
-    tabId: 0,
-    entities,
-  });
+  try {
+    void chrome.runtime.sendMessage({
+      type: 'CAGE_REPORT',
+      tabId: 0,
+      site: window.location.hostname,
+      entities,
+    });
+  } catch { /* extension context invalidated — safe to ignore */ }
 
+  console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) before send.`);
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// Event listeners
+// Event listeners — multiple strategies for maximum compatibility
 // ---------------------------------------------------------------------------
 
-/**
- * Intercept Enter key submissions in textareas.
- */
-document.addEventListener(
-  'keydown',
-  (event: KeyboardEvent) => {
-    // Shift+Enter = newline, not submit — skip
-    if (event.key !== 'Enter' || event.shiftKey) return;
+// Strategy 1: keydown Enter on the document (capture phase)
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
 
-    const target = event.target as HTMLElement;
-    const isPrompt = PROMPT_SELECTORS.some((sel) => target.matches(sel));
-    if (!isPrompt) return;
+  const target = e.target as HTMLElement;
 
-    interceptPrompt(target);
-    // We don't preventDefault — we let the submit happen with caged text
-  },
-  true, // capture phase — run before page handlers
-);
+  // Check if target IS or IS INSIDE a prompt element
+  const isPrompt = PROMPT_SELECTORS.some((sel) => {
+    try { return target.matches(sel) || target.closest(sel) !== null; }
+    catch { return false; }
+  });
 
-/**
- * Intercept form submissions for providers using button clicks.
- * We observe DOM mutations to attach to dynamically added send buttons.
- */
+  if (!isPrompt) return;
+  interceptPrompt(target);
+}, true);
+
+// Strategy 2: click on send buttons
 function attachSendButtonListeners(): void {
-  const sendButtonSelectors = [
-    'button[data-testid="send-button"]',
-    'button[aria-label*="send" i]',
-    'button[aria-label*="envoyer" i]',
-    'button[type="submit"]',
-  ];
-
-  for (const selector of sendButtonSelectors) {
-    document.querySelectorAll<HTMLButtonElement>(selector).forEach((btn) => {
+  for (const sel of SEND_BUTTON_SELECTORS) {
+    document.querySelectorAll<HTMLButtonElement>(sel).forEach((btn) => {
       if (btn.getAttribute(CAGED_ATTR)) return;
       btn.setAttribute(CAGED_ATTR, 'true');
-
-      btn.addEventListener(
-        'click',
-        () => {
-          const promptEl = findPromptElement();
-          if (promptEl) interceptPrompt(promptEl);
-        },
-        true, // capture
-      );
+      btn.addEventListener('click', () => {
+        const prompt = findPromptElement();
+        if (prompt) interceptPrompt(prompt);
+      }, true);
     });
   }
 }
 
-/** Re-scan for send buttons when the DOM changes (SPAs). */
+// Strategy 3: MutationObserver — handles SPAs where DOM changes dynamically
 const observer = new MutationObserver(() => {
   attachSendButtonListeners();
+  // Retry banner injection if body wasn't ready at boot
+  if (!document.getElementById(BANNER_ID)) injectBanner();
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
+// Strategy 4: form submit
+document.addEventListener('submit', (e: Event) => {
+  const form = e.target as HTMLFormElement;
+  const textarea = form.querySelector<HTMLElement>(PROMPT_SELECTORS.join(','));
+  if (textarea) interceptPrompt(textarea);
+}, true);
 
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
 function boot(): void {
-  injectBanner();
+  console.warn('[AI CAGE] Content script v0.4.5 booting on', window.location.hostname);
+
+  // Inject banner
+  if (!injectBanner()) {
+    // body not ready — wait
+    const bodyWatcher = new MutationObserver(() => {
+      if (document.body && injectBanner()) {
+        bodyWatcher.disconnect();
+      }
+    });
+    bodyWatcher.observe(document.documentElement, { childList: true });
+  }
+
+  // Start observing
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   attachSendButtonListeners();
-  console.warn('[AI CAGE] Content script active. PII caging enabled.');
+
+  console.warn('[AI CAGE] 🔒 Active — intercepting prompts on', window.location.hostname);
 }
 
+// Boot immediately regardless of readyState
+boot();
+
+// Also hook into page load events in case early boot missed something
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', boot);
-} else {
-  boot();
+  document.addEventListener('DOMContentLoaded', () => {
+    attachSendButtonListeners();
+    if (!document.getElementById(BANNER_ID)) injectBanner();
+  });
 }

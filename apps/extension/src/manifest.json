@@ -3,7 +3,7 @@
   "name": "AI CAGE — Enterprise AI Data Protection",
   "short_name": "AI CAGE",
   "version": "0.4.5",
-  "description": "Cages PII. Detects Shadow AI. Blocks Agent Rogue attacks. Zero data leaves your device.",
+  "description": "Cages PII. Detects Shadow AI. Blocks Agent Rogue attacks. Works on ALL AI chat platforms. Zero data leaves your device.",
 
   "permissions": [
     "activeTab",
@@ -19,8 +19,7 @@
   ],
 
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
 
   "content_scripts": [
@@ -32,7 +31,28 @@
         "https://gemini.google.com/*",
         "https://copilot.microsoft.com/*",
         "https://www.bing.com/chat*",
-        "https://m365.cloud.microsoft/*"
+        "https://m365.cloud.microsoft/*",
+        "https://copilot.cloud.microsoft/*",
+        "https://huggingface.co/chat*",
+        "https://chat.mistral.ai/*",
+        "https://groq.com/*",
+        "https://poe.com/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://pi.ai/*",
+        "https://you.com/*",
+        "https://phind.com/*",
+        "https://chat.deepseek.com/*",
+        "https://duckduckgo.com/*",
+        "https://cohere.com/*",
+        "https://coral.cohere.com/*",
+        "https://character.ai/*",
+        "https://www.character.ai/*",
+        "https://meta.ai/*",
+        "https://www.meta.ai/*",
+        "https://grok.x.com/*",
+        "https://x.com/i/grok*",
+        "https://kagi.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_start",
@@ -42,7 +62,7 @@
 
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AI CAGE — Protection stats",
+    "default_title": "AI CAGE — Click to see protection stats",
     "default_icon": {
       "16":  "icons/icon16.png",
       "32":  "icons/icon32.png",
