@@ -1,18 +1,18 @@
+// Copyright (c) 2026 Frikha, Tunisia. All rights reserved.
+// AI CAGE — Enterprise AI Data Protection
+// Licensed under Business Source License 1.1 — see LICENSE
+// Commercial use: contact@ai-cage.io
+
 /**
  * @file background.ts
- * AI CAGE — Chrome Extension MV3 Service Worker (background script).
+ * AI CAGE — MV3 Service Worker v0.4.5
  *
- * RESPONSIBILITIES (Phase 2):
- *   1. Count and badge PII caging events from content.ts (Cage 1)
- *   2. Detect Shadow AI — monitor outbound requests to known AI endpoints (Cage 2)
- *   3. Write an immutable local audit log to chrome.storage.local
- *   4. Serve stats to the popup on demand
- *
- * SECURITY CONTRACT:
- *   - Zero network calls initiated from this script.
- *   - Audit log never stores original PII values — only counts and types.
- *   - All state lives in chrome.storage.local (local device only, never synced).
- *   - chrome.storage.sync is intentionally NOT used.
+ * ÉTAPE 2 FIX:
+ *   - webRequest 'responseHeaders' removed (not available in MV3 Chrome)
+ *   - Use onBeforeRequest (works in MV3) for Shadow AI detection
+ *   - Graceful fallback if webRequest unavailable
+ *   - Badge shows AI CAGE icon correctly
+ *   - Version updated to 0.4.5
  */
 
 import { summariseCaged, matchAiEndpoint, logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV } from '@ai-cage/core';
@@ -119,15 +119,13 @@ async function handleCageReport(
  * Checks against the AI endpoint catalogue and logs silently.
  */
 async function detectShadowAIRequest(
-  details: chrome.webRequest.WebResponseHeadersDetails,
+  details: chrome.webRequest.WebResponseHeadersDetails | chrome.webRequest.WebRequestBodyDetails,
 ): Promise<void> {
-  const matches = matchAiEndpoint(details.url);
+  const url = (details as { url: string }).url;
+  const matches = matchAiEndpoint(url);
   if (matches.length === 0) return;
 
-  // Only log if NOT one of our approved AI cages (chat.openai.com
-  // accessed via content script is expected — we cage before sending)
-  const initiator = details.initiator ?? 'unknown';
-
+  const initiator = (details as { initiator?: string }).initiator ?? 'unknown';
   sessionShadowCount += 1;
 
   const counts: Record<string, number> = {};
@@ -135,10 +133,14 @@ async function detectShadowAIRequest(
     counts[m.id] = (counts[m.id] ?? 0) + 1;
   }
 
+  // Safe hostname extraction without DOM URL API
+  const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
+  const hostname = hostnameMatch?.[1] ?? url;
+
   await logEvent(
     {
       type: 'SHADOW_AI_DETECTED',
-      site: new URL(details.url).hostname,
+      site: hostname,
       counts,
       totalCount: matches.length,
       detail: `Initiated by: ${initiator} | Risk: ${matches[0]?.riskLevel ?? 'unknown'}`,
@@ -147,17 +149,18 @@ async function detectShadowAIRequest(
   );
 
   console.warn(
-    `[AI CAGE] ⚠️ Shadow AI detected: ${details.url} from ${initiator}`,
+    `[AI CAGE] ⚠️ Shadow AI detected: ${url} from ${initiator}`,
     matches.map((m) => m.name),
   );
 
-  // Update the global badge with both counts
   void updateGlobalBadge();
 }
 
 /**
  * Register the webRequest listener for Shadow AI detection.
- * Monitors ALL URLs — the matchAiEndpoint() filter runs locally.
+ * MV3 FIX: Use onBeforeRequest (works in MV3) instead of onCompleted
+ * with 'responseHeaders' (not available in MV3 Chrome).
+ * Graceful fallback if webRequest API unavailable.
  */
 function registerShadowAiObserver(): void {
   if (!chrome.webRequest) {
@@ -165,11 +168,17 @@ function registerShadowAiObserver(): void {
     return;
   }
 
-  chrome.webRequest.onCompleted.addListener(
-    (details) => { void detectShadowAIRequest(details); },
-    { urls: ['<all_urls>'] },
-    ['responseHeaders'],
-  );
+  try {
+    // onBeforeRequest works in MV3 — no 'responseHeaders' needed for URL matching
+    chrome.webRequest.onBeforeRequest.addListener(
+      (details) => { void detectShadowAIRequest(details as chrome.webRequest.WebResponseHeadersDetails); },
+      { urls: ['<all_urls>'] },
+      // No extra_info_spec — avoid 'responseHeaders' which fails in MV3
+    );
+    console.warn('[AI CAGE] Shadow AI webRequest observer registered (MV3 compatible).');
+  } catch (err) {
+    console.warn('[AI CAGE] Shadow AI webRequest registration failed:', err);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -24,20 +24,30 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "https://*/*",
+        "http://*/*"
       ],
       "exclude_matches": [
-        "chrome://*/*",
-        "chrome-extension://*/*",
-        "about://*/*",
-        "edge://*/*",
-        "moz-extension://*/*",
         "https://mail.google.com/*",
         "https://docs.google.com/*",
         "https://sheets.google.com/*",
+        "https://slides.google.com/*",
         "https://drive.google.com/*",
+        "https://calendar.google.com/*",
         "https://github.com/*",
-        "https://gitlab.com/*"
+        "https://gitlab.com/*",
+        "https://stackoverflow.com/*",
+        "https://youtube.com/*",
+        "https://www.youtube.com/*",
+        "https://twitter.com/*",
+        "https://x.com/*",
+        "https://facebook.com/*",
+        "https://instagram.com/*",
+        "https://linkedin.com/*",
+        "https://amazon.com/*",
+        "https://www.amazon.com/*",
+        "https://wikipedia.org/*",
+        "https://en.wikipedia.org/*"
       ],
       "js": [
         "content.js"

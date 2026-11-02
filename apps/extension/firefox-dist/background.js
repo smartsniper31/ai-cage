@@ -677,7 +677,8 @@
   }
   async function detectShadowAIRequest(details) {
     var _a;
-    const matches = matchAiEndpoint(details.url);
+    const url = details.url;
+    const matches = matchAiEndpoint(url);
     if (matches.length === 0) return;
     const initiator = details.initiator ?? "unknown";
     sessionShadowCount += 1;
@@ -685,10 +686,12 @@
     for (const m of matches) {
       counts[m.id] = (counts[m.id] ?? 0) + 1;
     }
+    const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
+    const hostname = (hostnameMatch == null ? void 0 : hostnameMatch[1]) ?? url;
     await logEvent(
       {
         type: "SHADOW_AI_DETECTED",
-        site: new URL(details.url).hostname,
+        site: hostname,
         counts,
         totalCount: matches.length,
         detail: `Initiated by: ${initiator} | Risk: ${((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown"}`
@@ -696,7 +699,7 @@
       chromeStorageAdapter
     );
     console.warn(
-      `[AI CAGE] ⚠️ Shadow AI detected: ${details.url} from ${initiator}`,
+      `[AI CAGE] ⚠️ Shadow AI detected: ${url} from ${initiator}`,
       matches.map((m) => m.name)
     );
     void updateGlobalBadge();
@@ -706,13 +709,18 @@
       console.warn("[AI CAGE] webRequest API not available — Shadow AI detection disabled.");
       return;
     }
-    chrome.webRequest.onCompleted.addListener(
-      (details) => {
-        void detectShadowAIRequest(details);
-      },
-      { urls: ["<all_urls>"] },
-      ["responseHeaders"]
-    );
+    try {
+      chrome.webRequest.onBeforeRequest.addListener(
+        (details) => {
+          void detectShadowAIRequest(details);
+        },
+        { urls: ["<all_urls>"] }
+        // No extra_info_spec — avoid 'responseHeaders' which fails in MV3
+      );
+      console.warn("[AI CAGE] Shadow AI webRequest observer registered (MV3 compatible).");
+    } catch (err) {
+      console.warn("[AI CAGE] Shadow AI webRequest registration failed:", err);
+    }
   }
   async function updateBadge(tabId, count) {
     const text = count > 0 ? String(count) : "";
