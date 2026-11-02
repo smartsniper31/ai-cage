@@ -1,0 +1,93 @@
+================================================================================
+AI CAGE — NOTICE OF COPYRIGHT AND INTELLECTUAL PROPERTY
+================================================================================
+
+Project Name:      AI CAGE — Enterprise AI Data Protection
+Tagline:           "Cage The Monster AI. Use ChatGPT. Leak Zero Data."
+Version:           0.4.5
+
+--------------------------------------------------------------------------------
+AUTHORSHIP & OWNERSHIP
+--------------------------------------------------------------------------------
+
+Copyright (c) 2026 Frikha, Tunisia
+GitHub:            https://github.com/smartsniper31
+Repository:        https://github.com/smartsniper31/ai-cage
+Contact:           contact@ai-cage.io
+
+All source code, design, architecture, documentation, and associated
+intellectual property in this repository are the original, exclusive creation
+and property of the author.
+
+Original creation date: October 2026
+Country of origin:      Tunisia (République Tunisienne)
+
+--------------------------------------------------------------------------------
+WHAT IS PROTECTED
+--------------------------------------------------------------------------------
+
+The following elements are protected by copyright and cannot be reproduced,
+resold, or used commercially without a written license from the author:
+
+  1. The AI CAGE brand name and tagline "Cage The Monster AI"
+  2. All source code in packages/presidio-lite/
+  3. All source code in packages/core/
+  4. The Shadow AI endpoint catalogue (shadowAiList.ts)
+  5. The prompt injection detection patterns (injectionDetectors.ts)
+  6. The agent policy engine (policy.ts, agentCage.ts)
+  7. The MCP monitoring implementation (mcpMonitor.ts)
+  8. The licensing engine (license.ts)
+  9. All UI designs (landing page, desktop app, extension popup)
+  10. All documentation and reports in /docs/
+
+--------------------------------------------------------------------------------
+COMMERCIAL LICENSING
+--------------------------------------------------------------------------------
+
+Commercial use requires a written license agreement.
+
+Permitted without a commercial license:
+  - Personal, educational, and research use
+  - Security auditing of the software
+  - Non-commercial internal use within a single organization
+
+Not permitted without a commercial license:
+  - Offering AI CAGE (or a derivative) as a paid service
+  - Embedding AI CAGE in a commercial product
+  - Reselling, white-labeling, or rebranding AI CAGE
+  - Using the AI CAGE brand or tagline commercially
+
+To obtain a commercial license:
+  Email: contact@ai-cage.io
+  Subject: "Commercial License Request"
+
+--------------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+--------------------------------------------------------------------------------
+
+This software uses the following open-source components:
+
+  - TypeScript (Apache 2.0) — microsoft/TypeScript
+  - Vite (MIT) — vitejs/vite
+  - Vitest (MIT) — vitest-dev/vitest
+  - Tailwind CSS (MIT) — tailwindlabs/tailwindcss
+  - Tauri (MIT/Apache 2.0) — tauri-apps/tauri
+  - pnpm (MIT) — pnpm/pnpm
+
+All third-party components retain their original licenses.
+See individual package.json files for full dependency lists.
+
+--------------------------------------------------------------------------------
+LEGAL JURISDICTION
+--------------------------------------------------------------------------------
+
+This project is governed by the laws of Tunisia (République Tunisienne).
+Any dispute arising from unauthorized use shall be subject to the jurisdiction
+of the competent courts of Tunisia.
+
+International copyright protection is provided under the Berne Convention,
+to which Tunisia is a signatory (since 1975).
+
+================================================================================
+END OF NOTICE
+================================================================================

@@ -1,3 +1,9 @@
+﻿// Copyright (c) 2026 Frikha, Tunisia. All rights reserved.
+// AI CAGE — Enterprise AI Data Protection
+// https://github.com/smartsniper31/ai-cage
+// Licensed under Business Source License 1.1 — see LICENSE for details.
+// Commercial use requires a license: contact@ai-cage.io
+
 /**
  * @file auditLog.ts
  * Immutable local audit log for AI CAGE.
