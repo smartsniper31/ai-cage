@@ -1,126 +1,105 @@
 /**
  * @file injected.ts
- * AI CAGE — Page-Context Network Interceptor v0.4.5
+ * AI CAGE — Page-Context Network Gate v0.4.5
  *
- * ROOT FIX: PII detection happens DIRECTLY in this script at the network level.
- * NO dependency on postMessage timing. NO DOM manipulation.
+ * ARCHITECTURE FIX:
  *
- * ARCHITECTURE:
- *   1. This script runs in the PAGE's JavaScript context (access to fetch/XHR)
- *   2. It contains its own self-contained PII detector (regex-based, no imports)
- *   3. It intercepts fetch() and XMLHttpRequest BEFORE the request is sent
- *   4. It cages PII in the request body directly
- *   5. It watches for [CAGED_X] tokens in the response and restores them
+ *   OLD (broken): injected.js cages independently → ignores user "Pass" decision
+ *   NEW (correct): injected.js HOLDS the request until content.ts sends a decision
  *
- * WHY THIS WORKS:
- *   - Runs in page context = can wrap window.fetch before React uses it
- *   - Self-contained PII detection = no timing dependency on postMessage
- *   - Intercepts the actual HTTP body = React state doesn't matter
+ *   Flow:
+ *     1. User types prompt → hits Enter
+ *     2. Page calls fetch('/api/chat')
+ *     3. injected.js intercepts → detects PII → PAUSES the request
+ *     4. Sends "AI_CAGE_PII_DETECTED" to content.ts with detected items
+ *     5. content.ts shows the control panel → user decides
+ *     6. User clicks "Cage All" → content.ts sends "AI_CAGE_PROCEED" { mode: 'cage' }
+ *        OR user clicks "Pass All" → content.ts sends "AI_CAGE_PROCEED" { mode: 'pass' }
+ *     7. injected.js resumes the request with the appropriate body
  *
- * SECURITY:
- *   - Zero external calls
- *   - Entity map lives only in closure memory
- *   - Communicates results to content script via postMessage (display only)
+ *   NEW TAB FIX:
+ *     - injected.js initialises its entity store fresh on every page load
+ *     - Per-tab state is isolated in the IIFE closure
+ *     - No shared state between tabs
  */
 
 (function (window) {
   'use strict';
 
-  // Guard against double-injection
   if ((window as { __AI_CAGE_ACTIVE__?: boolean }).__AI_CAGE_ACTIVE__) return;
   (window as { __AI_CAGE_ACTIVE__?: boolean }).__AI_CAGE_ACTIVE__ = true;
 
-  // ── Self-contained PII patterns (no external imports) ───────────────────
-  // These must match the core package patterns exactly.
+  // ── Self-contained PII patterns ─────────────────────────────────────────
 
-  interface PiiEntity {
-    type: string;
-    value: string;
-    placeholder: string;
-  }
+  interface PiiMatch { type: string; value: string; start: number; end: number; label: string; }
 
-  const PII_PATTERNS: Array<{ type: string; pattern: RegExp; label: string; score: number }> = [
-    // Critical — high confidence
-    { type: 'PRIVATE_KEY',    pattern: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,           label: 'PRIVKEY', score: 1.0 },
-    { type: 'API_KEY',        pattern: /\bAKIA[0-9A-Z]{16}\b/g,                                              label: 'APIKEY',  score: 0.99 },
-    { type: 'API_KEY',        pattern: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,}/g,          label: 'APIKEY',  score: 0.99 },
-    { type: 'API_KEY',        pattern: /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g,                     label: 'APIKEY',  score: 0.99 },
-    { type: 'EMAIL_ADDRESS',  pattern: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,           label: 'EMAIL',   score: 0.95 },
-    { type: 'CREDIT_CARD',    pattern: /\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, label: 'CARD', score: 0.92 },
-    { type: 'IBAN',           pattern: /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g,  label: 'IBAN',    score: 0.90 },
-    { type: 'GENERIC_SECRET', pattern: /\b(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi,        label: 'SECRET',  score: 0.85 },
-    { type: 'GENERIC_SECRET', pattern: /\b(?:api[_-]?key|secret[_-]?key)\s*[=:]\s*["']?[A-Za-z0-9\-_.]{20,}/gi, label: 'SECRET', score: 0.85 },
-    { type: 'IP_ADDRESS',     pattern: /\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g, label: 'IP', score: 0.85 },
-    { type: 'PHONE_NUMBER',   pattern: /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g,   label: 'PHONE',   score: 0.75 },
-    // Tunisian specific
-    { type: 'CIN_TN',         pattern: /\b(?:CIN|N°\s?CIN)\s*[:\-]?\s*(\d{8})\b/gi,                        label: 'CIN',     score: 0.85 },
-    { type: 'MF_TN',          pattern: /\b\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/g,                             label: 'MF',      score: 0.92 },
+  const PATTERNS: Array<{ type: string; label: string; re: RegExp }> = [
+    { type: 'PRIVATE_KEY',    label: 'PRIVKEY', re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g },
+    { type: 'API_KEY',        label: 'APIKEY',  re: /\bAKIA[0-9A-Z]{16}\b/g },
+    { type: 'API_KEY',        label: 'APIKEY',  re: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,}/g },
+    { type: 'API_KEY',        label: 'APIKEY',  re: /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g },
+    { type: 'EMAIL_ADDRESS',  label: 'EMAIL',   re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g },
+    { type: 'CREDIT_CARD',    label: 'CARD',    re: /\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g },
+    { type: 'IBAN',           label: 'IBAN',    re: /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g },
+    { type: 'GENERIC_SECRET', label: 'SECRET',  re: /\b(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi },
+    { type: 'IP_ADDRESS',     label: 'IP',      re: /\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}\b/g },
+    { type: 'PHONE_NUMBER',   label: 'PHONE',   re: /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g },
+    { type: 'CIN_TN',         label: 'CIN',     re: /\b(?:CIN|N°\s?CIN)\s*[:\-]?\s*(\d{8})\b/gi },
+    { type: 'MF_TN',          label: 'MF',      re: /\b\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/g },
   ];
 
-  /**
-   * Detects PII in text and returns array of entities with placeholders.
-   * Handles overlapping matches by processing highest-confidence first.
-   */
-  function detectAndCage(text: string): { caged: string; entities: PiiEntity[] } {
-    if (!text || text.length < 3) return { caged: text, entities: [] };
+  interface DetectResult { found: boolean; items: Array<{ type: string; label: string; value: string; preview: string }> }
 
-    interface RawMatch {
-      type: string;
-      label: string;
-      value: string;
-      start: number;
-      end: number;
-      score: number;
-    }
-
-    const raw: RawMatch[] = [];
-
-    for (const det of PII_PATTERNS) {
-      det.pattern.lastIndex = 0;
+  function detectPII(text: string): DetectResult {
+    const matches: PiiMatch[] = [];
+    for (const p of PATTERNS) {
+      p.re.lastIndex = 0;
       let m: RegExpExecArray | null;
-      while ((m = det.pattern.exec(text)) !== null) {
-        const val = m[1] ?? m[0];
-        const start = m.index + m[0].indexOf(val);
-        raw.push({ type: det.type, label: det.label, value: val, start, end: start + val.length, score: det.score });
-        if (m[0].length === 0) det.pattern.lastIndex++;
+      while ((m = p.re.exec(text)) !== null) {
+        const v = m[1] ?? m[0];
+        matches.push({ type: p.type, label: p.label, value: v, start: m.index, end: m.index + v.length });
+        if (m[0].length === 0) p.re.lastIndex++;
       }
-      det.pattern.lastIndex = 0;
+      p.re.lastIndex = 0;
+    }
+    if (matches.length === 0) return { found: false, items: [] };
+
+    // Deduplicate overlaps (keep first found)
+    const kept: PiiMatch[] = [];
+    const sorted = [...matches].sort((a, b) => a.start - b.start);
+    for (const c of sorted) {
+      if (!kept.some(k => c.start < k.end && c.end > k.start)) kept.push(c);
     }
 
-    if (raw.length === 0) return { caged: text, entities: [] };
-
-    // Sort by score desc then start asc, deduplicate overlaps
-    const sorted = [...raw].sort((a, b) => b.score - a.score || a.start - b.start);
-    const kept: RawMatch[] = [];
-    for (const candidate of sorted) {
-      if (!kept.some(k => candidate.start < k.end && candidate.end > k.start)) {
-        kept.push(candidate);
-      }
-    }
-    kept.sort((a, b) => a.start - b.start);
-
-    const entities: PiiEntity[] = [];
-    let counter = 1;
-    let result = text;
-    // Process in reverse so indices stay valid
-    for (const match of [...kept].reverse()) {
-      const placeholder = `[CAGED_${match.label}_${counter}]`;
-      counter++;
-      entities.unshift({ type: match.type, value: match.value, placeholder });
-      result = result.slice(0, match.start) + placeholder + result.slice(match.end);
-    }
-
-    return { caged: result, entities };
+    return {
+      found: true,
+      items: kept.map(k => ({
+        type: k.type, label: k.label, value: k.value,
+        preview: k.value.length > 10 ? k.value.slice(0, 4) + '***' + k.value.slice(-3) : '***',
+      })),
+    };
   }
 
-  /**
-   * Restores original values from [CAGED_X] tokens.
-   */
-  function uncageText(text: string, entities: PiiEntity[]): string {
+  function cageBody(text: string, items: Array<{ value: string; label: string }>): string {
     let result = text;
-    for (const e of entities) {
-      const escaped = e.placeholder.replace(/[[\]_]/g, '\\$&');
-      result = result.replace(new RegExp(escaped.replace(/\\/g, '\\\\'), 'g'), e.value);
+    let counter = 1;
+    for (const item of [...items].sort((a, b) => b.value.length - a.value.length)) {
+      const escaped = item.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const placeholder = `[CAGED_${item.label}_${counter}]`;
+      result = result.replace(new RegExp(escaped, 'g'), placeholder);
+      counter++;
+    }
+    return result;
+  }
+
+  function restoreBody(text: string, items: Array<{ value: string; label: string }>): string {
+    let result = text;
+    let counter = 1;
+    for (const item of [...items].sort((a, b) => b.value.length - a.value.length)) {
+      const placeholder = `[CAGED_${item.label}_${counter}]`;
+      const escaped = placeholder.replace(/[[\]_]/g, '\\$&');
+      result = result.replace(new RegExp(escaped.replace(/\\/g, '\\\\'), 'g'), item.value);
+      counter++;
     }
     return result;
   }
@@ -128,96 +107,155 @@
   // ── AI endpoint detection ────────────────────────────────────────────────
 
   const AI_PATTERNS = [
-    /api\.openai\.com/,
-    /chatgpt\.com\/backend-api/,
-    /chat\.openai\.com\/backend-api/,
-    /api\.anthropic\.com/,
-    /claude\.ai\/api/,
-    /generativelanguage\.googleapis\.com/,
-    /gemini\.google\.com/,
-    /api\.mistral\.ai/,
-    /api\.groq\.com/,
-    /api\.perplexity\.ai/,
-    /api\.cohere\.ai/,
-    /openrouter\.ai/,
-    /poe\.com\/api/,
-    /you\.com\/api/,
-    /chat\.deepseek\.com/,
+    /api\.openai\.com/, /chatgpt\.com\/backend-api/, /chat\.openai\.com\/backend-api/,
+    /api\.anthropic\.com/, /claude\.ai\/api/,
+    /generativelanguage\.googleapis\.com/, /gemini\.google\.com/,
+    /api\.mistral\.ai/, /api\.groq\.com/, /api\.perplexity\.ai/,
+    /api\.cohere\.ai/, /openrouter\.ai/, /poe\.com\/api/,
+    /you\.com\/api/, /chat\.deepseek\.com/,
   ];
 
-  function isAIEndpoint(url: string): boolean {
-    return AI_PATTERNS.some(p => p.test(url));
-  }
+  function isAI(url: string): boolean { return AI_PATTERNS.some(p => p.test(url)); }
 
-  // ── Entity store per tab/session ─────────────────────────────────────────
-  const entityStore: PiiEntity[] = [];
+  // ── Decision gate ────────────────────────────────────────────────────────
 
-  function notify(caged: number): void {
-    window.postMessage({ type: 'AI_CAGE_NETWORK_CAGED', count: caged }, '*');
-  }
+  /**
+   * Pending request waiting for user decision.
+   * resolve(body) → proceed with this body
+   * reject() → abort the request
+   */
+  type GateResolve = (body: string) => void;
+  const pendingGates = new Map<string, GateResolve>();
+  let gateCounter = 0;
 
-  function notifyRestored(): void {
-    window.postMessage({ type: 'AI_CAGE_NETWORK_RESTORED' }, '*');
-  }
+  function waitForDecision(
+    detectedItems: Array<{ type: string; label: string; value: string; preview: string }>,
+    originalBody: string,
+  ): Promise<string> {
+    return new Promise<string>((resolve) => {
+      const gateId = `gate_${++gateCounter}`;
 
-  // ── Process request body ─────────────────────────────────────────────────
+      // Notify content.ts: PII detected, waiting for decision
+      window.postMessage({
+        type: 'AI_CAGE_PII_DETECTED',
+        gateId,
+        items: detectedItems,
+        count: detectedItems.length,
+      }, '*');
 
-  function processBody(bodyStr: string): { body: string; count: number } {
-    try {
-      // Try JSON parse — most AI APIs use JSON
-      const parsed = JSON.parse(bodyStr) as Record<string, unknown>;
-      let changed = false;
-      let totalCaged = 0;
+      pendingGates.set(gateId, resolve);
 
-      // Deep scan all string values in the JSON for PII
-      function scanObj(obj: unknown): unknown {
-        if (typeof obj === 'string') {
-          const { caged, entities } = detectAndCage(obj);
-          if (entities.length > 0) {
-            entities.forEach(e => entityStore.push(e));
-            totalCaged += entities.length;
-            changed = true;
-            return caged;
-          }
-          return obj;
+      // Safety timeout: if no decision in 30s → pass uncaged
+      setTimeout(() => {
+        if (pendingGates.has(gateId)) {
+          pendingGates.delete(gateId);
+          resolve(originalBody); // timeout → pass
         }
-        if (Array.isArray(obj)) return obj.map(scanObj);
-        if (obj && typeof obj === 'object') {
-          const result: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(obj)) {
-            result[k] = scanObj(v);
-          }
-          return result;
-        }
-        return obj;
+      }, 30000);
+    });
+  }
+
+  // Listen for decisions from content.ts
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const d = event.data as { type?: string; gateId?: string; mode?: 'cage' | 'pass'; items?: Array<{ value: string; label: string }> };
+
+    if (d?.type === 'AI_CAGE_PROCEED' && d.gateId && pendingGates.has(d.gateId)) {
+      const resolve = pendingGates.get(d.gateId)!;
+      pendingGates.delete(d.gateId);
+
+      // content.ts sends back the items it decided to cage
+      if (d.mode === 'cage' && d.items && d.items.length > 0) {
+        resolve('__CAGE__'); // signal to cage
+      } else {
+        resolve('__PASS__'); // signal to pass
       }
-
-      const scanned = scanObj(parsed);
-      if (!changed) return { body: bodyStr, count: 0 };
-
-      if (totalCaged > 0) notify(totalCaged);
-      return { body: JSON.stringify(scanned), count: totalCaged };
-
-    } catch {
-      // Not JSON — scan as plain text
-      const { caged, entities } = detectAndCage(bodyStr);
-      if (entities.length > 0) {
-        entities.forEach(e => entityStore.push(e));
-        notify(entities.length);
-        return { body: caged, count: entities.length };
-      }
-      return { body: bodyStr, count: 0 };
     }
+  });
+
+  // ── Process JSON body ────────────────────────────────────────────────────
+
+  function scanJSON(obj: unknown, items: Array<{ type: string; label: string; value: string; preview: string }>): unknown {
+    if (typeof obj === 'string') {
+      const r = detectPII(obj);
+      r.items.forEach(i => { if (!items.some(x => x.value === i.value)) items.push(i); });
+      return obj;
+    }
+    if (Array.isArray(obj)) return obj.map(v => scanJSON(v, items));
+    if (obj && typeof obj === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) out[k] = scanJSON(v, items);
+      return out;
+    }
+    return obj;
   }
 
-  // ── Process response body ────────────────────────────────────────────────
+  function applyPageCage(obj: unknown, items: Array<{ type: string; label: string; value: string; preview: string }>): unknown {
+    if (typeof obj === 'string') return cageBody(obj, items);
+    if (Array.isArray(obj)) return obj.map(v => applyPageCage(v, items));
+    if (obj && typeof obj === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) out[k] = applyPageCage(v, items);
+      return out;
+    }
+    return obj;
+  }
 
-  function processResponse(text: string): string {
-    if (entityStore.length === 0) return text;
-    if (!text.includes('[CAGED_')) return text;
-    const restored = uncageText(text, entityStore);
-    if (restored !== text) notifyRestored();
-    return restored;
+  async function processRequestBody(bodyStr: string): Promise<string> {
+    const detectedItems: Array<{ type: string; label: string; value: string; preview: string }> = [];
+
+    try {
+      const parsed = JSON.parse(bodyStr);
+      scanJSON(parsed, detectedItems);
+    } catch {
+      const r = detectPII(bodyStr);
+      detectedItems.push(...r.items);
+    }
+
+    if (detectedItems.length === 0) return bodyStr;
+
+    // Wait for user decision
+    const decision = await waitForDecision(detectedItems, bodyStr);
+
+    if (decision === '__PASS__') return bodyStr;
+    if (decision === '__CAGE__') {
+      try {
+        const parsed = JSON.parse(bodyStr);
+        return JSON.stringify(applyPageCage(parsed, detectedItems));
+      } catch {
+        return cageBody(bodyStr, detectedItems);
+      }
+    }
+    return bodyStr;
+  }
+
+  // ── Per-tab entity store (isolated in closure) ───────────────────────────
+  // FIX: Each tab has its own store — no cross-tab leakage
+  const tabEntityStore: Array<{ value: string; label: string }> = [];
+
+  // Listen for entity sharing from content.ts (for response restoration)
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const d = event.data as { type?: string; entities?: Array<{ placeholder: string; originalValue: string }> };
+    if (d?.type === 'AI_CAGE_ENTITIES' && d.entities) {
+      // Map to label-based store for restoring
+      d.entities.forEach(e => {
+        const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
+        if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+      });
+    }
+  });
+
+  function processResponseText(text: string): string {
+    if (!text.includes('[CAGED_') || tabEntityStore.length === 0) return text;
+    let result = text;
+    tabEntityStore.forEach((e, idx) => {
+      const placeholder = `[CAGED_${e.label}_${idx + 1}]`;
+      const escaped = placeholder.replace(/[[\]_]/g, '\\$&');
+      result = result.replace(new RegExp(escaped.replace(/\\/g, '\\\\'), 'g'), e.value);
+    });
+    if (result !== text) window.postMessage({ type: 'AI_CAGE_NETWORK_RESTORED' }, '*');
+    return result;
   }
 
   // ── Wrap fetch ───────────────────────────────────────────────────────────
@@ -232,88 +270,58 @@
       : input instanceof URL ? input.href
       : (input as Request).url;
 
-    if (!isAIEndpoint(url)) {
-      return _fetch(input, init);
+    if (!isAI(url)) return _fetch(input, init);
+
+    let body = init?.body;
+    if (typeof body === 'string' && body.length > 2) {
+      body = await processRequestBody(body);
     }
 
-    // Process outgoing body
-    let newInit = init ? { ...init } : {};
-    if (init?.body && typeof init.body === 'string' && init.body.length > 2) {
-      const { body } = processBody(init.body);
-      newInit = { ...newInit, body };
-    }
-
+    const newInit = body !== init?.body ? { ...init, body } : init;
     const response = await _fetch(input, newInit);
 
-    // Process response
-    const contentType = response.headers.get('content-type') ?? '';
-
-    if (contentType.includes('text/event-stream')) {
-      // Streaming SSE — pipe through transformer
+    const ct = response.headers.get('content-type') ?? '';
+    if (ct.includes('text/event-stream')) {
       if (!response.body) return response;
       const reader = response.body.getReader();
-      const dec = new TextDecoder();
-      const enc = new TextEncoder();
-
+      const dec = new TextDecoder(), enc = new TextEncoder();
       const stream = new ReadableStream({
         async pull(ctrl) {
           const { done, value } = await reader.read();
           if (done) { ctrl.close(); return; }
-          const chunk = dec.decode(value, { stream: true });
-          ctrl.enqueue(enc.encode(processResponse(chunk)));
+          ctrl.enqueue(enc.encode(processResponseText(dec.decode(value, { stream: true }))));
         },
       });
-
-      return new Response(stream, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      });
+      return new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers });
     }
 
-    // Non-streaming
     const text = await response.text();
-    return new Response(processResponse(text), {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
+    return new Response(processResponseText(text), { status: response.status, statusText: response.statusText, headers: response.headers });
   };
 
-  // ── Wrap XMLHttpRequest ──────────────────────────────────────────────────
+  // ── Wrap XHR ─────────────────────────────────────────────────────────────
 
   const _XHR = window.XMLHttpRequest;
-
   function PatchedXHR(this: XMLHttpRequest) {
     const xhr = new _XHR();
     let _url = '';
-
     const _open = xhr.open.bind(xhr);
-    (xhr as { open: typeof xhr.open }).open = function (
-      method: string, url: string | URL, async = true,
-      user?: string | null, password?: string | null,
-    ) {
-      _url = String(url);
-      return _open(method, url, async, user, password);
+    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a = true, us?: string | null, pw?: string | null) {
+      _url = String(u); return _open(m, u, a, us, pw);
     };
-
     const _send = xhr.send.bind(xhr);
-    (xhr as { send: typeof xhr.send }).send = function (
-      body?: Document | XMLHttpRequestBodyInit | null,
-    ) {
-      if (isAIEndpoint(_url) && typeof body === 'string' && body.length > 2) {
-        const { body: processed } = processBody(body);
-        return _send(processed);
+    (xhr as { send: typeof xhr.send }).send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+      if (isAI(_url) && typeof body === 'string' && body.length > 2) {
+        processRequestBody(body).then(processed => _send(processed));
+        return;
       }
-      return _send(body);
+      _send(body);
     };
-
     return xhr;
   }
-
   PatchedXHR.prototype = _XHR.prototype;
   (window as { XMLHttpRequest: unknown }).XMLHttpRequest = PatchedXHR;
 
-  console.warn('[AI CAGE] 🔒 Network interceptor active — fetch/XHR patched with inline PII detection');
+  console.warn('[AI CAGE] 🔒 Gate interceptor active — waiting for user decisions on this tab');
 
 })(window);

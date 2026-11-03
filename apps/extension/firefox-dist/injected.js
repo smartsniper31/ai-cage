@@ -3,62 +3,56 @@
   (function(window2) {
     if (window2.__AI_CAGE_ACTIVE__) return;
     window2.__AI_CAGE_ACTIVE__ = true;
-    const PII_PATTERNS = [
-      // Critical — high confidence
-      { type: "PRIVATE_KEY", pattern: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g, label: "PRIVKEY", score: 1 },
-      { type: "API_KEY", pattern: /\bAKIA[0-9A-Z]{16}\b/g, label: "APIKEY", score: 0.99 },
-      { type: "API_KEY", pattern: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,}/g, label: "APIKEY", score: 0.99 },
-      { type: "API_KEY", pattern: /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g, label: "APIKEY", score: 0.99 },
-      { type: "EMAIL_ADDRESS", pattern: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, label: "EMAIL", score: 0.95 },
-      { type: "CREDIT_CARD", pattern: /\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, label: "CARD", score: 0.92 },
-      { type: "IBAN", pattern: /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g, label: "IBAN", score: 0.9 },
-      { type: "GENERIC_SECRET", pattern: /\b(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi, label: "SECRET", score: 0.85 },
-      { type: "GENERIC_SECRET", pattern: /\b(?:api[_-]?key|secret[_-]?key)\s*[=:]\s*["']?[A-Za-z0-9\-_.]{20,}/gi, label: "SECRET", score: 0.85 },
-      { type: "IP_ADDRESS", pattern: /\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g, label: "IP", score: 0.85 },
-      { type: "PHONE_NUMBER", pattern: /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g, label: "PHONE", score: 0.75 },
-      // Tunisian specific
-      { type: "CIN_TN", pattern: /\b(?:CIN|N°\s?CIN)\s*[:\-]?\s*(\d{8})\b/gi, label: "CIN", score: 0.85 },
-      { type: "MF_TN", pattern: /\b\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/g, label: "MF", score: 0.92 }
+    const PATTERNS = [
+      { type: "PRIVATE_KEY", label: "PRIVKEY", re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g },
+      { type: "API_KEY", label: "APIKEY", re: /\bAKIA[0-9A-Z]{16}\b/g },
+      { type: "API_KEY", label: "APIKEY", re: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,}/g },
+      { type: "API_KEY", label: "APIKEY", re: /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g },
+      { type: "EMAIL_ADDRESS", label: "EMAIL", re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g },
+      { type: "CREDIT_CARD", label: "CARD", re: /\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g },
+      { type: "IBAN", label: "IBAN", re: /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g },
+      { type: "GENERIC_SECRET", label: "SECRET", re: /\b(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi },
+      { type: "IP_ADDRESS", label: "IP", re: /\b(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}\b/g },
+      { type: "PHONE_NUMBER", label: "PHONE", re: /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g },
+      { type: "CIN_TN", label: "CIN", re: /\b(?:CIN|N°\s?CIN)\s*[:\-]?\s*(\d{8})\b/gi },
+      { type: "MF_TN", label: "MF", re: /\b\d{7}[A-Z]\/[A-Z]\/[A-Z]\/\d{3}\b/g }
     ];
-    function detectAndCage(text) {
-      if (!text || text.length < 3) return { caged: text, entities: [] };
-      const raw = [];
-      for (const det of PII_PATTERNS) {
-        det.pattern.lastIndex = 0;
+    function detectPII(text) {
+      const matches = [];
+      for (const p of PATTERNS) {
+        p.re.lastIndex = 0;
         let m;
-        while ((m = det.pattern.exec(text)) !== null) {
-          const val = m[1] ?? m[0];
-          const start = m.index + m[0].indexOf(val);
-          raw.push({ type: det.type, label: det.label, value: val, start, end: start + val.length, score: det.score });
-          if (m[0].length === 0) det.pattern.lastIndex++;
+        while ((m = p.re.exec(text)) !== null) {
+          const v = m[1] ?? m[0];
+          matches.push({ type: p.type, label: p.label, value: v, start: m.index, end: m.index + v.length });
+          if (m[0].length === 0) p.re.lastIndex++;
         }
-        det.pattern.lastIndex = 0;
+        p.re.lastIndex = 0;
       }
-      if (raw.length === 0) return { caged: text, entities: [] };
-      const sorted = [...raw].sort((a, b) => b.score - a.score || a.start - b.start);
+      if (matches.length === 0) return { found: false, items: [] };
       const kept = [];
-      for (const candidate of sorted) {
-        if (!kept.some((k) => candidate.start < k.end && candidate.end > k.start)) {
-          kept.push(candidate);
-        }
+      const sorted = [...matches].sort((a, b) => a.start - b.start);
+      for (const c of sorted) {
+        if (!kept.some((k) => c.start < k.end && c.end > k.start)) kept.push(c);
       }
-      kept.sort((a, b) => a.start - b.start);
-      const entities = [];
-      let counter = 1;
-      let result = text;
-      for (const match of [...kept].reverse()) {
-        const placeholder = `[CAGED_${match.label}_${counter}]`;
-        counter++;
-        entities.unshift({ type: match.type, value: match.value, placeholder });
-        result = result.slice(0, match.start) + placeholder + result.slice(match.end);
-      }
-      return { caged: result, entities };
+      return {
+        found: true,
+        items: kept.map((k) => ({
+          type: k.type,
+          label: k.label,
+          value: k.value,
+          preview: k.value.length > 10 ? k.value.slice(0, 4) + "***" + k.value.slice(-3) : "***"
+        }))
+      };
     }
-    function uncageText(text, entities) {
+    function cageBody(text, items) {
       let result = text;
-      for (const e of entities) {
-        const escaped = e.placeholder.replace(/[[\]_]/g, "\\$&");
-        result = result.replace(new RegExp(escaped.replace(/\\/g, "\\\\"), "g"), e.value);
+      let counter = 1;
+      for (const item of [...items].sort((a, b) => b.value.length - a.value.length)) {
+        const escaped = item.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const placeholder = `[CAGED_${item.label}_${counter}]`;
+        result = result.replace(new RegExp(escaped, "g"), placeholder);
+        counter++;
       }
       return result;
     }
@@ -79,81 +73,127 @@
       /you\.com\/api/,
       /chat\.deepseek\.com/
     ];
-    function isAIEndpoint(url) {
+    function isAI(url) {
       return AI_PATTERNS.some((p) => p.test(url));
     }
-    const entityStore = [];
-    function notify(caged) {
-      window2.postMessage({ type: "AI_CAGE_NETWORK_CAGED", count: caged }, "*");
-    }
-    function notifyRestored() {
-      window2.postMessage({ type: "AI_CAGE_NETWORK_RESTORED" }, "*");
-    }
-    function processBody(bodyStr) {
-      try {
-        let scanObj = function(obj) {
-          if (typeof obj === "string") {
-            const { caged, entities } = detectAndCage(obj);
-            if (entities.length > 0) {
-              entities.forEach((e) => entityStore.push(e));
-              totalCaged += entities.length;
-              changed = true;
-              return caged;
-            }
-            return obj;
+    const pendingGates = /* @__PURE__ */ new Map();
+    let gateCounter = 0;
+    function waitForDecision(detectedItems, originalBody) {
+      return new Promise((resolve) => {
+        const gateId = `gate_${++gateCounter}`;
+        window2.postMessage({
+          type: "AI_CAGE_PII_DETECTED",
+          gateId,
+          items: detectedItems,
+          count: detectedItems.length
+        }, "*");
+        pendingGates.set(gateId, resolve);
+        setTimeout(() => {
+          if (pendingGates.has(gateId)) {
+            pendingGates.delete(gateId);
+            resolve(originalBody);
           }
-          if (Array.isArray(obj)) return obj.map(scanObj);
-          if (obj && typeof obj === "object") {
-            const result = {};
-            for (const [k, v] of Object.entries(obj)) {
-              result[k] = scanObj(v);
-            }
-            return result;
-          }
-          return obj;
-        };
-        const parsed = JSON.parse(bodyStr);
-        let changed = false;
-        let totalCaged = 0;
-        const scanned = scanObj(parsed);
-        if (!changed) return { body: bodyStr, count: 0 };
-        if (totalCaged > 0) notify(totalCaged);
-        return { body: JSON.stringify(scanned), count: totalCaged };
-      } catch {
-        const { caged, entities } = detectAndCage(bodyStr);
-        if (entities.length > 0) {
-          entities.forEach((e) => entityStore.push(e));
-          notify(entities.length);
-          return { body: caged, count: entities.length };
+        }, 3e4);
+      });
+    }
+    window2.addEventListener("message", (event) => {
+      if (event.source !== window2) return;
+      const d = event.data;
+      if ((d == null ? void 0 : d.type) === "AI_CAGE_PROCEED" && d.gateId && pendingGates.has(d.gateId)) {
+        const resolve = pendingGates.get(d.gateId);
+        pendingGates.delete(d.gateId);
+        if (d.mode === "cage" && d.items && d.items.length > 0) {
+          resolve("__CAGE__");
+        } else {
+          resolve("__PASS__");
         }
-        return { body: bodyStr, count: 0 };
       }
+    });
+    function scanJSON(obj, items) {
+      if (typeof obj === "string") {
+        const r = detectPII(obj);
+        r.items.forEach((i) => {
+          if (!items.some((x) => x.value === i.value)) items.push(i);
+        });
+        return obj;
+      }
+      if (Array.isArray(obj)) return obj.map((v) => scanJSON(v, items));
+      if (obj && typeof obj === "object") {
+        const out = {};
+        for (const [k, v] of Object.entries(obj)) out[k] = scanJSON(v, items);
+        return out;
+      }
+      return obj;
     }
-    function processResponse(text) {
-      if (entityStore.length === 0) return text;
-      if (!text.includes("[CAGED_")) return text;
-      const restored = uncageText(text, entityStore);
-      if (restored !== text) notifyRestored();
-      return restored;
+    function applyPageCage(obj, items) {
+      if (typeof obj === "string") return cageBody(obj, items);
+      if (Array.isArray(obj)) return obj.map((v) => applyPageCage(v, items));
+      if (obj && typeof obj === "object") {
+        const out = {};
+        for (const [k, v] of Object.entries(obj)) out[k] = applyPageCage(v, items);
+        return out;
+      }
+      return obj;
+    }
+    async function processRequestBody(bodyStr) {
+      const detectedItems = [];
+      try {
+        const parsed = JSON.parse(bodyStr);
+        scanJSON(parsed, detectedItems);
+      } catch {
+        const r = detectPII(bodyStr);
+        detectedItems.push(...r.items);
+      }
+      if (detectedItems.length === 0) return bodyStr;
+      const decision = await waitForDecision(detectedItems, bodyStr);
+      if (decision === "__PASS__") return bodyStr;
+      if (decision === "__CAGE__") {
+        try {
+          const parsed = JSON.parse(bodyStr);
+          return JSON.stringify(applyPageCage(parsed, detectedItems));
+        } catch {
+          return cageBody(bodyStr, detectedItems);
+        }
+      }
+      return bodyStr;
+    }
+    const tabEntityStore = [];
+    window2.addEventListener("message", (event) => {
+      if (event.source !== window2) return;
+      const d = event.data;
+      if ((d == null ? void 0 : d.type) === "AI_CAGE_ENTITIES" && d.entities) {
+        d.entities.forEach((e) => {
+          const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
+          if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+        });
+      }
+    });
+    function processResponseText(text) {
+      if (!text.includes("[CAGED_") || tabEntityStore.length === 0) return text;
+      let result = text;
+      tabEntityStore.forEach((e, idx) => {
+        const placeholder = `[CAGED_${e.label}_${idx + 1}]`;
+        const escaped = placeholder.replace(/[[\]_]/g, "\\$&");
+        result = result.replace(new RegExp(escaped.replace(/\\/g, "\\\\"), "g"), e.value);
+      });
+      if (result !== text) window2.postMessage({ type: "AI_CAGE_NETWORK_RESTORED" }, "*");
+      return result;
     }
     const _fetch = window2.fetch.bind(window2);
     window2.fetch = async function(input, init) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (!isAIEndpoint(url)) {
-        return _fetch(input, init);
+      if (!isAI(url)) return _fetch(input, init);
+      let body = init == null ? void 0 : init.body;
+      if (typeof body === "string" && body.length > 2) {
+        body = await processRequestBody(body);
       }
-      let newInit = init ? { ...init } : {};
-      if ((init == null ? void 0 : init.body) && typeof init.body === "string" && init.body.length > 2) {
-        const { body } = processBody(init.body);
-        newInit = { ...newInit, body };
-      }
+      const newInit = body !== (init == null ? void 0 : init.body) ? { ...init, body } : init;
       const response = await _fetch(input, newInit);
-      const contentType = response.headers.get("content-type") ?? "";
-      if (contentType.includes("text/event-stream")) {
+      const ct = response.headers.get("content-type") ?? "";
+      if (ct.includes("text/event-stream")) {
         if (!response.body) return response;
         const reader = response.body.getReader();
-        const dec = new TextDecoder();
-        const enc = new TextEncoder();
+        const dec = new TextDecoder(), enc = new TextEncoder();
         const stream = new ReadableStream({
           async pull(ctrl) {
             const { done, value } = await reader.read();
@@ -161,44 +201,35 @@
               ctrl.close();
               return;
             }
-            const chunk = dec.decode(value, { stream: true });
-            ctrl.enqueue(enc.encode(processResponse(chunk)));
+            ctrl.enqueue(enc.encode(processResponseText(dec.decode(value, { stream: true }))));
           }
         });
-        return new Response(stream, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers
-        });
+        return new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers });
       }
       const text = await response.text();
-      return new Response(processResponse(text), {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers
-      });
+      return new Response(processResponseText(text), { status: response.status, statusText: response.statusText, headers: response.headers });
     };
     const _XHR = window2.XMLHttpRequest;
     function PatchedXHR() {
       const xhr = new _XHR();
       let _url = "";
       const _open = xhr.open.bind(xhr);
-      xhr.open = function(method, url, async = true, user, password) {
-        _url = String(url);
-        return _open(method, url, async, user, password);
+      xhr.open = function(m, u, a = true, us, pw) {
+        _url = String(u);
+        return _open(m, u, a, us, pw);
       };
       const _send = xhr.send.bind(xhr);
       xhr.send = function(body) {
-        if (isAIEndpoint(_url) && typeof body === "string" && body.length > 2) {
-          const { body: processed } = processBody(body);
-          return _send(processed);
+        if (isAI(_url) && typeof body === "string" && body.length > 2) {
+          processRequestBody(body).then((processed) => _send(processed));
+          return;
         }
-        return _send(body);
+        _send(body);
       };
       return xhr;
     }
     PatchedXHR.prototype = _XHR.prototype;
     window2.XMLHttpRequest = PatchedXHR;
-    console.warn("[AI CAGE] 🔒 Network interceptor active — fetch/XHR patched with inline PII detection");
+    console.warn("[AI CAGE] 🔒 Gate interceptor active — waiting for user decisions on this tab");
   })(window);
 })();

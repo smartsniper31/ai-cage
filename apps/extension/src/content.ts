@@ -341,6 +341,185 @@ function applyEntityDecisions(decisions: Array<{ idx: number; action: 'cage' | '
   }
 }
 
+/**
+ * Handles PII detected at the NETWORK level by injected.js.
+ * Shows the control panel and sends back the decision (cage/pass) to injected.js.
+ * This is the key function that makes "Pass" actually pass — not cage.
+ */
+function handleNetworkPII(
+  gateId: string,
+  items: Array<{ type: string; label: string; value: string; preview: string }>,
+): void {
+  // Update session state
+  bubbleState = 'detected';
+  updateBubble();
+
+  // Show panel with the detected items
+  showNetworkPanel(gateId, items);
+}
+
+function showNetworkPanel(
+  gateId: string,
+  items: Array<{ type: string; label: string; value: string; preview: string }>,
+): void {
+  const existing = document.getElementById(PANEL_ID);
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = PANEL_ID;
+  panel.style.cssText = [
+    'position:fixed', 'bottom:74px', 'right:20px', 'z-index:2147483647',
+    'width:310px', 'max-height:420px',
+    'background:#fff', 'color:#0f172a',
+    'border-radius:14px',
+    'box-shadow:0 8px 32px rgba(0,0,0,.3)',
+    `font-family:${FONT}`, 'font-size:13px',
+    'overflow:hidden',
+  ].join(';');
+
+  // Header
+  const header = document.createElement('div');
+  header.style.cssText = 'background:#d97706;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;';
+  header.innerHTML = `
+    <span style="font-size:16px">⚠️</span>
+    <div style="flex:1">
+      <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
+      <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? 's' : ''} found — what do you want to do?</div>
+    </div>
+  `;
+  panel.appendChild(header);
+
+  // Items list
+  const list = document.createElement('div');
+  list.style.cssText = 'max-height:200px;overflow-y:auto;padding:6px 0;';
+
+  const chosenItems = new Set<number>(); // track per-item choices
+
+  items.forEach((item, idx) => {
+    const typeColors: Record<string, string> = {
+      EMAIL_ADDRESS: '#0369a1', CREDIT_CARD: '#dc2626',
+      IBAN: '#7c3aed', API_KEY: '#dc2626',
+      PRIVATE_KEY: '#dc2626', PHONE_NUMBER: '#d97706',
+      IP_ADDRESS: '#64748b', CIN_TN: '#0369a1',
+      MF_TN: '#0369a1', GENERIC_SECRET: '#dc2626',
+    };
+    const color = typeColors[item.type] ?? '#64748b';
+    const row = document.createElement('div');
+    row.id = `ai-cage-row-${idx}`;
+    row.style.cssText = 'padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;';
+    row.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase">${item.type.replace(/_/g,' ').toLowerCase()}</div>
+        <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.preview}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button data-idx="${idx}" data-act="cage"
+          style="background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+          🔒 Cage
+        </button>
+        <button data-idx="${idx}" data-act="pass"
+          style="background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+          Pass
+        </button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+  panel.appendChild(list);
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.style.cssText = 'padding:10px 14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:8px;';
+  actions.innerHTML = `
+    <button id="ai-cage-net-cage-all"
+      style="background:#15803d;color:#fff;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+      🔒 Cage All & Send
+    </button>
+    <button id="ai-cage-net-pass-all"
+      style="background:#e2e8f0;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+      ⚡ Send Unprotected
+    </button>
+  `;
+  panel.appendChild(actions);
+
+  // Warning footer
+  const warn = document.createElement('div');
+  warn.style.cssText = 'padding:8px 14px;background:#fef2f2;border-top:1px solid #fecaca;font-size:11px;color:#991b1b;';
+  warn.textContent = '⚠️ "Send Unprotected" sends your real data to the AI.';
+  panel.appendChild(warn);
+
+  document.body.appendChild(panel);
+
+  // ── Decision handlers ──
+
+  function sendDecision(mode: 'cage' | 'pass', cageItems: typeof items): void {
+    panel.remove();
+    window.postMessage({
+      type: 'AI_CAGE_PROCEED',
+      gateId,
+      mode,
+      items: cageItems.map(i => ({ value: i.value, label: i.label })),
+    }, '*');
+
+    if (mode === 'cage') {
+      sessionTotal += cageItems.length;
+      bubbleState = 'caged';
+      updateBubble();
+      try {
+        void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
+      } catch { /* ignore */ }
+    } else {
+      bubbleState = 'idle';
+      updateBubble();
+    }
+  }
+
+  document.getElementById('ai-cage-net-cage-all')?.addEventListener('click', () => {
+    sendDecision('cage', items);
+  });
+
+  document.getElementById('ai-cage-net-pass-all')?.addEventListener('click', () => {
+    sendDecision('pass', []);
+  });
+
+  // Per-item buttons
+  list.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const t = e.currentTarget as HTMLElement;
+      const idx = parseInt(t.dataset['idx'] ?? '0', 10);
+      const act = t.dataset['act'] as 'cage' | 'pass';
+
+      // Mark this row's decision
+      const row = document.getElementById(`ai-cage-row-${idx}`);
+      if (row) {
+        row.style.background = act === 'cage' ? '#f0fdf4' : '#fef2f2';
+        row.querySelectorAll('button').forEach(b => (b as HTMLButtonElement).disabled = true);
+        if (act === 'cage') chosenItems.add(idx);
+        else chosenItems.delete(idx);
+      }
+
+      // Check if all items have been decided
+      if (chosenItems.size + (items.length - chosenItems.size) === items.length) {
+        // Auto-send when last item decided
+        const toСage = items.filter((_, i) => chosenItems.has(i));
+        sendDecision(toСage.length > 0 ? 'cage' : 'pass', toСage);
+      }
+    });
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', (e) => {
+      const p = document.getElementById(PANEL_ID);
+      const bub = document.getElementById(BUBBLE_ID);
+      if (p && !p.contains(e.target as Node) && !bub?.contains(e.target as Node)) {
+        // Outside click → pass (don't block the request indefinitely)
+        sendDecision('pass', []);
+      }
+    }, { once: true });
+  }, 200);
+}
+
 // ─── PROMPT SELECTORS ──────────────────────────────────────────────────────────
 const PROMPT_SELECTORS = [
   '#prompt-textarea', 'div#prompt-textarea[contenteditable]',
@@ -474,7 +653,14 @@ document.addEventListener('submit', (e: Event) => {
 // Listen for network-level events from injected.js
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
-  const d = event.data as { type?: string; count?: number };
+  const d = event.data as { type?: string; count?: number; gateId?: string; items?: Array<{ type: string; label: string; value: string; preview: string }> };
+
+  // NEW: injected.js detected PII and is waiting for our decision
+  if (d?.type === 'AI_CAGE_PII_DETECTED' && d.gateId && d.items) {
+    handleNetworkPII(d.gateId, d.items);
+    return;
+  }
+
   if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
     sessionTotal += d.count;
     bubbleState = 'caged';

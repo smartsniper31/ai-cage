@@ -101,7 +101,23 @@
 Chaque étape ne démarre que si l'étape précédente satisfait TOUS ses critères de validation.
 Si une étape échoue, on la fixe avant de continuer. On ne saute jamais une étape.
 
-**Étape courante : ÉTAPE 2**
+**Étape courante : ÉTAPE 2 — Validation réelle**
+
+---
+
+## ÉTAPE 1 — VALIDÉE ✅ (v3 finale)
+
+**Date :** 2026-11-03
+**Build :** EXT:0 — content.js 28.90 kB, injected.js 8.60 kB
+**Tests :** 202/202
+
+### Livraisons Étape 1 :
+1. **injected.js** — Détection PII inline dans le contexte page (fetch/XHR interceptés avant React)
+2. **Bulle flottante** — Remplace la barre intrusive (coin bas-droit, 44px, verte/ambre/bleue)
+3. **Panneau de contrôle** — L'utilisateur voit chaque item détecté et choisit : 🔒 Cage ou Pass
+4. **Human-in-the-loop** — Cage All / Pass All / item par item
+5. **document_start** — Injection avant tout script de la page
+6. **Manifest `<all_urls>`** — Fonctionne sur TOUTE IA, présente et future
 
 ---
 
