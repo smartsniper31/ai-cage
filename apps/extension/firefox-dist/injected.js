@@ -24,8 +24,11 @@
         let m;
         while ((m = p.re.exec(text)) !== null) {
           const v = m[1] ?? m[0];
+          if (v.length === 0) {
+            p.re.lastIndex++;
+            continue;
+          }
           matches.push({ type: p.type, label: p.label, value: v, start: m.index, end: m.index + v.length });
-          if (m[0].length === 0) p.re.lastIndex++;
         }
         p.re.lastIndex = 0;
       }
@@ -99,14 +102,15 @@
     window2.addEventListener("message", (event) => {
       if (event.source !== window2) return;
       const d = event.data;
-      if ((d == null ? void 0 : d.type) === "AI_CAGE_PROCEED" && d.gateId && pendingGates.has(d.gateId)) {
-        const resolve = pendingGates.get(d.gateId);
-        pendingGates.delete(d.gateId);
-        if (d.mode === "cage" && d.items && d.items.length > 0) {
-          resolve("__CAGE__");
-        } else {
-          resolve("__PASS__");
-        }
+      if ((d == null ? void 0 : d.type) !== "AI_CAGE_PROCEED") return;
+      if (!d.gateId) return;
+      const resolve = pendingGates.get(d.gateId);
+      if (!resolve) return;
+      pendingGates.delete(d.gateId);
+      if (d.mode === "cage") {
+        resolve("__CAGE__");
+      } else {
+        resolve("__PASS__");
       }
     });
     function scanJSON(obj, items) {

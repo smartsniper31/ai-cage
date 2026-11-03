@@ -53,18 +53,18 @@
   function detectPII(text: string): DetectResult {
     const matches: PiiMatch[] = [];
     for (const p of PATTERNS) {
+      // CRITICAL: always reset lastIndex before use — prevents accumulation bug
       p.re.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = p.re.exec(text)) !== null) {
         const v = m[1] ?? m[0];
+        if (v.length === 0) { p.re.lastIndex++; continue; } // guard zero-length
         matches.push({ type: p.type, label: p.label, value: v, start: m.index, end: m.index + v.length });
-        if (m[0].length === 0) p.re.lastIndex++;
       }
-      p.re.lastIndex = 0;
+      p.re.lastIndex = 0; // reset after use too
     }
     if (matches.length === 0) return { found: false, items: [] };
 
-    // Deduplicate overlaps (keep first found)
     const kept: PiiMatch[] = [];
     const sorted = [...matches].sort((a, b) => a.start - b.start);
     for (const c of sorted) {
@@ -160,16 +160,20 @@
     if (event.source !== window) return;
     const d = event.data as { type?: string; gateId?: string; mode?: 'cage' | 'pass'; items?: Array<{ value: string; label: string }> };
 
-    if (d?.type === 'AI_CAGE_PROCEED' && d.gateId && pendingGates.has(d.gateId)) {
-      const resolve = pendingGates.get(d.gateId)!;
-      pendingGates.delete(d.gateId);
+    if (d?.type !== 'AI_CAGE_PROCEED') return;
+    if (!d.gateId) return;
 
-      // content.ts sends back the items it decided to cage
-      if (d.mode === 'cage' && d.items && d.items.length > 0) {
-        resolve('__CAGE__'); // signal to cage
-      } else {
-        resolve('__PASS__'); // signal to pass
-      }
+    // Find gate — check exact match
+    const resolve = pendingGates.get(d.gateId);
+    if (!resolve) return; // gate already resolved or unknown
+
+    pendingGates.delete(d.gateId); // remove FIRST to prevent double-fire
+
+    if (d.mode === 'cage') {
+      resolve('__CAGE__');
+    } else {
+      // mode === 'pass' OR anything else → always release the request as-is
+      resolve('__PASS__');
     }
   });
 

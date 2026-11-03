@@ -1,32 +1,92 @@
-// Copyright (c) 2026 Frikha, Tunisia. All rights reserved.
-// AI CAGE — Enterprise AI Data Protection
-// Licensed under Business Source License 1.1 — see LICENSE
+﻿// Copyright (c) 2026 Frikha, Tunisia. All rights reserved.
+// AI CAGE — Enterprise AI Data Protection v0.5.0-stealth
+// Licensed under Business Source License 1.1
 // Commercial use: contact@ai-cage.io
 
 /**
- * @file content.ts — AI CAGE Universal Content Script v0.4.5
+ * @file content.ts — AI CAGE Ghost Mode v0.5.0
  *
- * UX v2: Floating bubble (not intrusive banner) + User control panel
- *   - Discreet green/amber/blue bubble bottom-right corner
- *   - Click bubble → mini control panel showing detected items
- *   - User chooses which items to cage or send in clear
- *   - Human-in-the-loop for every sensitive item
+ * GHOST MODE fixes:
+ *   1. Shadow DOM (closed) — bubble + panel invisible to page JS
+ *   2. No style tag in document.head — no React hydration mismatch
+ *   3. No localStorage/sessionStorage touches — no dark mode reload
+ *   4. Pass fix: sendDecision always resolves gate immediately
+ *   5. Stop-after-3-messages fix: regex lastIndex reset + gate cleanup
  */
 
 import { cageText } from '@ai-cage/core';
 import type { CagedEntity } from '@ai-cage/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BUBBLE_ID   = 'ai-cage-bubble-v2';
-const PANEL_ID    = 'ai-cage-panel-v2';
-const CAGED_ATTR  = 'data-ai-cage-done';
-const FONT        = 'system-ui,-apple-system,sans-serif';
+const SHADOW_HOST_ID = 'ai-cage-host-v5';
+const CAGED_ATTR     = 'data-ai-cage-done';
+const FONT           = 'system-ui,-apple-system,sans-serif';
 
 // ─── Session state ─────────────────────────────────────────────────────────────
 let sessionTotal   = 0;
 let bubbleState: 'idle' | 'detected' | 'caged' | 'restored' = 'idle';
 let pendingEntities: CagedEntity[] = [];
-let pendingElement: HTMLElement | null = null;
+
+// ─── Shadow DOM host ───────────────────────────────────────────────────────────
+let shadowRoot: ShadowRoot | null = null;
+
+function getShadowRoot(): ShadowRoot | null {
+  if (shadowRoot) return shadowRoot;
+  if (!document.body) return null;
+
+  const host = document.createElement('div');
+  host.id = SHADOW_HOST_ID;
+  host.style.cssText = 'display:contents;position:static;all:unset;';
+  // closed mode = page JS cannot access .shadowRoot
+  shadowRoot = host.attachShadow({ mode: 'closed' });
+  document.body.appendChild(host);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes cage-in { from{opacity:0;transform:translateY(10px) scale(.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+    #cage-bubble {
+      position:fixed;bottom:20px;right:20px;z-index:2147483647;
+      width:44px;height:44px;border-radius:50%;
+      background:#15803d;color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:18px;font-weight:800;
+      box-shadow:0 2px 12px rgba(0,0,0,.35);
+      user-select:none;transition:all .25s;
+      border:2px solid rgba(255,255,255,.25);
+      font-family:${FONT};
+    }
+    #cage-bubble.amber{background:#d97706}
+    #cage-bubble.blue{background:#0369a1}
+    #cage-badge{
+      position:absolute;top:-4px;right:-4px;
+      background:#dc2626;color:#fff;border-radius:999px;
+      font-size:10px;font-weight:800;min-width:16px;height:16px;
+      display:none;align-items:center;justify-content:center;padding:0 3px;
+    }
+    #cage-panel{
+      position:fixed;bottom:74px;right:20px;z-index:2147483647;
+      width:310px;max-height:440px;
+      background:#fff;color:#0f172a;border-radius:14px;
+      box-shadow:0 8px 32px rgba(0,0,0,.28);
+      font-family:${FONT};font-size:13px;overflow:hidden;
+      animation:cage-in .2s ease;
+    }
+    .ch{background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px}
+    .ch.amber{background:#d97706}
+    .cs{padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;gap:16px}
+    .cl{max-height:200px;overflow-y:auto;padding:6px 0}
+    .cr{padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px}
+    .ca{padding:10px 14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .cw{padding:8px 14px;background:#fef2f2;border-top:1px solid #fecaca;font-size:11px;color:#991b1b}
+    .cf{padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    .bg{background:#15803d;color:#fff;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+    .gg{background:#e2e8f0;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+    .bs{background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+    .gs{background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+  `;
+  shadowRoot.appendChild(style);
+  return shadowRoot;
+}
 
 // ─── PAGE SCRIPT INJECTION ─────────────────────────────────────────────────────
 function injectPageScript(): void {
@@ -40,484 +100,152 @@ function injectPageScript(): void {
 }
 
 function shareEntitiesWithPage(entities: CagedEntity[]): void {
-  window.postMessage({
-    type: 'AI_CAGE_ENTITIES',
-    entities: entities.map(e => ({ placeholder: e.placeholder, originalValue: e.originalValue })),
-  }, '*');
+  window.postMessage({ type: 'AI_CAGE_ENTITIES', entities: entities.map(e => ({ placeholder: e.placeholder, originalValue: e.originalValue })) }, '*');
 }
 
 // ─── BUBBLE ────────────────────────────────────────────────────────────────────
-
 function createBubble(): void {
-  if (document.getElementById(BUBBLE_ID)) return;
+  const root = getShadowRoot();
+  if (!root || root.getElementById('cage-bubble')) return;
   const b = document.createElement('div');
-  b.id = BUBBLE_ID;
+  b.id = 'cage-bubble';
   b.setAttribute('role', 'button');
-  b.setAttribute('aria-label', 'AI CAGE — Click to manage protected data');
-  b.style.cssText = [
-    'position:fixed', 'bottom:20px', 'right:20px', 'z-index:2147483647',
-    'width:44px', 'height:44px', 'border-radius:50%',
-    'background:#15803d', 'color:#fff',
-    'display:flex', 'align-items:center', 'justify-content:center',
-    'cursor:pointer',
-    'box-shadow:0 2px 12px rgba(0,0,0,.35)',
-    `font-family:${FONT}`, 'font-size:18px', 'font-weight:800',
-    'user-select:none', 'transition:all .25s',
-    'border:2px solid rgba(255,255,255,.3)',
-  ].join(';');
+  b.setAttribute('aria-label', 'AI CAGE');
   b.innerHTML = '🔒';
-  b.title = 'AI CAGE Active — Click for details';
   b.addEventListener('click', togglePanel);
-
-  // Tooltip counter badge
   const badge = document.createElement('span');
-  badge.id = 'ai-cage-badge';
-  badge.style.cssText = [
-    'position:absolute', 'top:-4px', 'right:-4px',
-    'background:#dc2626', 'color:#fff',
-    'border-radius:999px', 'font-size:10px', 'font-weight:800',
-    'min-width:16px', 'height:16px',
-    'display:none', 'align-items:center', 'justify-content:center',
-    'padding:0 3px', 'line-height:1',
-  ].join(';');
+  badge.id = 'cage-badge';
   b.appendChild(badge);
-
-  document.body.appendChild(b);
+  root.appendChild(b);
 }
 
 function updateBubble(): void {
-  const b = document.getElementById(BUBBLE_ID);
-  const badge = document.getElementById('ai-cage-badge');
+  const root = getShadowRoot();
+  if (!root) return;
+  const b = root.getElementById('cage-bubble') as HTMLElement | null;
+  const badge = root.getElementById('cage-badge') as HTMLElement | null;
   if (!b) return;
-
-  const colors: Record<typeof bubbleState, string> = {
-    idle:     '#15803d',
-    detected: '#d97706',
-    caged:    '#0369a1',
-    restored: '#15803d',
-  };
-
-  const icons: Record<typeof bubbleState, string> = {
-    idle:     '🔒',
-    detected: '⚠️',
-    caged:    '🔒',
-    restored: '✅',
-  };
-
-  b.style.background = colors[bubbleState];
-  b.innerHTML = icons[bubbleState];
+  b.className = bubbleState === 'detected' ? 'amber' : bubbleState === 'caged' ? 'blue' : '';
+  const icon = b.childNodes[0];
+  if (icon) icon.textContent = bubbleState === 'detected' ? '⚠️' : bubbleState === 'restored' ? '✅' : '🔒';
   if (badge) b.appendChild(badge);
-
-  if (sessionTotal > 0 && badge) {
-    badge.style.display = 'flex';
-    badge.textContent = String(sessionTotal);
-  }
-
-  // Pulse animation on state change
+  if (sessionTotal > 0 && badge) { badge.style.display = 'flex'; badge.textContent = String(sessionTotal); }
   b.style.transform = 'scale(1.15)';
-  setTimeout(() => { if (b) b.style.transform = 'scale(1)'; }, 250);
+  setTimeout(() => { b.style.transform = 'scale(1)'; }, 250);
+  try { void chrome.action.setBadgeText({ text: sessionTotal > 0 ? String(sessionTotal) : '' }); } catch { /* ignore */ }
 }
 
-// ─── CONTROL PANEL ─────────────────────────────────────────────────────────────
-
+// ─── STATUS PANEL ──────────────────────────────────────────────────────────────
 function togglePanel(): void {
-  const existing = document.getElementById(PANEL_ID);
+  const root = getShadowRoot();
+  if (!root) return;
+  const existing = root.getElementById('cage-panel');
   if (existing) { existing.remove(); return; }
-  showPanel();
+  showStatusPanel();
 }
 
-function showPanel(): void {
-  const existing = document.getElementById(PANEL_ID);
-  if (existing) existing.remove();
-
+function showStatusPanel(): void {
+  const root = getShadowRoot();
+  if (!root) return;
+  root.getElementById('cage-panel')?.remove();
   const panel = document.createElement('div');
-  panel.id = PANEL_ID;
-  panel.style.cssText = [
-    'position:fixed', 'bottom:74px', 'right:20px', 'z-index:2147483647',
-    'width:300px', 'max-height:400px',
-    'background:#fff', 'color:#0f172a',
-    'border-radius:14px',
-    'box-shadow:0 8px 32px rgba(0,0,0,.25)',
-    `font-family:${FONT}`, 'font-size:13px',
-    'overflow:hidden',
-    'animation:ai-cage-slide-in .2s ease',
-  ].join(';');
-
-  // Inject animation keyframes once
-  if (!document.getElementById('ai-cage-styles')) {
-    const style = document.createElement('style');
-    style.id = 'ai-cage-styles';
-    style.textContent = `
-      @keyframes ai-cage-slide-in {
-        from { opacity:0; transform:translateY(12px) scale(.95); }
-        to   { opacity:1; transform:translateY(0) scale(1); }
-      }
-    `;
-    document.head?.appendChild(style);
-  }
-
-  // ── Header ──
-  const header = document.createElement('div');
-  header.style.cssText = 'background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;';
-  header.innerHTML = `
-    <span style="font-size:16px">🔒</span>
-    <div style="flex:1">
-      <div style="font-weight:700;font-size:13px">AI CAGE</div>
-      <div style="font-size:11px;opacity:.8">${window.location.hostname}</div>
+  panel.id = 'cage-panel';
+  panel.innerHTML = `
+    <div class="ch">
+      <span style="font-size:16px">🔒</span>
+      <div style="flex:1"><div style="font-weight:700;font-size:13px">AI CAGE</div><div style="font-size:11px;opacity:.8">${window.location.hostname}</div></div>
+      <button id="cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;padding:2px">×</button>
     </div>
-    <button id="ai-cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1;padding:2px;">×</button>
-  `;
-  panel.appendChild(header);
-
-  // ── Stats row ──
-  const stats = document.createElement('div');
-  stats.style.cssText = 'padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;gap:16px;';
-  stats.innerHTML = `
-    <div style="text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#15803d">${sessionTotal}</div>
-      <div style="font-size:10px;color:#64748b">Total caged</div>
+    <div class="cs">
+      <div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#15803d">${sessionTotal}</div><div style="font-size:10px;color:#64748b">Total caged</div></div>
+      <div style="margin-left:auto;align-self:center;font-size:11px;color:#166534;font-weight:600">✅ Zero data sent</div>
     </div>
-    <div style="text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#0369a1">${pendingEntities.length}</div>
-      <div style="font-size:10px;color:#64748b">Pending review</div>
+    <div style="padding:14px;font-size:12px;color:#64748b;text-align:center">
+      ${sessionTotal > 0 ? `✅ ${sessionTotal} item(s) caged this session` : '🔍 Monitoring... Type a prompt with sensitive data.'}
     </div>
-    <div style="margin-left:auto;align-self:center">
-      <div style="font-size:11px;color:#166534;font-weight:600">✅ Zero data sent</div>
-    </div>
-  `;
-  panel.appendChild(stats);
-
-  // ── Entity list ──
-  const listWrap = document.createElement('div');
-  listWrap.style.cssText = 'max-height:200px;overflow-y:auto;padding:8px 0;';
-
-  if (pendingEntities.length === 0 && sessionTotal === 0) {
-    listWrap.innerHTML = `
-      <div style="padding:20px;text-align:center;color:#64748b;font-size:12px">
-        <div style="font-size:24px;margin-bottom:6px">🔍</div>
-        Monitoring your prompts...<br>
-        No sensitive data detected yet.
-      </div>`;
-  } else if (pendingEntities.length > 0) {
-    listWrap.innerHTML = `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Detected Items — Choose action:</div>`;
-
-    pendingEntities.forEach((entity, idx) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;';
-
-      const typeColors: Record<string, string> = {
-        EMAIL_ADDRESS: '#0369a1', CREDIT_CARD: '#dc2626',
-        IBAN: '#7c3aed', API_KEY: '#dc2626',
-        PRIVATE_KEY: '#dc2626', PHONE_NUMBER: '#d97706',
-        IP_ADDRESS: '#64748b', CIN_TN: '#0369a1',
-        MF_TN: '#0369a1', GENERIC_SECRET: '#dc2626',
-      };
-      const color = typeColors[entity.type] ?? '#64748b';
-      const shortType = entity.type.replace('_', ' ').toLowerCase();
-
-      // Show partially redacted value
-      const val = entity.originalValue;
-      const preview = val.length > 12
-        ? val.slice(0, 4) + '***' + val.slice(-3)
-        : val.slice(0, 2) + '***';
-
-      row.innerHTML = `
-        <div style="flex:1;min-width:0">
-          <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase">${shortType}</div>
-          <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>
-        </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">
-          <button data-idx="${idx}" data-action="cage"
-            style="background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
-            🔒 Cage
-          </button>
-          <button data-idx="${idx}" data-action="pass"
-            style="background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
-            Pass
-          </button>
-        </div>
-      `;
-      listWrap.appendChild(row);
-    });
-  } else {
-    listWrap.innerHTML = `
-      <div style="padding:16px 14px">
-        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">Session history</div>
-        <div style="font-size:12px;color:#16a34a">✅ ${sessionTotal} item(s) successfully caged this session</div>
-      </div>`;
-  }
-  panel.appendChild(listWrap);
-
-  // ── Action buttons ──
-  if (pendingEntities.length > 0) {
-    const actions = document.createElement('div');
-    actions.style.cssText = 'padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;gap:8px;';
-    actions.innerHTML = `
-      <button id="ai-cage-cage-all" style="flex:1;background:#15803d;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-        🔒 Cage All
-      </button>
-      <button id="ai-cage-pass-all" style="flex:1;background:#e2e8f0;color:#374151;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-        Send All (no protection)
-      </button>
-    `;
-    panel.appendChild(actions);
-  }
-
-  // ── Footer ──
-  const footer = document.createElement('div');
-  footer.style.cssText = 'padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;';
-  footer.innerHTML = `
-    <span style="font-size:10px;color:#94a3b8">🇹🇳 Made in Tunisia · Zero data sent</span>
-    <span style="font-size:10px;color:#94a3b8">v0.4.5</span>
-  `;
-  panel.appendChild(footer);
-
-  document.body.appendChild(panel);
-
-  // ── Event handlers ──
-  document.getElementById('ai-cage-close')?.addEventListener('click', () => panel.remove());
-
-  document.getElementById('ai-cage-cage-all')?.addEventListener('click', () => {
-    applyEntityDecisions(pendingEntities.map((_, i) => ({ idx: i, action: 'cage' as const })));
-    panel.remove();
-  });
-
-  document.getElementById('ai-cage-pass-all')?.addEventListener('click', () => {
-    pendingEntities = [];
-    panel.remove();
-    bubbleState = 'idle';
-    updateBubble();
-  });
-
-  listWrap.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = e.currentTarget as HTMLElement;
-      const idx = parseInt(target.dataset['idx'] ?? '0', 10);
-      const action = target.dataset['action'] as 'cage' | 'pass';
-      applyEntityDecisions([{ idx, action }]);
-      panel.remove();
-      // Reopen if more items pending
-      if (pendingEntities.length > 0) setTimeout(showPanel, 100);
-    });
-  });
-
-  // Close on outside click
+    <div class="cf"><span>🇹🇳 Made in Tunisia</span><span>v0.5.0</span></div>`;
+  root.appendChild(panel);
+  root.getElementById('cage-close')?.addEventListener('click', () => panel.remove());
   setTimeout(() => {
     document.addEventListener('click', (e) => {
-      const p = document.getElementById(PANEL_ID);
-      const bub = document.getElementById(BUBBLE_ID);
-      if (p && !p.contains(e.target as Node) && !bub?.contains(e.target as Node)) {
-        p.remove();
-      }
+      const host = document.getElementById(SHADOW_HOST_ID);
+      if (host && !host.contains(e.target as Node)) root.getElementById('cage-panel')?.remove();
     }, { once: true });
-  }, 100);
+  }, 150);
 }
 
-function applyEntityDecisions(decisions: Array<{ idx: number; action: 'cage' | 'pass' }>): void {
-  const caged  = decisions.filter(d => d.action === 'cage').map(d => pendingEntities[d.idx]).filter(Boolean);
-  const passed = decisions.filter(d => d.action === 'pass').map(d => pendingEntities[d.idx]).filter(Boolean);
+// ─── NETWORK PII PANEL ─────────────────────────────────────────────────────────
+function showNetworkPanel(gateId: string, items: Array<{ type: string; label: string; value: string; preview: string }>): void {
+  const root = getShadowRoot();
+  if (!root) { sendGateDecision(gateId, 'pass', []); return; }
+  root.getElementById('cage-panel')?.remove();
 
-  // Remove processed entities
-  const processedIdxs = new Set(decisions.map(d => d.idx));
-  pendingEntities = pendingEntities.filter((_, i) => !processedIdxs.has(i));
-
-  if (caged.length > 0) {
-    sessionTotal += caged.length;
-    shareEntitiesWithPage(caged);
-    bubbleState = 'caged';
-    updateBubble();
-    try {
-      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: caged });
-    } catch { /* ignore */ }
-  }
-
-  if (passed.length > 0) {
-    console.warn(`[AI CAGE] User chose to pass ${passed.length} item(s) uncaged.`);
-  }
-
-  if (pendingEntities.length === 0 && caged.length > 0) {
-    bubbleState = 'caged';
-    updateBubble();
-  }
-}
-
-/**
- * Handles PII detected at the NETWORK level by injected.js.
- * Shows the control panel and sends back the decision (cage/pass) to injected.js.
- * This is the key function that makes "Pass" actually pass — not cage.
- */
-function handleNetworkPII(
-  gateId: string,
-  items: Array<{ type: string; label: string; value: string; preview: string }>,
-): void {
-  // Update session state
-  bubbleState = 'detected';
-  updateBubble();
-
-  // Show panel with the detected items
-  showNetworkPanel(gateId, items);
-}
-
-function showNetworkPanel(
-  gateId: string,
-  items: Array<{ type: string; label: string; value: string; preview: string }>,
-): void {
-  const existing = document.getElementById(PANEL_ID);
-  if (existing) existing.remove();
-
-  const panel = document.createElement('div');
-  panel.id = PANEL_ID;
-  panel.style.cssText = [
-    'position:fixed', 'bottom:74px', 'right:20px', 'z-index:2147483647',
-    'width:310px', 'max-height:420px',
-    'background:#fff', 'color:#0f172a',
-    'border-radius:14px',
-    'box-shadow:0 8px 32px rgba(0,0,0,.3)',
-    `font-family:${FONT}`, 'font-size:13px',
-    'overflow:hidden',
-  ].join(';');
-
-  // Header
-  const header = document.createElement('div');
-  header.style.cssText = 'background:#d97706;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;';
-  header.innerHTML = `
-    <span style="font-size:16px">⚠️</span>
-    <div style="flex:1">
-      <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
-      <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? 's' : ''} found — what do you want to do?</div>
-    </div>
-  `;
-  panel.appendChild(header);
-
-  // Items list
-  const list = document.createElement('div');
-  list.style.cssText = 'max-height:200px;overflow-y:auto;padding:6px 0;';
-
-  const chosenItems = new Set<number>(); // track per-item choices
-
-  items.forEach((item, idx) => {
-    const typeColors: Record<string, string> = {
-      EMAIL_ADDRESS: '#0369a1', CREDIT_CARD: '#dc2626',
-      IBAN: '#7c3aed', API_KEY: '#dc2626',
-      PRIVATE_KEY: '#dc2626', PHONE_NUMBER: '#d97706',
-      IP_ADDRESS: '#64748b', CIN_TN: '#0369a1',
-      MF_TN: '#0369a1', GENERIC_SECRET: '#dc2626',
-    };
-    const color = typeColors[item.type] ?? '#64748b';
-    const row = document.createElement('div');
-    row.id = `ai-cage-row-${idx}`;
-    row.style.cssText = 'padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;';
-    row.innerHTML = `
+  const itemsHtml = items.map((item, idx) => `
+    <div class="cr" id="cr-${idx}">
       <div style="flex:1;min-width:0">
-        <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase">${item.type.replace(/_/g,' ').toLowerCase()}</div>
+        <div style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase">${item.type.replace(/_/g,' ')}</div>
         <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.preview}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button data-idx="${idx}" data-act="cage"
-          style="background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
-          🔒 Cage
-        </button>
-        <button data-idx="${idx}" data-act="pass"
-          style="background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
-          Pass
-        </button>
+        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cage</button>
+        <button class="gs" data-idx="${idx}" data-act="pass">Pass</button>
       </div>
-    `;
-    list.appendChild(row);
-  });
-  panel.appendChild(list);
+    </div>`).join('');
 
-  // Action buttons
-  const actions = document.createElement('div');
-  actions.style.cssText = 'padding:10px 14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:8px;';
-  actions.innerHTML = `
-    <button id="ai-cage-net-cage-all"
-      style="background:#15803d;color:#fff;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-      🔒 Cage All & Send
-    </button>
-    <button id="ai-cage-net-pass-all"
-      style="background:#e2e8f0;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-      ⚡ Send Unprotected
-    </button>
-  `;
-  panel.appendChild(actions);
+  const panel = document.createElement('div');
+  panel.id = 'cage-panel';
+  panel.innerHTML = `
+    <div class="ch amber">
+      <span style="font-size:16px">⚠️</span>
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
+        <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? 's' : ''} — choose action</div>
+      </div>
+    </div>
+    <div class="cl">${itemsHtml}</div>
+    <div class="ca">
+      <button class="bg" id="cage-all">🔒 Cage All & Send</button>
+      <button class="gg" id="pass-all">⚡ Send Unprotected</button>
+    </div>
+    <div class="cw">⚠️ "Send Unprotected" sends your real data to the AI.</div>`;
+  root.appendChild(panel);
+  bubbleState = 'detected';
+  updateBubble();
 
-  // Warning footer
-  const warn = document.createElement('div');
-  warn.style.cssText = 'padding:8px 14px;background:#fef2f2;border-top:1px solid #fecaca;font-size:11px;color:#991b1b;';
-  warn.textContent = '⚠️ "Send Unprotected" sends your real data to the AI.';
-  panel.appendChild(warn);
-
-  document.body.appendChild(panel);
-
-  // ── Decision handlers ──
-
-  function sendDecision(mode: 'cage' | 'pass', cageItems: typeof items): void {
-    panel.remove();
-    window.postMessage({
-      type: 'AI_CAGE_PROCEED',
-      gateId,
-      mode,
-      items: cageItems.map(i => ({ value: i.value, label: i.label })),
-    }, '*');
-
+  let sent = false;
+  function decide(mode: 'cage' | 'pass', cageItems: typeof items): void {
+    if (sent) return;
+    sent = true;
+    root.getElementById('cage-panel')?.remove();
+    sendGateDecision(gateId, mode, cageItems);
+    if (mode === 'cage') { sessionTotal += cageItems.length; bubbleState = 'caged'; }
+    else { bubbleState = 'idle'; }
+    updateBubble();
     if (mode === 'cage') {
-      sessionTotal += cageItems.length;
-      bubbleState = 'caged';
-      updateBubble();
-      try {
-        void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
-      } catch { /* ignore */ }
-    } else {
-      bubbleState = 'idle';
-      updateBubble();
+      try { void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] }); } catch { /* ignore */ }
     }
   }
 
-  document.getElementById('ai-cage-net-cage-all')?.addEventListener('click', () => {
-    sendDecision('cage', items);
-  });
-
-  document.getElementById('ai-cage-net-pass-all')?.addEventListener('click', () => {
-    sendDecision('pass', []);
-  });
-
-  // Per-item buttons
-  list.querySelectorAll('button[data-act]').forEach(btn => {
+  root.getElementById('cage-all')?.addEventListener('click', () => decide('cage', items));
+  root.getElementById('pass-all')?.addEventListener('click', () => decide('pass', []));
+  root.querySelectorAll('button[data-act]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const t = e.currentTarget as HTMLElement;
       const idx = parseInt(t.dataset['idx'] ?? '0', 10);
       const act = t.dataset['act'] as 'cage' | 'pass';
-
-      // Mark this row's decision
-      const row = document.getElementById(`ai-cage-row-${idx}`);
-      if (row) {
-        row.style.background = act === 'cage' ? '#f0fdf4' : '#fef2f2';
-        row.querySelectorAll('button').forEach(b => (b as HTMLButtonElement).disabled = true);
-        if (act === 'cage') chosenItems.add(idx);
-        else chosenItems.delete(idx);
-      }
-
-      // Check if all items have been decided
-      if (chosenItems.size + (items.length - chosenItems.size) === items.length) {
-        // Auto-send when last item decided
-        const toСage = items.filter((_, i) => chosenItems.has(i));
-        sendDecision(toСage.length > 0 ? 'cage' : 'pass', toСage);
-      }
+      const row = root.getElementById(`cr-${idx}`);
+      if (row) { row.style.background = act === 'cage' ? '#f0fdf4' : '#fef2f2'; row.querySelectorAll('button').forEach(b => ((b as HTMLButtonElement).disabled = true)); }
+      if (items.length === 1) decide(act, act === 'cage' ? [items[0]!] : []);
     });
   });
+}
 
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', (e) => {
-      const p = document.getElementById(PANEL_ID);
-      const bub = document.getElementById(BUBBLE_ID);
-      if (p && !p.contains(e.target as Node) && !bub?.contains(e.target as Node)) {
-        // Outside click → pass (don't block the request indefinitely)
-        sendDecision('pass', []);
-      }
-    }, { once: true });
-  }, 200);
+function sendGateDecision(gateId: string, mode: 'cage' | 'pass', items: Array<{ value: string; label: string }>): void {
+  window.postMessage({ type: 'AI_CAGE_PROCEED', gateId, mode, items }, '*');
+}
+
+function handleNetworkPII(gateId: string, items: Array<{ type: string; label: string; value: string; preview: string }>): void {
+  showNetworkPanel(gateId, items);
 }
 
 // ─── PROMPT SELECTORS ──────────────────────────────────────────────────────────
@@ -543,13 +271,8 @@ const SEND_SELECTORS = [
 
 function findPrompt(): HTMLElement | null {
   for (const sel of PROMPT_SELECTORS) {
-    try {
-      const el = document.querySelector<HTMLElement>(sel);
-      if (el) {
-        const r = el.getBoundingClientRect();
-        if (r.width > 50 && r.height > 20) return el;
-      }
-    } catch { /* skip */ }
+    try { const el = document.querySelector<HTMLElement>(sel); if (el) { const r = el.getBoundingClientRect(); if (r.width > 50 && r.height > 20) return el; } }
+    catch { /* skip */ }
   }
   return null;
 }
@@ -561,70 +284,39 @@ function readText(el: HTMLElement): string {
 
 function writeText(el: HTMLElement, text: string): void {
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-    const proto = el instanceof HTMLTextAreaElement
-      ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-    if (setter) setter.call(el, text);
-    else el.value = text;
-    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    if (setter) setter.call(el, text); else el.value = text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
     el.focus();
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, text);
-    if (readText(el) !== text) {
-      el.innerText = text;
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
-    }
+    if (readText(el) !== text) { el.innerText = text; el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text })); }
   }
 }
 
 // ─── CAGE LOGIC ────────────────────────────────────────────────────────────────
-
-/**
- * Detects PII in prompt. If found:
- *  - Shows bubble in "detected" state
- *  - Opens control panel for user decision
- *  - User decides per item: cage or pass
- */
 function handlePrompt(el: HTMLElement): void {
   const raw = readText(el);
   if (!raw || raw.length < 3) return;
-
   const { cagedText, entities, totalCaged } = cageText(raw);
   if (totalCaged === 0) return;
-
-  // Store pending entities for user review
   pendingEntities = [...pendingEntities, ...entities];
-
-  // Update bubble to "detected" state
   bubbleState = 'detected';
   updateBubble();
-
-  // Show control panel automatically
-  showPanel();
-
-  // Also write caged text to DOM as fallback
-  // (injected.js will handle the actual network-level caging)
   writeText(el, cagedText);
   shareEntitiesWithPage(entities);
-
   sessionTotal += totalCaged;
-
-  try {
-    void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities });
-  } catch { /* ignore */ }
+  try { void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities }); } catch { /* ignore */ }
 }
 
 // ─── EVENT LISTENERS ───────────────────────────────────────────────────────────
-
 document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey) return;
   const target = e.target as HTMLElement;
-  const isPrompt = PROMPT_SELECTORS.some(sel => {
-    try { return target.matches(sel) || !!target.closest(sel); }
-    catch { return false; }
-  });
+  const isPrompt = PROMPT_SELECTORS.some(sel => { try { return target.matches(sel) || !!target.closest(sel); } catch { return false; } });
   if (isPrompt) handlePrompt(target);
 }, true);
 
@@ -633,116 +325,56 @@ function hookButtons(): void {
     document.querySelectorAll<HTMLElement>(sel).forEach(btn => {
       if (btn.getAttribute(CAGED_ATTR) === '1') return;
       btn.setAttribute(CAGED_ATTR, '1');
-      btn.addEventListener('click', () => {
-        const p = findPrompt();
-        if (p) handlePrompt(p);
-      }, true);
+      btn.addEventListener('click', () => { const p = findPrompt(); if (p) handlePrompt(p); }, true);
     });
   });
 }
 
 document.addEventListener('submit', (e: Event) => {
   const form = e.target as HTMLFormElement;
-  const sel = PROMPT_SELECTORS.join(',');
-  try {
-    const input = form.querySelector<HTMLElement>(sel);
-    if (input) handlePrompt(input);
-  } catch { /* ignore */ }
+  try { const input = form.querySelector<HTMLElement>(PROMPT_SELECTORS.join(',')); if (input) handlePrompt(input); } catch { /* ignore */ }
 }, true);
 
-// Listen for network-level events from injected.js
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   const d = event.data as { type?: string; count?: number; gateId?: string; items?: Array<{ type: string; label: string; value: string; preview: string }> };
 
-  // NEW: injected.js detected PII and is waiting for our decision
-  if (d?.type === 'AI_CAGE_PII_DETECTED' && d.gateId && d.items) {
-    handleNetworkPII(d.gateId, d.items);
-    return;
-  }
-
+  if (d?.type === 'AI_CAGE_PII_DETECTED' && d.gateId && d.items) { handleNetworkPII(d.gateId, d.items); return; }
   if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
-    sessionTotal += d.count;
-    bubbleState = 'caged';
-    updateBubble();
-    try {
-      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
-    } catch { /* ignore */ }
+    sessionTotal += d.count; bubbleState = 'caged'; updateBubble();
+    try { void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] }); } catch { /* ignore */ }
   }
-
-  // Injection detected in AI response → send AGENT_TOOL_CALL event for Agent tab
+  if (d?.type === 'AI_CAGE_NETWORK_RESTORED') { bubbleState = 'restored'; updateBubble(); setTimeout(() => { bubbleState = 'idle'; updateBubble(); }, 3000); }
   if (d?.type === 'AI_CAGE_INJECTION_DETECTED') {
-    try {
-      void chrome.runtime.sendMessage({
-        type: 'AGENT_EVENT',
-        site: window.location.hostname,
-        detail: (d as { detail?: string }).detail ?? 'Injection detected in AI response',
-        blocked: true,
-      });
-    } catch { /* ignore */ }
-    bubbleState = 'detected';
-    updateBubble();
-  }
-
-  if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
-    bubbleState = 'restored';
-    updateBubble();
-    setTimeout(() => { bubbleState = 'idle'; updateBubble(); }, 3000);
+    try { void chrome.runtime.sendMessage({ type: 'AGENT_EVENT', site: window.location.hostname, detail: (d as { detail?: string }).detail ?? 'Injection detected', blocked: true }); } catch { /* ignore */ }
+    bubbleState = 'detected'; updateBubble();
   }
 });
 
 const domObserver = new MutationObserver(() => {
   hookButtons();
-  if (!document.getElementById(BUBBLE_ID)) createBubble();
-});
-
-// Response uncaging observer
-const responseObserver = new MutationObserver((mutations) => {
-  if (pendingEntities.length === 0 && sessionTotal === 0) return;
-  for (const mut of mutations) {
-    mut.addedNodes.forEach(node => {
-      if (node instanceof Element && node.innerHTML?.includes('[CAGED_')) {
-        // Signal injected.js to handle restoration
-        window.postMessage({ type: 'AI_CAGE_RESTORE_REQUEST' }, '*');
-      }
-    });
-    if (mut.type === 'characterData' && mut.target.textContent?.includes('[CAGED_')) {
-      window.postMessage({ type: 'AI_CAGE_RESTORE_REQUEST' }, '*');
-    }
-  }
+  const root = getShadowRoot();
+  if (root && !root.getElementById('cage-bubble')) createBubble();
 });
 
 // ─── BOOT ──────────────────────────────────────────────────────────────────────
-
 function boot(): void {
-  // 1. Inject network interceptor first
   injectPageScript();
-
-  // 2. Create floating bubble
-  const tryBubble = () => {
-    if (document.body) { createBubble(); return true; }
-    return false;
+  const tryInit = () => {
+    if (!document.body) return false;
+    createBubble();
+    domObserver.observe(document.body, { childList: true, subtree: true });
+    return true;
   };
-  if (!tryBubble()) {
-    const w = new MutationObserver(() => { if (tryBubble()) w.disconnect(); });
+  if (!tryInit()) {
+    const w = new MutationObserver(() => { if (tryInit()) w.disconnect(); });
     w.observe(document.documentElement, { childList: true });
   }
-
-  // 3. Start observers
-  if (document.body) {
-    domObserver.observe(document.body, { childList: true, subtree: true });
-    responseObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-  }
-
   hookButtons();
-  console.warn(`[AI CAGE] 🔒 v0.4.5 active on ${window.location.hostname} — bubble mode`);
+  console.warn(`[AI CAGE] 🔒 Ghost Mode v0.5.0 on ${window.location.hostname}`);
 }
 
 boot();
-
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    hookButtons();
-    if (!document.getElementById(BUBBLE_ID)) createBubble();
-  });
+  document.addEventListener('DOMContentLoaded', () => { hookButtons(); createBubble(); });
 }
