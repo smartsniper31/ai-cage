@@ -4,165 +4,41 @@
 // Commercial use: contact@ai-cage.io
 
 /**
- * @file content.ts
- * AI CAGE — Universal Content Script v0.4.5
+ * @file content.ts — AI CAGE Universal Content Script v0.4.5
  *
- * PHILOSOPHY — "The client decides what AI they use, not us."
- *   This script works on ANY website with an AI chat interface.
- *   It does NOT rely on a hardcoded list of AI providers.
- *   It auto-detects text input fields and AI response areas
- *   using universal DOM heuristics.
- *
- * WHAT IT DOES:
- *   1. AUTO-DETECTS the prompt input on any AI chat page
- *   2. CAGES PII before the message is sent (cageText)
- *   3. OBSERVES the AI response area
- *   4. RESTORES original values in the response (uncageText)
- *   5. Shows the 🔒 banner on any supported page
- *
- * UNIVERSAL DETECTION STRATEGY:
- *   - No hardcoded URLs in content script (manifest handles scope)
- *   - Input detection: look for large text areas / contenteditables
- *   - Response detection: observe DOM mutations for new assistant text
- *   - React/Vue/Svelte compatibility: use native input value setter
- *
- * SECURITY CONTRACT:
- *   - cageText() runs LOCALLY, BEFORE any network call
- *   - uncageText() runs LOCALLY, ON the response
- *   - Entity mapping lives ONLY in this script's closure
- *   - Zero network calls from this script
+ * UX v2: Floating bubble (not intrusive banner) + User control panel
+ *   - Discreet green/amber/blue bubble bottom-right corner
+ *   - Click bubble → mini control panel showing detected items
+ *   - User chooses which items to cage or send in clear
+ *   - Human-in-the-loop for every sensitive item
  */
 
-import { cageText, uncageText } from '@ai-cage/core';
+import { cageText } from '@ai-cage/core';
 import type { CagedEntity } from '@ai-cage/core';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+const BUBBLE_ID   = 'ai-cage-bubble-v2';
+const PANEL_ID    = 'ai-cage-panel-v2';
+const CAGED_ATTR  = 'data-ai-cage-done';
+const FONT        = 'system-ui,-apple-system,sans-serif';
 
-const BANNER_ID  = 'ai-cage-banner-v2';
-const CAGED_ATTR = 'data-ai-cage-done';
+// ─── Session state ─────────────────────────────────────────────────────────────
+let sessionTotal   = 0;
+let bubbleState: 'idle' | 'detected' | 'caged' | 'restored' = 'idle';
+let pendingEntities: CagedEntity[] = [];
+let pendingElement: HTMLElement | null = null;
 
-/**
- * Universal prompt input selectors.
- * Works on ANY AI chat interface — current and future.
- * Priority: most specific first, most generic last.
- */
-const PROMPT_SELECTORS: string[] = [
-  // ── ChatGPT / OpenAI (2023–2025+) ──────────────────────────────────────
-  '#prompt-textarea',
-  'div#prompt-textarea[contenteditable]',
-  // ── Claude (Anthropic) ──────────────────────────────────────────────────
-  'div.ProseMirror[contenteditable="true"]',
-  // ── Gemini (Google) ─────────────────────────────────────────────────────
-  'rich-textarea .ql-editor',
-  'div.ql-editor[contenteditable="true"]',
-  // ── Copilot / Bing Chat / Edge ───────────────────────────────────────────
-  'textarea#searchbox',
-  'cib-text-input textarea',
-  'div[class*="copilot"][contenteditable="true"]',
-  // ── Mistral / Le Chat ────────────────────────────────────────────────────
-  'textarea[placeholder*="Envoyer un message"]',
-  // ── Perplexity ──────────────────────────────────────────────────────────
-  'textarea[placeholder*="Ask anything"]',
-  'textarea[placeholder*="Search the internet"]',
-  // ── DeepSeek ────────────────────────────────────────────────────────────
-  'textarea#chat-input',
-  // ── Poe ─────────────────────────────────────────────────────────────────
-  'textarea[class*="GrowingTextArea"]',
-  // ── Meta AI ─────────────────────────────────────────────────────────────
-  'div[aria-label*="Message"][contenteditable="true"]',
-  // ── Grok (X/Twitter) ────────────────────────────────────────────────────
-  'div[data-testid="tweetTextarea_0"][contenteditable]',
-  // ── HuggingFace Chat ────────────────────────────────────────────────────
-  'textarea[placeholder*="Ask anything"]',
-  // ── Cohere / Coral ──────────────────────────────────────────────────────
-  'textarea[placeholder*="Send a message"]',
-  // ── You.com / Phind / Pi.ai ─────────────────────────────────────────────
-  'textarea[placeholder*="Type a message"]',
-  'textarea[placeholder*="Reply to"]',
-  // ── UNIVERSAL FALLBACKS (work on any AI not yet listed) ─────────────────
-  // Large contenteditable divs with aria attributes typical of chat
-  'div[contenteditable="true"][aria-multiline="true"]',
-  'div[contenteditable="true"][role="textbox"]',
-  'div[contenteditable="true"][aria-label]',
-  // Standard textarea (works on 90% of AI chat interfaces)
-  'textarea[rows]',
-  'textarea',
-  // Last resort contenteditable
-  'div[contenteditable="true"]',
-];
-
-/**
- * Universal send button selectors.
- * Works on any AI chat interface.
- */
-const SEND_SELECTORS: string[] = [
-  // Data attribute patterns
-  'button[data-testid*="send"]',
-  'button[data-testid*="submit"]',
-  // Aria label patterns
-  'button[aria-label*="Send"]',
-  'button[aria-label*="send"]',
-  'button[aria-label*="Submit"]',
-  'button[aria-label*="Envoyer"]',
-  'button[aria-label*="Soumettre"]',
-  // SVG arrow buttons near inputs
-  'button[type="submit"]',
-  // Class-based (common patterns)
-  'button[class*="send"]',
-  'button[class*="submit"]',
-  'button[class*="Send"]',
-];
-
-/**
- * AI response container selectors — where we watch for the AI's reply.
- * We observe mutations here to apply uncageText.
- */
-const RESPONSE_SELECTORS: string[] = [
-  // ChatGPT
-  '[data-message-author-role="assistant"]',
-  '.markdown.prose',
-  // Claude
-  '[data-testid="assistant-message"]',
-  '.font-claude-message',
-  // Gemini
-  'model-response',
-  '.response-container',
-  // Copilot
-  '.ac-adaptiveCard',
-  'cib-message[bubble-type="ai"]',
-  // Universal patterns
-  '[class*="assistant"]',
-  '[class*="response"]',
-  '[class*="bot-message"]',
-  '[class*="ai-message"]',
-  '[data-role="assistant"]',
-  '[data-author="assistant"]',
-  '[data-sender="ai"]',
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PAGE SCRIPT INJECTION
-// Injects the fetch/XHR interceptor into the page's JavaScript context.
-// Must run at document_start to patch fetch BEFORE any page code uses it.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── PAGE SCRIPT INJECTION ─────────────────────────────────────────────────────
 function injectPageScript(): void {
   try {
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('injected.js');
-    // Inject synchronously so it patches fetch before page scripts run
-    script.async = false;
-    script.onload = function () { (this as HTMLScriptElement).remove(); };
-    (document.head || document.documentElement).prepend(script);
-    console.warn('[AI CAGE] Page-context network interceptor injected.');
-  } catch (e) {
-    console.warn('[AI CAGE] Could not inject page script:', e);
-  }
+    const s = document.createElement('script');
+    s.src = chrome.runtime.getURL('injected.js');
+    s.async = false;
+    s.onload = function () { (this as HTMLScriptElement).remove(); };
+    (document.head || document.documentElement).prepend(s);
+  } catch (e) { console.warn('[AI CAGE] inject failed:', e); }
 }
 
-// Share entities with the injected page script for uncaging responses
 function shareEntitiesWithPage(entities: CagedEntity[]): void {
   window.postMessage({
     type: 'AI_CAGE_ENTITIES',
@@ -170,416 +46,502 @@ function shareEntitiesWithPage(entities: CagedEntity[]): void {
   }, '*');
 }
 
-// Listen for network-level cage/restore events from injected.js
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
-  const d = event.data as { type?: string; count?: number };
-  if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
-    sessionCageTotal += d.count;
-    updateBanner(sessionCageTotal, false);
-    try {
-      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
-    } catch { /* ignore */ }
-  }
-  if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
-    updateBanner(sessionCageTotal, true);
-  }
-  if (d?.type === 'AI_CAGE_CAGED') updateBanner(sessionCageTotal, false);
-  if (d?.type === 'AI_CAGE_RESTORED') updateBanner(sessionCageTotal, true);
-});
+// ─── BUBBLE ────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SESSION STATE
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Map: prompt element → its last sent entities (for uncaging responses) */
-const sessionEntityMap: CagedEntity[][] = [];
-let   sessionCageTotal = 0;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BANNER
-// ─────────────────────────────────────────────────────────────────────────────
-
-function injectBanner(): boolean {
-  if (!document.body) return false;
-  if (document.getElementById(BANNER_ID)) return true;
-
+function createBubble(): void {
+  if (document.getElementById(BUBBLE_ID)) return;
   const b = document.createElement('div');
-  b.id = BANNER_ID;
-  b.setAttribute('role', 'status');
+  b.id = BUBBLE_ID;
+  b.setAttribute('role', 'button');
+  b.setAttribute('aria-label', 'AI CAGE — Click to manage protected data');
   b.style.cssText = [
-    'position:fixed','top:0','left:0','right:0',
-    'z-index:2147483647',
-    'background:#15803d','color:#fff',
-    'font-family:system-ui,sans-serif',
-    'font-size:13px','font-weight:600',
-    'padding:6px 16px',
-    'display:flex','align-items:center','gap:8px',
-    'box-shadow:0 2px 8px rgba(0,0,0,.25)',
-    'user-select:none',
-    'transition:background .3s',
+    'position:fixed', 'bottom:20px', 'right:20px', 'z-index:2147483647',
+    'width:44px', 'height:44px', 'border-radius:50%',
+    'background:#15803d', 'color:#fff',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'cursor:pointer',
+    'box-shadow:0 2px 12px rgba(0,0,0,.35)',
+    `font-family:${FONT}`, 'font-size:18px', 'font-weight:800',
+    'user-select:none', 'transition:all .25s',
+    'border:2px solid rgba(255,255,255,.3)',
+  ].join(';');
+  b.innerHTML = '🔒';
+  b.title = 'AI CAGE Active — Click for details';
+  b.addEventListener('click', togglePanel);
+
+  // Tooltip counter badge
+  const badge = document.createElement('span');
+  badge.id = 'ai-cage-badge';
+  badge.style.cssText = [
+    'position:absolute', 'top:-4px', 'right:-4px',
+    'background:#dc2626', 'color:#fff',
+    'border-radius:999px', 'font-size:10px', 'font-weight:800',
+    'min-width:16px', 'height:16px',
+    'display:none', 'align-items:center', 'justify-content:center',
+    'padding:0 3px', 'line-height:1',
+  ].join(';');
+  b.appendChild(badge);
+
+  document.body.appendChild(b);
+}
+
+function updateBubble(): void {
+  const b = document.getElementById(BUBBLE_ID);
+  const badge = document.getElementById('ai-cage-badge');
+  if (!b) return;
+
+  const colors: Record<typeof bubbleState, string> = {
+    idle:     '#15803d',
+    detected: '#d97706',
+    caged:    '#0369a1',
+    restored: '#15803d',
+  };
+
+  const icons: Record<typeof bubbleState, string> = {
+    idle:     '🔒',
+    detected: '⚠️',
+    caged:    '🔒',
+    restored: '✅',
+  };
+
+  b.style.background = colors[bubbleState];
+  b.innerHTML = icons[bubbleState];
+  if (badge) b.appendChild(badge);
+
+  if (sessionTotal > 0 && badge) {
+    badge.style.display = 'flex';
+    badge.textContent = String(sessionTotal);
+  }
+
+  // Pulse animation on state change
+  b.style.transform = 'scale(1.15)';
+  setTimeout(() => { if (b) b.style.transform = 'scale(1)'; }, 250);
+}
+
+// ─── CONTROL PANEL ─────────────────────────────────────────────────────────────
+
+function togglePanel(): void {
+  const existing = document.getElementById(PANEL_ID);
+  if (existing) { existing.remove(); return; }
+  showPanel();
+}
+
+function showPanel(): void {
+  const existing = document.getElementById(PANEL_ID);
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = PANEL_ID;
+  panel.style.cssText = [
+    'position:fixed', 'bottom:74px', 'right:20px', 'z-index:2147483647',
+    'width:300px', 'max-height:400px',
+    'background:#fff', 'color:#0f172a',
+    'border-radius:14px',
+    'box-shadow:0 8px 32px rgba(0,0,0,.25)',
+    `font-family:${FONT}`, 'font-size:13px',
+    'overflow:hidden',
+    'animation:ai-cage-slide-in .2s ease',
   ].join(';');
 
-  b.innerHTML = `
-    <span style="font-size:16px">🔒</span>
-    <span>AI CAGE Active</span>
-    <span id="ai-cage-ctr" style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">
-      Monitoring…
-    </span>
-  `;
+  // Inject animation keyframes once
+  if (!document.getElementById('ai-cage-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ai-cage-styles';
+    style.textContent = `
+      @keyframes ai-cage-slide-in {
+        from { opacity:0; transform:translateY(12px) scale(.95); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+      }
+    `;
+    document.head?.appendChild(style);
+  }
 
-  try { document.body.prepend(b); return true; }
-  catch { return false; }
+  // ── Header ──
+  const header = document.createElement('div');
+  header.style.cssText = 'background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;';
+  header.innerHTML = `
+    <span style="font-size:16px">🔒</span>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:13px">AI CAGE</div>
+      <div style="font-size:11px;opacity:.8">${window.location.hostname}</div>
+    </div>
+    <button id="ai-cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1;padding:2px;">×</button>
+  `;
+  panel.appendChild(header);
+
+  // ── Stats row ──
+  const stats = document.createElement('div');
+  stats.style.cssText = 'padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;gap:16px;';
+  stats.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#15803d">${sessionTotal}</div>
+      <div style="font-size:10px;color:#64748b">Total caged</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#0369a1">${pendingEntities.length}</div>
+      <div style="font-size:10px;color:#64748b">Pending review</div>
+    </div>
+    <div style="margin-left:auto;align-self:center">
+      <div style="font-size:11px;color:#166534;font-weight:600">✅ Zero data sent</div>
+    </div>
+  `;
+  panel.appendChild(stats);
+
+  // ── Entity list ──
+  const listWrap = document.createElement('div');
+  listWrap.style.cssText = 'max-height:200px;overflow-y:auto;padding:8px 0;';
+
+  if (pendingEntities.length === 0 && sessionTotal === 0) {
+    listWrap.innerHTML = `
+      <div style="padding:20px;text-align:center;color:#64748b;font-size:12px">
+        <div style="font-size:24px;margin-bottom:6px">🔍</div>
+        Monitoring your prompts...<br>
+        No sensitive data detected yet.
+      </div>`;
+  } else if (pendingEntities.length > 0) {
+    listWrap.innerHTML = `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Detected Items — Choose action:</div>`;
+
+    pendingEntities.forEach((entity, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;';
+
+      const typeColors: Record<string, string> = {
+        EMAIL_ADDRESS: '#0369a1', CREDIT_CARD: '#dc2626',
+        IBAN: '#7c3aed', API_KEY: '#dc2626',
+        PRIVATE_KEY: '#dc2626', PHONE_NUMBER: '#d97706',
+        IP_ADDRESS: '#64748b', CIN_TN: '#0369a1',
+        MF_TN: '#0369a1', GENERIC_SECRET: '#dc2626',
+      };
+      const color = typeColors[entity.type] ?? '#64748b';
+      const shortType = entity.type.replace('_', ' ').toLowerCase();
+
+      // Show partially redacted value
+      const val = entity.originalValue;
+      const preview = val.length > 12
+        ? val.slice(0, 4) + '***' + val.slice(-3)
+        : val.slice(0, 2) + '***';
+
+      row.innerHTML = `
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase">${shortType}</div>
+          <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button data-idx="${idx}" data-action="cage"
+            style="background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+            🔒 Cage
+          </button>
+          <button data-idx="${idx}" data-action="pass"
+            style="background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+            Pass
+          </button>
+        </div>
+      `;
+      listWrap.appendChild(row);
+    });
+  } else {
+    listWrap.innerHTML = `
+      <div style="padding:16px 14px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">Session history</div>
+        <div style="font-size:12px;color:#16a34a">✅ ${sessionTotal} item(s) successfully caged this session</div>
+      </div>`;
+  }
+  panel.appendChild(listWrap);
+
+  // ── Action buttons ──
+  if (pendingEntities.length > 0) {
+    const actions = document.createElement('div');
+    actions.style.cssText = 'padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;gap:8px;';
+    actions.innerHTML = `
+      <button id="ai-cage-cage-all" style="flex:1;background:#15803d;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+        🔒 Cage All
+      </button>
+      <button id="ai-cage-pass-all" style="flex:1;background:#e2e8f0;color:#374151;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+        Send All (no protection)
+      </button>
+    `;
+    panel.appendChild(actions);
+  }
+
+  // ── Footer ──
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;';
+  footer.innerHTML = `
+    <span style="font-size:10px;color:#94a3b8">🇹🇳 Made in Tunisia · Zero data sent</span>
+    <span style="font-size:10px;color:#94a3b8">v0.4.5</span>
+  `;
+  panel.appendChild(footer);
+
+  document.body.appendChild(panel);
+
+  // ── Event handlers ──
+  document.getElementById('ai-cage-close')?.addEventListener('click', () => panel.remove());
+
+  document.getElementById('ai-cage-cage-all')?.addEventListener('click', () => {
+    applyEntityDecisions(pendingEntities.map((_, i) => ({ idx: i, action: 'cage' as const })));
+    panel.remove();
+  });
+
+  document.getElementById('ai-cage-pass-all')?.addEventListener('click', () => {
+    pendingEntities = [];
+    panel.remove();
+    bubbleState = 'idle';
+    updateBubble();
+  });
+
+  listWrap.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const idx = parseInt(target.dataset['idx'] ?? '0', 10);
+      const action = target.dataset['action'] as 'cage' | 'pass';
+      applyEntityDecisions([{ idx, action }]);
+      panel.remove();
+      // Reopen if more items pending
+      if (pendingEntities.length > 0) setTimeout(showPanel, 100);
+    });
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', (e) => {
+      const p = document.getElementById(PANEL_ID);
+      const bub = document.getElementById(BUBBLE_ID);
+      if (p && !p.contains(e.target as Node) && !bub?.contains(e.target as Node)) {
+        p.remove();
+      }
+    }, { once: true });
+  }, 100);
 }
 
-function updateBanner(caged: number, uncaged: boolean = false): void {
-  const ctr = document.getElementById('ai-cage-ctr');
-  const banner = document.getElementById(BANNER_ID);
-  if (!ctr || !banner) return;
+function applyEntityDecisions(decisions: Array<{ idx: number; action: 'cage' | 'pass' }>): void {
+  const caged  = decisions.filter(d => d.action === 'cage').map(d => pendingEntities[d.idx]).filter(Boolean);
+  const passed = decisions.filter(d => d.action === 'pass').map(d => pendingEntities[d.idx]).filter(Boolean);
 
-  if (caged === 0) {
-    ctr.textContent = 'Monitoring…';
-    banner.style.background = '#15803d';
-  } else if (uncaged) {
-    ctr.textContent = `${caged} item${caged > 1 ? 's' : ''} caged ✓ Restored`;
-    banner.style.background = '#0369a1'; // blue — both cage + uncage done
-  } else {
-    ctr.textContent = `${caged} item${caged > 1 ? 's' : ''} caged — waiting for AI…`;
-    banner.style.background = '#b45309'; // amber — caged, waiting restore
+  // Remove processed entities
+  const processedIdxs = new Set(decisions.map(d => d.idx));
+  pendingEntities = pendingEntities.filter((_, i) => !processedIdxs.has(i));
+
+  if (caged.length > 0) {
+    sessionTotal += caged.length;
+    shareEntitiesWithPage(caged);
+    bubbleState = 'caged';
+    updateBubble();
+    try {
+      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: caged });
+    } catch { /* ignore */ }
+  }
+
+  if (passed.length > 0) {
+    console.warn(`[AI CAGE] User chose to pass ${passed.length} item(s) uncaged.`);
+  }
+
+  if (pendingEntities.length === 0 && caged.length > 0) {
+    bubbleState = 'caged';
+    updateBubble();
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INPUT DETECTION — UNIVERSAL
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── PROMPT SELECTORS ──────────────────────────────────────────────────────────
+const PROMPT_SELECTORS = [
+  '#prompt-textarea', 'div#prompt-textarea[contenteditable]',
+  'div[contenteditable="true"][data-id]',
+  'div.ProseMirror[contenteditable="true"]',
+  'rich-textarea .ql-editor', 'div.ql-editor[contenteditable="true"]',
+  'textarea#chat-input',
+  'div[contenteditable="true"][aria-multiline="true"]',
+  'div[contenteditable="true"][role="textbox"]',
+  'div[contenteditable="true"][aria-label]',
+  'textarea[rows]', 'textarea',
+  'div[contenteditable="true"]',
+];
 
-function findPromptElement(): HTMLElement | null {
+const SEND_SELECTORS = [
+  'button[data-testid*="send"]', 'button[data-testid*="submit"]',
+  'button[aria-label*="Send"]', 'button[aria-label*="send"]',
+  'button[aria-label*="Submit"]', 'button[aria-label*="Envoyer"]',
+  'button[type="submit"]',
+];
+
+function findPrompt(): HTMLElement | null {
   for (const sel of PROMPT_SELECTORS) {
     try {
       const el = document.querySelector<HTMLElement>(sel);
-      if (el && isUsableInput(el)) return el;
-    } catch { /* invalid selector — skip */ }
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 50 && r.height > 20) return el;
+      }
+    } catch { /* skip */ }
   }
   return null;
 }
 
-function isUsableInput(el: HTMLElement): boolean {
-  try {
-    const r = el.getBoundingClientRect();
-    // Must be visible and reasonably sized (not a hidden tiny input)
-    return r.width > 50 && r.height > 20;
-  } catch { return false; }
-}
-
 function readText(el: HTMLElement): string {
-  if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-    return el.value;
-  }
-  // contenteditable — get text without HTML tags
+  if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
   return (el.innerText ?? el.textContent ?? '').trim();
 }
 
 function writeText(el: HTMLElement, text: string): void {
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-    // Use native setter to bypass React's synthetic event system
     const proto = el instanceof HTMLTextAreaElement
-      ? window.HTMLTextAreaElement.prototype
-      : window.HTMLInputElement.prototype;
-    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-
-    if (nativeSetter) {
-      nativeSetter.call(el, text);
-    } else {
-      el.value = text;
-    }
-
-    // Dispatch all relevant events so React/Vue/Svelte update their state
+      ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(el, text);
+    else el.value = text;
     el.dispatchEvent(new Event('input',  { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
-    // contenteditable — select all and replace
     el.focus();
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, text);
-
-    // If execCommand failed (some browsers), use direct DOM + event
     if (readText(el) !== text) {
       el.innerText = text;
       el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
-
-      // Move cursor to end
-      try {
-        const range = document.createRange();
-        const sel   = window.getSelection();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      } catch { /* ignore cursor positioning errors */ }
     }
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CAGE LOGIC — PII REMOVAL BEFORE SEND
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── CAGE LOGIC ────────────────────────────────────────────────────────────────
 
-function cagePrompt(el: HTMLElement): boolean {
+/**
+ * Detects PII in prompt. If found:
+ *  - Shows bubble in "detected" state
+ *  - Opens control panel for user decision
+ *  - User decides per item: cage or pass
+ */
+function handlePrompt(el: HTMLElement): void {
   const raw = readText(el);
-  if (!raw || raw.length < 3) return false;
+  if (!raw || raw.length < 3) return;
 
   const { cagedText, entities, totalCaged } = cageText(raw);
-  if (totalCaged === 0) return false;
+  if (totalCaged === 0) return;
 
+  // Store pending entities for user review
+  pendingEntities = [...pendingEntities, ...entities];
+
+  // Update bubble to "detected" state
+  bubbleState = 'detected';
+  updateBubble();
+
+  // Show control panel automatically
+  showPanel();
+
+  // Also write caged text to DOM as fallback
+  // (injected.js will handle the actual network-level caging)
   writeText(el, cagedText);
-
-  // Store entities for response restoration
-  sessionEntityMap.push(entities);
-  // Keep only last 10 interactions to avoid memory growth
-  if (sessionEntityMap.length > 10) sessionEntityMap.shift();
-
-  // Share entities with the page-context script (for fetch/XHR interception)
   shareEntitiesWithPage(entities);
 
-  sessionCageTotal += totalCaged;
-  updateBanner(sessionCageTotal, false);
+  sessionTotal += totalCaged;
 
-  // Notify background
   try {
-    void chrome.runtime.sendMessage({
-      type: 'CAGE_REPORT',
-      tabId: 0,
-      site: window.location.hostname,
-      entities,
-    });
-  } catch { /* extension context invalidated — safe */ }
-
-  console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) on ${window.location.hostname}`);
-  return true;
+    void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities });
+  } catch { /* ignore */ }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UNCAGE LOGIC — RESTORE PII IN AI RESPONSE
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── EVENT LISTENERS ───────────────────────────────────────────────────────────
 
-/**
- * Scans a text node or element for [CAGED_X] tokens and restores them.
- * Called when we detect new content in AI response areas.
- */
-function tryUncageNode(node: Node): boolean {
-  if (sessionEntityMap.length === 0) return false;
-
-  // Use all recent entity maps (in case user sent multiple messages)
-  const allEntities = sessionEntityMap.flat();
-  if (allEntities.length === 0) return false;
-
-  if (node.nodeType === Node.TEXT_NODE) {
-    const original = node.textContent ?? '';
-    if (!original.includes('[CAGED_')) return false;
-    const restored = uncageText(original, allEntities);
-    if (restored !== original) {
-      node.textContent = restored;
-      updateBanner(sessionCageTotal, true);
-      return true;
-    }
-  } else if (node instanceof Element) {
-    const html = node.innerHTML;
-    if (!html.includes('[CAGED_')) return false;
-    const restored = uncageText(html, allEntities);
-    if (restored !== html) {
-      node.innerHTML = restored;
-      updateBanner(sessionCageTotal, true);
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Walk all text nodes in a subtree and uncage them. */
-function uncageSubtree(root: Node): void {
-  if (sessionEntityMap.length === 0) return;
-
-  const walker = document.createTreeWalker(
-    root,
-    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-    {
-      acceptNode: (node) => {
-        // Skip script/style nodes
-        if (node instanceof Element) {
-          const tag = node.tagName?.toLowerCase();
-          if (tag === 'script' || tag === 'style' || tag === 'noscript') {
-            return NodeFilter.FILTER_REJECT;
-          }
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    },
-  );
-
-  let node: Node | null;
-  while ((node = walker.nextNode()) !== null) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes('[CAGED_')) {
-      tryUncageNode(node);
-    }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE OBSERVER — WATCH FOR AI ANSWERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Observes the entire document for AI response content.
- * When we see text containing [CAGED_X], we restore it.
- *
- * UNIVERSAL APPROACH: Instead of watching specific AI response containers,
- * we watch the whole document body for new text nodes containing cage tokens.
- * This works on ANY AI platform, current and future.
- */
-const responseObserver = new MutationObserver((mutations) => {
-  if (sessionEntityMap.length === 0) return;
-
-  for (const mutation of mutations) {
-    // New nodes added to DOM
-    mutation.addedNodes.forEach((node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        if (node.textContent?.includes('[CAGED_')) {
-          tryUncageNode(node);
-        }
-      } else if (node instanceof Element) {
-        // Scan the entire subtree
-        if (node.innerHTML?.includes('[CAGED_')) {
-          uncageSubtree(node);
-        }
-      }
-    });
-
-    // Character data changed (streaming responses)
-    if (mutation.type === 'characterData') {
-      const t = mutation.target;
-      if (t.textContent?.includes('[CAGED_')) {
-        tryUncageNode(t);
-      }
-    }
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEND INTERCEPTION — UNIVERSAL STRATEGIES
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Strategy 1: keydown Enter — capture phase (fires before page handlers) */
 document.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
-
+  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey) return;
   const target = e.target as HTMLElement;
-
-  // Is this target a prompt input?
-  const isInput = PROMPT_SELECTORS.some((sel) => {
+  const isPrompt = PROMPT_SELECTORS.some(sel => {
     try { return target.matches(sel) || !!target.closest(sel); }
     catch { return false; }
   });
-
-  if (!isInput) return;
-  cagePrompt(target);
+  if (isPrompt) handlePrompt(target);
 }, true);
 
-/** Strategy 2: click on send buttons */
-function hookSendButtons(): void {
-  for (const sel of SEND_SELECTORS) {
-    document.querySelectorAll<HTMLElement>(sel).forEach((btn) => {
+function hookButtons(): void {
+  SEND_SELECTORS.forEach(sel => {
+    document.querySelectorAll<HTMLElement>(sel).forEach(btn => {
       if (btn.getAttribute(CAGED_ATTR) === '1') return;
       btn.setAttribute(CAGED_ATTR, '1');
       btn.addEventListener('click', () => {
-        const prompt = findPromptElement();
-        if (prompt) cagePrompt(prompt);
+        const p = findPrompt();
+        if (p) handlePrompt(p);
       }, true);
     });
-  }
+  });
 }
 
-/** Strategy 3: form submit */
 document.addEventListener('submit', (e: Event) => {
   const form = e.target as HTMLFormElement;
   const sel = PROMPT_SELECTORS.join(',');
   try {
     const input = form.querySelector<HTMLElement>(sel);
-    if (input) cagePrompt(input);
+    if (input) handlePrompt(input);
   } catch { /* ignore */ }
 }, true);
 
-/** Strategy 4: Detect send via input going empty after non-empty state */
-let lastInputValue = '';
-document.addEventListener('input', (e: Event) => {
-  const target = e.target as HTMLElement;
-  const isInput = PROMPT_SELECTORS.some((sel) => {
-    try { return target.matches(sel) || !!target.closest(sel); }
-    catch { return false; }
-  });
-  if (!isInput) return;
-  const val = readText(target);
-  if (lastInputValue.length > 5 && val.length === 0) {
-    // Likely submitted — check if we should have caged it
-    // (this catches cases where the form cleared the input on submit)
+// Listen for network-level events from injected.js
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+  const d = event.data as { type?: string; count?: number };
+  if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
+    sessionTotal += d.count;
+    bubbleState = 'caged';
+    updateBubble();
+    try {
+      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
+    } catch { /* ignore */ }
   }
-  lastInputValue = val;
-}, true);
-
-// DOM observer for dynamically added send buttons (SPAs)
-const domObserver = new MutationObserver(() => {
-  hookSendButtons();
-  if (!document.getElementById(BANNER_ID)) injectBanner();
+  if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
+    bubbleState = 'restored';
+    updateBubble();
+    setTimeout(() => { bubbleState = 'idle'; updateBubble(); }, 3000);
+  }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────────────────────────────────────────
+const domObserver = new MutationObserver(() => {
+  hookButtons();
+  if (!document.getElementById(BUBBLE_ID)) createBubble();
+});
+
+// Response uncaging observer
+const responseObserver = new MutationObserver((mutations) => {
+  if (pendingEntities.length === 0 && sessionTotal === 0) return;
+  for (const mut of mutations) {
+    mut.addedNodes.forEach(node => {
+      if (node instanceof Element && node.innerHTML?.includes('[CAGED_')) {
+        // Signal injected.js to handle restoration
+        window.postMessage({ type: 'AI_CAGE_RESTORE_REQUEST' }, '*');
+      }
+    });
+    if (mut.type === 'characterData' && mut.target.textContent?.includes('[CAGED_')) {
+      window.postMessage({ type: 'AI_CAGE_RESTORE_REQUEST' }, '*');
+    }
+  }
+});
+
+// ─── BOOT ──────────────────────────────────────────────────────────────────────
 
 function boot(): void {
-  console.warn(`[AI CAGE] 🔒 Universal content script v0.4.5 active on ${window.location.hostname}`);
-
-  // FIRST: inject the page-context network interceptor
-  // This must run before any page scripts to patch fetch/XHR
+  // 1. Inject network interceptor first
   injectPageScript();
 
-  // Inject banner
-  if (!injectBanner()) {
-    // Body not ready — wait
-    const w = new MutationObserver(() => {
-      if (document.body && injectBanner()) w.disconnect();
-    });
+  // 2. Create floating bubble
+  const tryBubble = () => {
+    if (document.body) { createBubble(); return true; }
+    return false;
+  };
+  if (!tryBubble()) {
+    const w = new MutationObserver(() => { if (tryBubble()) w.disconnect(); });
     w.observe(document.documentElement, { childList: true });
   }
 
-  // Start DOM observer (for SPA navigation and send buttons)
+  // 3. Start observers
   if (document.body) {
     domObserver.observe(document.body, { childList: true, subtree: true });
-
-    // Start response observer — watches ALL DOM mutations for [CAGED_] tokens
-    responseObserver.observe(document.body, {
-      childList:     true,
-      subtree:       true,
-      characterData: true,
-    });
+    responseObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 
-  hookSendButtons();
+  hookButtons();
+  console.warn(`[AI CAGE] 🔒 v0.4.5 active on ${window.location.hostname} — bubble mode`);
 }
 
-// Boot immediately (document_start means DOM may not be ready)
 boot();
 
-// Also boot on DOMContentLoaded for any missed elements
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    hookSendButtons();
-    if (!document.getElementById(BANNER_ID)) injectBanner();
-    // Re-start observers if body was not ready at first boot
-    if (!responseObserver) return;
-    responseObserver.observe(document.body, {
-      childList:     true,
-      subtree:       true,
-      characterData: true,
-    });
+    hookButtons();
+    if (!document.getElementById(BUBBLE_ID)) createBubble();
   });
 }

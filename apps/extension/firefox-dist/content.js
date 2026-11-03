@@ -320,90 +320,24 @@
       totalCaged: entities.length
     };
   }
-  function uncageText(cagedResponse, entities) {
-    let result = cagedResponse;
-    for (const entity of entities) {
-      const escaped = entity.placeholder.replace(/[[\]]/g, "\\$&");
-      const pattern = new RegExp(escaped, "g");
-      result = result.replace(pattern, entity.originalValue);
-    }
-    return result;
-  }
-  const BANNER_ID = "ai-cage-banner-v2";
+  const BUBBLE_ID = "ai-cage-bubble-v2";
+  const PANEL_ID = "ai-cage-panel-v2";
   const CAGED_ATTR = "data-ai-cage-done";
-  const PROMPT_SELECTORS = [
-    // ── ChatGPT / OpenAI (2023–2025+) ──────────────────────────────────────
-    "#prompt-textarea",
-    "div#prompt-textarea[contenteditable]",
-    // ── Claude (Anthropic) ──────────────────────────────────────────────────
-    'div.ProseMirror[contenteditable="true"]',
-    // ── Gemini (Google) ─────────────────────────────────────────────────────
-    "rich-textarea .ql-editor",
-    'div.ql-editor[contenteditable="true"]',
-    // ── Copilot / Bing Chat / Edge ───────────────────────────────────────────
-    "textarea#searchbox",
-    "cib-text-input textarea",
-    'div[class*="copilot"][contenteditable="true"]',
-    // ── Mistral / Le Chat ────────────────────────────────────────────────────
-    'textarea[placeholder*="Envoyer un message"]',
-    // ── Perplexity ──────────────────────────────────────────────────────────
-    'textarea[placeholder*="Ask anything"]',
-    'textarea[placeholder*="Search the internet"]',
-    // ── DeepSeek ────────────────────────────────────────────────────────────
-    "textarea#chat-input",
-    // ── Poe ─────────────────────────────────────────────────────────────────
-    'textarea[class*="GrowingTextArea"]',
-    // ── Meta AI ─────────────────────────────────────────────────────────────
-    'div[aria-label*="Message"][contenteditable="true"]',
-    // ── Grok (X/Twitter) ────────────────────────────────────────────────────
-    'div[data-testid="tweetTextarea_0"][contenteditable]',
-    // ── HuggingFace Chat ────────────────────────────────────────────────────
-    'textarea[placeholder*="Ask anything"]',
-    // ── Cohere / Coral ──────────────────────────────────────────────────────
-    'textarea[placeholder*="Send a message"]',
-    // ── You.com / Phind / Pi.ai ─────────────────────────────────────────────
-    'textarea[placeholder*="Type a message"]',
-    'textarea[placeholder*="Reply to"]',
-    // ── UNIVERSAL FALLBACKS (work on any AI not yet listed) ─────────────────
-    // Large contenteditable divs with aria attributes typical of chat
-    'div[contenteditable="true"][aria-multiline="true"]',
-    'div[contenteditable="true"][role="textbox"]',
-    'div[contenteditable="true"][aria-label]',
-    // Standard textarea (works on 90% of AI chat interfaces)
-    "textarea[rows]",
-    "textarea",
-    // Last resort contenteditable
-    'div[contenteditable="true"]'
-  ];
-  const SEND_SELECTORS = [
-    // Data attribute patterns
-    'button[data-testid*="send"]',
-    'button[data-testid*="submit"]',
-    // Aria label patterns
-    'button[aria-label*="Send"]',
-    'button[aria-label*="send"]',
-    'button[aria-label*="Submit"]',
-    'button[aria-label*="Envoyer"]',
-    'button[aria-label*="Soumettre"]',
-    // SVG arrow buttons near inputs
-    'button[type="submit"]',
-    // Class-based (common patterns)
-    'button[class*="send"]',
-    'button[class*="submit"]',
-    'button[class*="Send"]'
-  ];
+  const FONT = "system-ui,-apple-system,sans-serif";
+  let sessionTotal = 0;
+  let bubbleState = "idle";
+  let pendingEntities = [];
   function injectPageScript() {
     try {
-      const script = document.createElement("script");
-      script.src = chrome.runtime.getURL("injected.js");
-      script.async = false;
-      script.onload = function() {
+      const s = document.createElement("script");
+      s.src = chrome.runtime.getURL("injected.js");
+      s.async = false;
+      s.onload = function() {
         this.remove();
       };
-      (document.head || document.documentElement).prepend(script);
-      console.warn("[AI CAGE] Page-context network interceptor injected.");
+      (document.head || document.documentElement).prepend(s);
     } catch (e) {
-      console.warn("[AI CAGE] Could not inject page script:", e);
+      console.warn("[AI CAGE] inject failed:", e);
     }
   }
   function shareEntitiesWithPage(entities) {
@@ -412,113 +346,334 @@
       entities: entities.map((e) => ({ placeholder: e.placeholder, originalValue: e.originalValue }))
     }, "*");
   }
-  window.addEventListener("message", (event) => {
-    if (event.source !== window) return;
-    const d = event.data;
-    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_CAGED" && d.count) {
-      sessionCageTotal += d.count;
-      updateBanner(sessionCageTotal, false);
+  function createBubble() {
+    if (document.getElementById(BUBBLE_ID)) return;
+    const b = document.createElement("div");
+    b.id = BUBBLE_ID;
+    b.setAttribute("role", "button");
+    b.setAttribute("aria-label", "AI CAGE — Click to manage protected data");
+    b.style.cssText = [
+      "position:fixed",
+      "bottom:20px",
+      "right:20px",
+      "z-index:2147483647",
+      "width:44px",
+      "height:44px",
+      "border-radius:50%",
+      "background:#15803d",
+      "color:#fff",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "cursor:pointer",
+      "box-shadow:0 2px 12px rgba(0,0,0,.35)",
+      `font-family:${FONT}`,
+      "font-size:18px",
+      "font-weight:800",
+      "user-select:none",
+      "transition:all .25s",
+      "border:2px solid rgba(255,255,255,.3)"
+    ].join(";");
+    b.innerHTML = "🔒";
+    b.title = "AI CAGE Active — Click for details";
+    b.addEventListener("click", togglePanel);
+    const badge = document.createElement("span");
+    badge.id = "ai-cage-badge";
+    badge.style.cssText = [
+      "position:absolute",
+      "top:-4px",
+      "right:-4px",
+      "background:#dc2626",
+      "color:#fff",
+      "border-radius:999px",
+      "font-size:10px",
+      "font-weight:800",
+      "min-width:16px",
+      "height:16px",
+      "display:none",
+      "align-items:center",
+      "justify-content:center",
+      "padding:0 3px",
+      "line-height:1"
+    ].join(";");
+    b.appendChild(badge);
+    document.body.appendChild(b);
+  }
+  function updateBubble() {
+    const b = document.getElementById(BUBBLE_ID);
+    const badge = document.getElementById("ai-cage-badge");
+    if (!b) return;
+    const colors = {
+      idle: "#15803d",
+      detected: "#d97706",
+      caged: "#0369a1",
+      restored: "#15803d"
+    };
+    const icons = {
+      idle: "🔒",
+      detected: "⚠️",
+      caged: "🔒",
+      restored: "✅"
+    };
+    b.style.background = colors[bubbleState];
+    b.innerHTML = icons[bubbleState];
+    if (badge) b.appendChild(badge);
+    if (sessionTotal > 0 && badge) {
+      badge.style.display = "flex";
+      badge.textContent = String(sessionTotal);
+    }
+    b.style.transform = "scale(1.15)";
+    setTimeout(() => {
+      if (b) b.style.transform = "scale(1)";
+    }, 250);
+  }
+  function togglePanel() {
+    const existing = document.getElementById(PANEL_ID);
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    showPanel();
+  }
+  function showPanel() {
+    var _a, _b, _c, _d;
+    const existing = document.getElementById(PANEL_ID);
+    if (existing) existing.remove();
+    const panel = document.createElement("div");
+    panel.id = PANEL_ID;
+    panel.style.cssText = [
+      "position:fixed",
+      "bottom:74px",
+      "right:20px",
+      "z-index:2147483647",
+      "width:300px",
+      "max-height:400px",
+      "background:#fff",
+      "color:#0f172a",
+      "border-radius:14px",
+      "box-shadow:0 8px 32px rgba(0,0,0,.25)",
+      `font-family:${FONT}`,
+      "font-size:13px",
+      "overflow:hidden",
+      "animation:ai-cage-slide-in .2s ease"
+    ].join(";");
+    if (!document.getElementById("ai-cage-styles")) {
+      const style = document.createElement("style");
+      style.id = "ai-cage-styles";
+      style.textContent = `
+      @keyframes ai-cage-slide-in {
+        from { opacity:0; transform:translateY(12px) scale(.95); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+      }
+    `;
+      (_a = document.head) == null ? void 0 : _a.appendChild(style);
+    }
+    const header = document.createElement("div");
+    header.style.cssText = "background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;";
+    header.innerHTML = `
+    <span style="font-size:16px">🔒</span>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:13px">AI CAGE</div>
+      <div style="font-size:11px;opacity:.8">${window.location.hostname}</div>
+    </div>
+    <button id="ai-cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1;padding:2px;">×</button>
+  `;
+    panel.appendChild(header);
+    const stats = document.createElement("div");
+    stats.style.cssText = "padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;gap:16px;";
+    stats.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#15803d">${sessionTotal}</div>
+      <div style="font-size:10px;color:#64748b">Total caged</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#0369a1">${pendingEntities.length}</div>
+      <div style="font-size:10px;color:#64748b">Pending review</div>
+    </div>
+    <div style="margin-left:auto;align-self:center">
+      <div style="font-size:11px;color:#166534;font-weight:600">✅ Zero data sent</div>
+    </div>
+  `;
+    panel.appendChild(stats);
+    const listWrap = document.createElement("div");
+    listWrap.style.cssText = "max-height:200px;overflow-y:auto;padding:8px 0;";
+    if (pendingEntities.length === 0 && sessionTotal === 0) {
+      listWrap.innerHTML = `
+      <div style="padding:20px;text-align:center;color:#64748b;font-size:12px">
+        <div style="font-size:24px;margin-bottom:6px">🔍</div>
+        Monitoring your prompts...<br>
+        No sensitive data detected yet.
+      </div>`;
+    } else if (pendingEntities.length > 0) {
+      listWrap.innerHTML = `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Detected Items — Choose action:</div>`;
+      pendingEntities.forEach((entity, idx) => {
+        const row = document.createElement("div");
+        row.style.cssText = "padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;";
+        const typeColors = {
+          EMAIL_ADDRESS: "#0369a1",
+          CREDIT_CARD: "#dc2626",
+          IBAN: "#7c3aed",
+          API_KEY: "#dc2626",
+          PRIVATE_KEY: "#dc2626",
+          PHONE_NUMBER: "#d97706",
+          IP_ADDRESS: "#64748b",
+          CIN_TN: "#0369a1",
+          MF_TN: "#0369a1",
+          GENERIC_SECRET: "#dc2626"
+        };
+        const color = typeColors[entity.type] ?? "#64748b";
+        const shortType = entity.type.replace("_", " ").toLowerCase();
+        const val = entity.originalValue;
+        const preview = val.length > 12 ? val.slice(0, 4) + "***" + val.slice(-3) : val.slice(0, 2) + "***";
+        row.innerHTML = `
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase">${shortType}</div>
+          <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button data-idx="${idx}" data-action="cage"
+            style="background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+            🔒 Cage
+          </button>
+          <button data-idx="${idx}" data-action="pass"
+            style="background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">
+            Pass
+          </button>
+        </div>
+      `;
+        listWrap.appendChild(row);
+      });
+    } else {
+      listWrap.innerHTML = `
+      <div style="padding:16px 14px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">Session history</div>
+        <div style="font-size:12px;color:#16a34a">✅ ${sessionTotal} item(s) successfully caged this session</div>
+      </div>`;
+    }
+    panel.appendChild(listWrap);
+    if (pendingEntities.length > 0) {
+      const actions = document.createElement("div");
+      actions.style.cssText = "padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;gap:8px;";
+      actions.innerHTML = `
+      <button id="ai-cage-cage-all" style="flex:1;background:#15803d;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+        🔒 Cage All
+      </button>
+      <button id="ai-cage-pass-all" style="flex:1;background:#e2e8f0;color:#374151;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+        Send All (no protection)
+      </button>
+    `;
+      panel.appendChild(actions);
+    }
+    const footer = document.createElement("div");
+    footer.style.cssText = "padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;";
+    footer.innerHTML = `
+    <span style="font-size:10px;color:#94a3b8">🇹🇳 Made in Tunisia · Zero data sent</span>
+    <span style="font-size:10px;color:#94a3b8">v0.4.5</span>
+  `;
+    panel.appendChild(footer);
+    document.body.appendChild(panel);
+    (_b = document.getElementById("ai-cage-close")) == null ? void 0 : _b.addEventListener("click", () => panel.remove());
+    (_c = document.getElementById("ai-cage-cage-all")) == null ? void 0 : _c.addEventListener("click", () => {
+      applyEntityDecisions(pendingEntities.map((_, i) => ({ idx: i, action: "cage" })));
+      panel.remove();
+    });
+    (_d = document.getElementById("ai-cage-pass-all")) == null ? void 0 : _d.addEventListener("click", () => {
+      pendingEntities = [];
+      panel.remove();
+      bubbleState = "idle";
+      updateBubble();
+    });
+    listWrap.querySelectorAll("button[data-action]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const target = e.currentTarget;
+        const idx = parseInt(target.dataset["idx"] ?? "0", 10);
+        const action = target.dataset["action"];
+        applyEntityDecisions([{ idx, action }]);
+        panel.remove();
+        if (pendingEntities.length > 0) setTimeout(showPanel, 100);
+      });
+    });
+    setTimeout(() => {
+      document.addEventListener("click", (e) => {
+        const p = document.getElementById(PANEL_ID);
+        const bub = document.getElementById(BUBBLE_ID);
+        if (p && !p.contains(e.target) && !(bub == null ? void 0 : bub.contains(e.target))) {
+          p.remove();
+        }
+      }, { once: true });
+    }, 100);
+  }
+  function applyEntityDecisions(decisions) {
+    const caged = decisions.filter((d) => d.action === "cage").map((d) => pendingEntities[d.idx]).filter(Boolean);
+    const passed = decisions.filter((d) => d.action === "pass").map((d) => pendingEntities[d.idx]).filter(Boolean);
+    const processedIdxs = new Set(decisions.map((d) => d.idx));
+    pendingEntities = pendingEntities.filter((_, i) => !processedIdxs.has(i));
+    if (caged.length > 0) {
+      sessionTotal += caged.length;
+      shareEntitiesWithPage(caged);
+      bubbleState = "caged";
+      updateBubble();
       try {
-        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
+        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: caged });
       } catch {
       }
     }
-    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
-      updateBanner(sessionCageTotal, true);
+    if (passed.length > 0) {
+      console.warn(`[AI CAGE] User chose to pass ${passed.length} item(s) uncaged.`);
     }
-    if ((d == null ? void 0 : d.type) === "AI_CAGE_CAGED") updateBanner(sessionCageTotal, false);
-    if ((d == null ? void 0 : d.type) === "AI_CAGE_RESTORED") updateBanner(sessionCageTotal, true);
-  });
-  const sessionEntityMap = [];
-  let sessionCageTotal = 0;
-  function injectBanner() {
-    if (!document.body) return false;
-    if (document.getElementById(BANNER_ID)) return true;
-    const b = document.createElement("div");
-    b.id = BANNER_ID;
-    b.setAttribute("role", "status");
-    b.style.cssText = [
-      "position:fixed",
-      "top:0",
-      "left:0",
-      "right:0",
-      "z-index:2147483647",
-      "background:#15803d",
-      "color:#fff",
-      "font-family:system-ui,sans-serif",
-      "font-size:13px",
-      "font-weight:600",
-      "padding:6px 16px",
-      "display:flex",
-      "align-items:center",
-      "gap:8px",
-      "box-shadow:0 2px 8px rgba(0,0,0,.25)",
-      "user-select:none",
-      "transition:background .3s"
-    ].join(";");
-    b.innerHTML = `
-    <span style="font-size:16px">🔒</span>
-    <span>AI CAGE Active</span>
-    <span id="ai-cage-ctr" style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">
-      Monitoring…
-    </span>
-  `;
-    try {
-      document.body.prepend(b);
-      return true;
-    } catch {
-      return false;
+    if (pendingEntities.length === 0 && caged.length > 0) {
+      bubbleState = "caged";
+      updateBubble();
     }
   }
-  function updateBanner(caged, uncaged = false) {
-    const ctr = document.getElementById("ai-cage-ctr");
-    const banner = document.getElementById(BANNER_ID);
-    if (!ctr || !banner) return;
-    if (caged === 0) {
-      ctr.textContent = "Monitoring…";
-      banner.style.background = "#15803d";
-    } else if (uncaged) {
-      ctr.textContent = `${caged} item${caged > 1 ? "s" : ""} caged ✓ Restored`;
-      banner.style.background = "#0369a1";
-    } else {
-      ctr.textContent = `${caged} item${caged > 1 ? "s" : ""} caged — waiting for AI…`;
-      banner.style.background = "#b45309";
-    }
-  }
-  function findPromptElement() {
+  const PROMPT_SELECTORS = [
+    "#prompt-textarea",
+    "div#prompt-textarea[contenteditable]",
+    'div[contenteditable="true"][data-id]',
+    'div.ProseMirror[contenteditable="true"]',
+    "rich-textarea .ql-editor",
+    'div.ql-editor[contenteditable="true"]',
+    "textarea#chat-input",
+    'div[contenteditable="true"][aria-multiline="true"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'div[contenteditable="true"][aria-label]',
+    "textarea[rows]",
+    "textarea",
+    'div[contenteditable="true"]'
+  ];
+  const SEND_SELECTORS = [
+    'button[data-testid*="send"]',
+    'button[data-testid*="submit"]',
+    'button[aria-label*="Send"]',
+    'button[aria-label*="send"]',
+    'button[aria-label*="Submit"]',
+    'button[aria-label*="Envoyer"]',
+    'button[type="submit"]'
+  ];
+  function findPrompt() {
     for (const sel of PROMPT_SELECTORS) {
       try {
         const el = document.querySelector(sel);
-        if (el && isUsableInput(el)) return el;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 50 && r.height > 20) return el;
+        }
       } catch {
       }
     }
     return null;
   }
-  function isUsableInput(el) {
-    try {
-      const r = el.getBoundingClientRect();
-      return r.width > 50 && r.height > 20;
-    } catch {
-      return false;
-    }
-  }
   function readText(el) {
-    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-      return el.value;
-    }
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
     return (el.innerText ?? el.textContent ?? "").trim();
   }
   function writeText(el, text) {
     var _a;
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
       const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
-      const nativeSetter = (_a = Object.getOwnPropertyDescriptor(proto, "value")) == null ? void 0 : _a.set;
-      if (nativeSetter) {
-        nativeSetter.call(el, text);
-      } else {
-        el.value = text;
-      }
+      const setter = (_a = Object.getOwnPropertyDescriptor(proto, "value")) == null ? void 0 : _a.set;
+      if (setter) setter.call(el, text);
+      else el.value = text;
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
     } else {
@@ -528,199 +683,126 @@
       if (readText(el) !== text) {
         el.innerText = text;
         el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
-        try {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.selectNodeContents(el);
-          range.collapse(false);
-          sel == null ? void 0 : sel.removeAllRanges();
-          sel == null ? void 0 : sel.addRange(range);
-        } catch {
-        }
       }
     }
   }
-  function cagePrompt(el) {
+  function handlePrompt(el) {
     const raw = readText(el);
-    if (!raw || raw.length < 3) return false;
+    if (!raw || raw.length < 3) return;
     const { cagedText, entities, totalCaged } = cageText(raw);
-    if (totalCaged === 0) return false;
+    if (totalCaged === 0) return;
+    pendingEntities = [...pendingEntities, ...entities];
+    bubbleState = "detected";
+    updateBubble();
+    showPanel();
     writeText(el, cagedText);
-    sessionEntityMap.push(entities);
-    if (sessionEntityMap.length > 10) sessionEntityMap.shift();
     shareEntitiesWithPage(entities);
-    sessionCageTotal += totalCaged;
-    updateBanner(sessionCageTotal, false);
+    sessionTotal += totalCaged;
     try {
-      void chrome.runtime.sendMessage({
-        type: "CAGE_REPORT",
-        tabId: 0,
-        site: window.location.hostname,
-        entities
-      });
+      void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities });
     } catch {
     }
-    console.warn(`[AI CAGE] 🔒 Caged ${totalCaged} PII item(s) on ${window.location.hostname}`);
-    return true;
   }
-  function tryUncageNode(node) {
-    if (sessionEntityMap.length === 0) return false;
-    const allEntities = sessionEntityMap.flat();
-    if (allEntities.length === 0) return false;
-    if (node.nodeType === Node.TEXT_NODE) {
-      const original = node.textContent ?? "";
-      if (!original.includes("[CAGED_")) return false;
-      const restored = uncageText(original, allEntities);
-      if (restored !== original) {
-        node.textContent = restored;
-        updateBanner(sessionCageTotal, true);
-        return true;
-      }
-    } else if (node instanceof Element) {
-      const html = node.innerHTML;
-      if (!html.includes("[CAGED_")) return false;
-      const restored = uncageText(html, allEntities);
-      if (restored !== html) {
-        node.innerHTML = restored;
-        updateBanner(sessionCageTotal, true);
-        return true;
-      }
-    }
-    return false;
-  }
-  function uncageSubtree(root) {
-    var _a;
-    if (sessionEntityMap.length === 0) return;
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode: (node2) => {
-          var _a2;
-          if (node2 instanceof Element) {
-            const tag = (_a2 = node2.tagName) == null ? void 0 : _a2.toLowerCase();
-            if (tag === "script" || tag === "style" || tag === "noscript") {
-              return NodeFilter.FILTER_REJECT;
-            }
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
-    );
-    let node;
-    while ((node = walker.nextNode()) !== null) {
-      if (node.nodeType === Node.TEXT_NODE && ((_a = node.textContent) == null ? void 0 : _a.includes("[CAGED_"))) {
-        tryUncageNode(node);
-      }
-    }
-  }
-  const responseObserver = new MutationObserver((mutations) => {
-    var _a;
-    if (sessionEntityMap.length === 0) return;
-    for (const mutation of mutations) {
-      mutation.addedNodes.forEach((node) => {
-        var _a2, _b;
-        if (node.nodeType === Node.TEXT_NODE) {
-          if ((_a2 = node.textContent) == null ? void 0 : _a2.includes("[CAGED_")) {
-            tryUncageNode(node);
-          }
-        } else if (node instanceof Element) {
-          if ((_b = node.innerHTML) == null ? void 0 : _b.includes("[CAGED_")) {
-            uncageSubtree(node);
-          }
-        }
-      });
-      if (mutation.type === "characterData") {
-        const t = mutation.target;
-        if ((_a = t.textContent) == null ? void 0 : _a.includes("[CAGED_")) {
-          tryUncageNode(t);
-        }
-      }
-    }
-  });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey) return;
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey) return;
     const target = e.target;
-    const isInput = PROMPT_SELECTORS.some((sel) => {
+    const isPrompt = PROMPT_SELECTORS.some((sel) => {
       try {
         return target.matches(sel) || !!target.closest(sel);
       } catch {
         return false;
       }
     });
-    if (!isInput) return;
-    cagePrompt(target);
+    if (isPrompt) handlePrompt(target);
   }, true);
-  function hookSendButtons() {
-    for (const sel of SEND_SELECTORS) {
+  function hookButtons() {
+    SEND_SELECTORS.forEach((sel) => {
       document.querySelectorAll(sel).forEach((btn) => {
         if (btn.getAttribute(CAGED_ATTR) === "1") return;
         btn.setAttribute(CAGED_ATTR, "1");
         btn.addEventListener("click", () => {
-          const prompt = findPromptElement();
-          if (prompt) cagePrompt(prompt);
+          const p = findPrompt();
+          if (p) handlePrompt(p);
         }, true);
       });
-    }
+    });
   }
   document.addEventListener("submit", (e) => {
     const form = e.target;
     const sel = PROMPT_SELECTORS.join(",");
     try {
       const input = form.querySelector(sel);
-      if (input) cagePrompt(input);
+      if (input) handlePrompt(input);
     } catch {
     }
   }, true);
-  let lastInputValue = "";
-  document.addEventListener("input", (e) => {
-    const target = e.target;
-    const isInput = PROMPT_SELECTORS.some((sel) => {
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    const d = event.data;
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_CAGED" && d.count) {
+      sessionTotal += d.count;
+      bubbleState = "caged";
+      updateBubble();
       try {
-        return target.matches(sel) || !!target.closest(sel);
+        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
       } catch {
-        return false;
       }
-    });
-    if (!isInput) return;
-    const val = readText(target);
-    if (lastInputValue.length > 5 && val.length === 0) ;
-    lastInputValue = val;
-  }, true);
+    }
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
+      bubbleState = "restored";
+      updateBubble();
+      setTimeout(() => {
+        bubbleState = "idle";
+        updateBubble();
+      }, 3e3);
+    }
+  });
   const domObserver = new MutationObserver(() => {
-    hookSendButtons();
-    if (!document.getElementById(BANNER_ID)) injectBanner();
+    hookButtons();
+    if (!document.getElementById(BUBBLE_ID)) createBubble();
+  });
+  const responseObserver = new MutationObserver((mutations) => {
+    var _a;
+    if (pendingEntities.length === 0 && sessionTotal === 0) return;
+    for (const mut of mutations) {
+      mut.addedNodes.forEach((node) => {
+        var _a2;
+        if (node instanceof Element && ((_a2 = node.innerHTML) == null ? void 0 : _a2.includes("[CAGED_"))) {
+          window.postMessage({ type: "AI_CAGE_RESTORE_REQUEST" }, "*");
+        }
+      });
+      if (mut.type === "characterData" && ((_a = mut.target.textContent) == null ? void 0 : _a.includes("[CAGED_"))) {
+        window.postMessage({ type: "AI_CAGE_RESTORE_REQUEST" }, "*");
+      }
+    }
   });
   function boot() {
-    console.warn(`[AI CAGE] 🔒 Universal content script v0.4.5 active on ${window.location.hostname}`);
     injectPageScript();
-    if (!injectBanner()) {
+    const tryBubble = () => {
+      if (document.body) {
+        createBubble();
+        return true;
+      }
+      return false;
+    };
+    if (!tryBubble()) {
       const w = new MutationObserver(() => {
-        if (document.body && injectBanner()) w.disconnect();
+        if (tryBubble()) w.disconnect();
       });
       w.observe(document.documentElement, { childList: true });
     }
     if (document.body) {
       domObserver.observe(document.body, { childList: true, subtree: true });
-      responseObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
+      responseObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
-    hookSendButtons();
+    hookButtons();
+    console.warn(`[AI CAGE] 🔒 v0.4.5 active on ${window.location.hostname} — bubble mode`);
   }
   boot();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      hookSendButtons();
-      if (!document.getElementById(BANNER_ID)) injectBanner();
-      if (!responseObserver) return;
-      responseObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
+      hookButtons();
+      if (!document.getElementById(BUBBLE_ID)) createBubble();
     });
   }
 })();
