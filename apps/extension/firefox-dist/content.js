@@ -900,6 +900,19 @@
       } catch {
       }
     }
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_INJECTION_DETECTED") {
+      try {
+        void chrome.runtime.sendMessage({
+          type: "AGENT_EVENT",
+          site: window.location.hostname,
+          detail: d.detail ?? "Injection detected in AI response",
+          blocked: true
+        });
+      } catch {
+      }
+      bubbleState = "detected";
+      updateBubble();
+    }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
       bubbleState = "restored";
       updateBubble();

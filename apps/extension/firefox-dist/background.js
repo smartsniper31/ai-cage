@@ -675,35 +675,6 @@
     const summary = summariseCaged(msg.entities);
     console.warn(`[AI CAGE] 🔒 Caged ${count} item(s) on ${msg.site}:`, summary);
   }
-  async function detectShadowAIRequest(details) {
-    var _a;
-    const url = details.url;
-    const matches = matchAiEndpoint(url);
-    if (matches.length === 0) return;
-    const initiator = details.initiator ?? "unknown";
-    sessionShadowCount += 1;
-    const counts = {};
-    for (const m of matches) {
-      counts[m.id] = (counts[m.id] ?? 0) + 1;
-    }
-    const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
-    const hostname = (hostnameMatch == null ? void 0 : hostnameMatch[1]) ?? url;
-    await logEvent(
-      {
-        type: "SHADOW_AI_DETECTED",
-        site: hostname,
-        counts,
-        totalCount: matches.length,
-        detail: `Initiated by: ${initiator} | Risk: ${((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown"}`
-      },
-      chromeStorageAdapter
-    );
-    console.warn(
-      `[AI CAGE] ⚠️ Shadow AI detected: ${url} from ${initiator}`,
-      matches.map((m) => m.name)
-    );
-    void updateGlobalBadge();
-  }
   function registerShadowAiObserver() {
     if (!chrome.webRequest) {
       console.warn("[AI CAGE] webRequest API not available — Shadow AI detection disabled.");
@@ -712,14 +683,34 @@
     try {
       chrome.webRequest.onBeforeRequest.addListener(
         (details) => {
-          void detectShadowAIRequest(details);
+          var _a, _b, _c, _d;
+          const url = details.url;
+          const matches = matchAiEndpoint(url);
+          if (matches.length === 0) return;
+          sessionShadowCount += 1;
+          const counts = {};
+          for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
+          const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
+          const hostname = (hostnameMatch == null ? void 0 : hostnameMatch[1]) ?? url;
+          const initiator = details.initiator ?? "unknown";
+          void logEvent(
+            {
+              type: "SHADOW_AI_DETECTED",
+              site: hostname,
+              counts,
+              totalCount: matches.length,
+              detail: `Initiator: ${initiator} | Risk: ${((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown"} | Product: ${((_b = matches[0]) == null ? void 0 : _b.name) ?? url}`
+            },
+            chromeStorageAdapter
+          );
+          console.warn(`[AI CAGE] ⚠️ Shadow AI: ${((_c = matches[0]) == null ? void 0 : _c.name) ?? url} (${((_d = matches[0]) == null ? void 0 : _d.riskLevel) ?? "unknown"})`);
+          void updateGlobalBadge();
         },
         { urls: ["<all_urls>"] }
-        // No extra_info_spec — avoid 'responseHeaders' which fails in MV3
       );
-      console.warn("[AI CAGE] Shadow AI webRequest observer registered (MV3 compatible).");
+      console.warn("[AI CAGE] Shadow AI observer registered (MV3 onBeforeRequest).");
     } catch (err) {
-      console.warn("[AI CAGE] Shadow AI webRequest registration failed:", err);
+      console.warn("[AI CAGE] Shadow AI registration failed:", err);
     }
   }
   async function updateBadge(tabId, count) {
@@ -745,6 +736,21 @@
     (message, sender, sendResponse) => {
       var _a;
       const msg = message;
+      if (msg.type === "AGENT_EVENT") {
+        const agentMsg = msg;
+        void logEvent(
+          {
+            type: "AGENT_TOOL_CALL",
+            site: agentMsg.site,
+            counts: { blocked: agentMsg.blocked ? 1 : 0 },
+            totalCount: 1,
+            detail: agentMsg.detail
+          },
+          chromeStorageAdapter
+        );
+        sendResponse({ ok: true });
+        return true;
+      }
       if (msg.type === "CAGE_REPORT") {
         const tabId = ((_a = sender.tab) == null ? void 0 : _a.id) ?? msg.tabId;
         void handleCageReport(msg, tabId).then(() => {
@@ -800,5 +806,5 @@
     },
     chromeStorageAdapter
   );
-  console.warn("[AI CAGE] Background service worker v0.2.0 started. Cage 1 + Cage 2 active.");
+  console.warn("[AI CAGE] Background service worker v0.4.5 — Cage 1+2+3 active.");
 })();

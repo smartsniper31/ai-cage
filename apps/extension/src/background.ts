@@ -111,56 +111,13 @@ async function handleCageReport(
 }
 
 // ---------------------------------------------------------------------------
-// Cage 2: Shadow AI detection via webRequest observer
+// Cage 2: Shadow AI detection — now inline in registerShadowAiObserver
 // ---------------------------------------------------------------------------
 
 /**
- * Called for every completed outbound request.
- * Checks against the AI endpoint catalogue and logs silently.
- */
-async function detectShadowAIRequest(
-  details: chrome.webRequest.WebResponseHeadersDetails | chrome.webRequest.WebRequestBodyDetails,
-): Promise<void> {
-  const url = (details as { url: string }).url;
-  const matches = matchAiEndpoint(url);
-  if (matches.length === 0) return;
-
-  const initiator = (details as { initiator?: string }).initiator ?? 'unknown';
-  sessionShadowCount += 1;
-
-  const counts: Record<string, number> = {};
-  for (const m of matches) {
-    counts[m.id] = (counts[m.id] ?? 0) + 1;
-  }
-
-  // Safe hostname extraction without DOM URL API
-  const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
-  const hostname = hostnameMatch?.[1] ?? url;
-
-  await logEvent(
-    {
-      type: 'SHADOW_AI_DETECTED',
-      site: hostname,
-      counts,
-      totalCount: matches.length,
-      detail: `Initiated by: ${initiator} | Risk: ${matches[0]?.riskLevel ?? 'unknown'}`,
-    },
-    chromeStorageAdapter,
-  );
-
-  console.warn(
-    `[AI CAGE] ⚠️ Shadow AI detected: ${url} from ${initiator}`,
-    matches.map((m) => m.name),
-  );
-
-  void updateGlobalBadge();
-}
-
-/**
  * Register the webRequest listener for Shadow AI detection.
- * MV3 FIX: Use onBeforeRequest (works in MV3) instead of onCompleted
- * with 'responseHeaders' (not available in MV3 Chrome).
- * Graceful fallback if webRequest API unavailable.
+ * MV3 FIX: Use onBeforeRequest (works in MV3).
+ * onCompleted with 'responseHeaders' is NOT available in MV3 Chrome.
  */
 function registerShadowAiObserver(): void {
   if (!chrome.webRequest) {
@@ -169,15 +126,40 @@ function registerShadowAiObserver(): void {
   }
 
   try {
-    // onBeforeRequest works in MV3 — no 'responseHeaders' needed for URL matching
     chrome.webRequest.onBeforeRequest.addListener(
-      (details) => { void detectShadowAIRequest(details as chrome.webRequest.WebResponseHeadersDetails); },
+      (details: chrome.webRequest.WebRequestBodyDetails) => {
+        const url = details.url;
+        const matches = matchAiEndpoint(url);
+        if (matches.length === 0) return;
+
+        sessionShadowCount += 1;
+
+        const counts: Record<string, number> = {};
+        for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
+
+        const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
+        const hostname = hostnameMatch?.[1] ?? url;
+        const initiator = details.initiator ?? 'unknown';
+
+        void logEvent(
+          {
+            type: 'SHADOW_AI_DETECTED',
+            site: hostname,
+            counts,
+            totalCount: matches.length,
+            detail: `Initiator: ${initiator} | Risk: ${matches[0]?.riskLevel ?? 'unknown'} | Product: ${matches[0]?.name ?? url}`,
+          },
+          chromeStorageAdapter,
+        );
+
+        console.warn(`[AI CAGE] ⚠️ Shadow AI: ${matches[0]?.name ?? url} (${matches[0]?.riskLevel ?? 'unknown'})`);
+        void updateGlobalBadge();
+      },
       { urls: ['<all_urls>'] },
-      // No extra_info_spec — avoid 'responseHeaders' which fails in MV3
     );
-    console.warn('[AI CAGE] Shadow AI webRequest observer registered (MV3 compatible).');
+    console.warn('[AI CAGE] Shadow AI observer registered (MV3 onBeforeRequest).');
   } catch (err) {
-    console.warn('[AI CAGE] Shadow AI webRequest registration failed:', err);
+    console.warn('[AI CAGE] Shadow AI registration failed:', err);
   }
 }
 
@@ -215,6 +197,22 @@ async function updateGlobalBadge(): Promise<void> {
 chrome.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse) => {
     const msg = message as IncomingMessage;
+
+    if (msg.type === 'AGENT_EVENT') {
+      const agentMsg = msg as { type: string; site: string; detail: string; blocked: boolean };
+      void logEvent(
+        {
+          type: 'AGENT_TOOL_CALL' as never,
+          site: agentMsg.site,
+          counts: { blocked: agentMsg.blocked ? 1 : 0 },
+          totalCount: 1,
+          detail: agentMsg.detail,
+        },
+        chromeStorageAdapter,
+      );
+      sendResponse({ ok: true });
+      return true;
+    }
 
     if (msg.type === 'CAGE_REPORT') {
       const tabId = sender.tab?.id ?? msg.tabId;
@@ -289,4 +287,4 @@ void logEvent(
   chromeStorageAdapter,
 );
 
-console.warn('[AI CAGE] Background service worker v0.2.0 started. Cage 1 + Cage 2 active.');
+console.warn('[AI CAGE] Background service worker v0.4.5 — Cage 1+2+3 active.');

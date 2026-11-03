@@ -669,6 +669,21 @@ window.addEventListener('message', (event) => {
       void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
     } catch { /* ignore */ }
   }
+
+  // Injection detected in AI response → send AGENT_TOOL_CALL event for Agent tab
+  if (d?.type === 'AI_CAGE_INJECTION_DETECTED') {
+    try {
+      void chrome.runtime.sendMessage({
+        type: 'AGENT_EVENT',
+        site: window.location.hostname,
+        detail: (d as { detail?: string }).detail ?? 'Injection detected in AI response',
+        blocked: true,
+      });
+    } catch { /* ignore */ }
+    bubbleState = 'detected';
+    updateBubble();
+  }
+
   if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
     bubbleState = 'restored';
     updateBubble();

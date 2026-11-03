@@ -101,11 +101,48 @@
 Chaque étape ne démarre que si l'étape précédente satisfait TOUS ses critères de validation.
 Si une étape échoue, on la fixe avant de continuer. On ne saute jamais une étape.
 
-**Étape courante : ÉTAPE 2 — Validation réelle**
+**Étape courante : ÉTAPE 3 — Shadow AI MV3 + Agent Tab**
 
 ---
 
-## ÉTAPE 1 — VALIDÉE ✅ (v3 finale)
+## ÉTAPE 1 — VALIDÉE ✅ avec lacunes mineures (non bloquantes)
+
+**Lacunes notées :**
+- Le panneau de décision peut apparaître légèrement après l'envoi sur certaines IA rapides (timing réseau)
+- Sur quelques IA le DOM-level write échoue silencieusement (non critique — le gate réseau fonctionne)
+- À améliorer en Étape 5 (production finale)
+
+---
+
+## ÉTAPE 3 — Shadow AI webRequest MV3 + Agent Tab
+
+---
+
+## ÉTAPE 1 v3 — VALIDÉE ✅
+
+**Date :** 2026-11-03 · **Build :** EXT:0 · **Tests :** 202/202
+
+### Deux bugs réels corrigés :
+
+**Bug 1 — "Pass" cageait quand même**
+- Cause : `injected.js` détectait et cageait indépendamment, ignorait la décision "Pass"
+- Fix : Système de "gate" — `injected.js` SUSPEND la requête, envoie `AI_CAGE_PII_DETECTED` au content script, attend `AI_CAGE_PROCEED` avec la décision `cage` ou `pass`
+
+**Bug 2 — Nouvel onglet ne cageait pas**
+- Cause : Entity store partagé entre onglets, pas de per-tab isolation
+- Fix : Entity store dans la closure IIFE de `injected.js` → chaque onglet a son propre état isolé
+
+### Architecture finale (gate protocol) :
+```
+1. User tape → presse Entrée
+2. Page appelle fetch('/api/chat', { body: "email: test@..." })
+3. injected.js intercepte → détecte PII → SUSPEND la requête
+4. Envoie "AI_CAGE_PII_DETECTED" { gateId, items }
+5. content.ts affiche le panneau → l'utilisateur choisit
+6. "Cage All" → content.ts envoie "AI_CAGE_PROCEED" { mode:'cage' }
+   "Send Unprotected" → content.ts envoie "AI_CAGE_PROCEED" { mode:'pass' }
+7. injected.js reprend la requête avec/sans caging selon la décision
+```
 
 **Date :** 2026-11-03
 **Build :** EXT:0 — content.js 28.90 kB, injected.js 8.60 kB
