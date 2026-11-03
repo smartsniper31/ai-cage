@@ -392,24 +392,42 @@
     'button[class*="submit"]',
     'button[class*="Send"]'
   ];
+  function injectPageScript() {
+    try {
+      const script = document.createElement("script");
+      script.src = chrome.runtime.getURL("injected.js");
+      script.async = false;
+      script.onload = function() {
+        this.remove();
+      };
+      (document.head || document.documentElement).prepend(script);
+      console.warn("[AI CAGE] Page-context network interceptor injected.");
+    } catch (e) {
+      console.warn("[AI CAGE] Could not inject page script:", e);
+    }
+  }
   function shareEntitiesWithPage(entities) {
     window.postMessage({
       type: "AI_CAGE_ENTITIES",
-      entities: entities.map((e) => ({
-        placeholder: e.placeholder,
-        originalValue: e.originalValue
-      }))
+      entities: entities.map((e) => ({ placeholder: e.placeholder, originalValue: e.originalValue }))
     }, "*");
   }
   window.addEventListener("message", (event) => {
-    var _a, _b;
     if (event.source !== window) return;
-    if (((_a = event.data) == null ? void 0 : _a.type) === "AI_CAGE_CAGED") {
+    const d = event.data;
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_CAGED" && d.count) {
+      sessionCageTotal += d.count;
       updateBanner(sessionCageTotal, false);
+      try {
+        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
+      } catch {
+      }
     }
-    if (((_b = event.data) == null ? void 0 : _b.type) === "AI_CAGE_RESTORED") {
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
       updateBanner(sessionCageTotal, true);
     }
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_CAGED") updateBanner(sessionCageTotal, false);
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_RESTORED") updateBanner(sessionCageTotal, true);
   });
   const sessionEntityMap = [];
   let sessionCageTotal = 0;
@@ -675,6 +693,7 @@
   });
   function boot() {
     console.warn(`[AI CAGE] 🔒 Universal content script v0.4.5 active on ${window.location.hostname}`);
+    injectPageScript();
     if (!injectBanner()) {
       const w = new MutationObserver(() => {
         if (document.body && injectBanner()) w.disconnect();

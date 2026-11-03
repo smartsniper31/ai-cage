@@ -145,43 +145,47 @@ const RESPONSE_SELECTORS: string[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE SCRIPT INJECTION
 // Injects the fetch/XHR interceptor into the page's JavaScript context.
-// This bypasses the extension isolation and intercepts React's network calls.
+// Must run at document_start to patch fetch BEFORE any page code uses it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function injectPageScript(): void {
   try {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('injected.js');
-    script.onload = function () {
-      (this as HTMLScriptElement).remove();
-    };
-    (document.head || document.documentElement).appendChild(script);
-    console.warn('[AI CAGE] Page-context script injected.');
+    // Inject synchronously so it patches fetch before page scripts run
+    script.async = false;
+    script.onload = function () { (this as HTMLScriptElement).remove(); };
+    (document.head || document.documentElement).prepend(script);
+    console.warn('[AI CAGE] Page-context network interceptor injected.');
   } catch (e) {
     console.warn('[AI CAGE] Could not inject page script:', e);
   }
 }
 
-// Share entities with the injected page script
+// Share entities with the injected page script for uncaging responses
 function shareEntitiesWithPage(entities: CagedEntity[]): void {
   window.postMessage({
     type: 'AI_CAGE_ENTITIES',
-    entities: entities.map((e) => ({
-      placeholder: e.placeholder,
-      originalValue: e.originalValue,
-    })),
+    entities: entities.map(e => ({ placeholder: e.placeholder, originalValue: e.originalValue })),
   }, '*');
 }
 
-// Listen for events from the injected page script
+// Listen for network-level cage/restore events from injected.js
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
-  if (event.data?.type === 'AI_CAGE_CAGED') {
+  const d = event.data as { type?: string; count?: number };
+  if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
+    sessionCageTotal += d.count;
     updateBanner(sessionCageTotal, false);
+    try {
+      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
+    } catch { /* ignore */ }
   }
-  if (event.data?.type === 'AI_CAGE_RESTORED') {
+  if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
     updateBanner(sessionCageTotal, true);
   }
+  if (d?.type === 'AI_CAGE_CAGED') updateBanner(sessionCageTotal, false);
+  if (d?.type === 'AI_CAGE_RESTORED') updateBanner(sessionCageTotal, true);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -533,6 +537,10 @@ const domObserver = new MutationObserver(() => {
 
 function boot(): void {
   console.warn(`[AI CAGE] 🔒 Universal content script v0.4.5 active on ${window.location.hostname}`);
+
+  // FIRST: inject the page-context network interceptor
+  // This must run before any page scripts to patch fetch/XHR
+  injectPageScript();
 
   // Inject banner
   if (!injectBanner()) {
