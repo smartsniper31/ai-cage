@@ -120,8 +120,8 @@
           <div class="text-sm text-slate-500">AI endpoints tracked</div>
         </div>
         <div class="text-center">
-          <div class="text-3xl font-extrabold text-cage-green">6</div>
-          <div class="text-sm text-slate-500">Cages active</div>
+          <div class="text-3xl font-extrabold text-cage-green">3</div>
+          <div class="text-sm text-slate-500">Cages live</div>
         </div>
         <div class="text-center">
           <div class="text-3xl font-extrabold text-cage-green">0€</div>
@@ -238,8 +238,8 @@
         </div>
         <div class="bg-cage-green-dark text-white rounded-xl p-6 flex flex-col justify-center">
           <div class="text-3xl mb-3">📊</div>
-          <h3 class="font-bold text-lg mb-2">6 of 7 Cages Live</h3>
-          <p class="text-sm text-green-100">202 tests. 15 PII types. 15 injection types. 47 AI endpoints. 20 MCP tools catalogued.</p>
+          <h3 class="font-bold text-lg mb-2">3 of 7 Cages Live</h3>
+          <p class="text-sm text-green-100">202 tests. 15 PII types. 15 injection types. 47 AI endpoints. Cages 4 &amp; 5 coming in v0.7.0.</p>
         </div>
       </div>
     </div>
@@ -286,7 +286,7 @@
           <button
             id="pro-trial-btn"
             class="block w-full text-center bg-cage-green text-white py-2.5 rounded-lg font-semibold hover:bg-cage-green-dark transition text-sm cursor-pointer">
-            💳 Démarrer l'essai Pro — 5€/mois
+            🚀 Start Free Trial — €5/month
           </button>
         </div>
 
@@ -302,7 +302,12 @@
             <li class="flex gap-2">✅ Centralised policy</li>
             <li class="flex gap-2">✅ Priority support</li>
           </ul>
-          <a href="mailto:contact@ai-cage.io?subject=AI CAGE Enterprise" class="block text-center bg-slate-800 text-white py-2.5 rounded-lg font-semibold hover:bg-slate-900 transition text-sm">Contact Sales</a>
+          <!-- Same modal pattern as Pro — no mailto: -->
+          <button
+            id="enterprise-btn"
+            class="block w-full text-center bg-slate-800 text-white py-2.5 rounded-lg font-semibold hover:bg-slate-900 transition text-sm cursor-pointer">
+            Contact Sales
+          </button>
         </div>
 
         <!-- Compliance -->
@@ -316,7 +321,12 @@
             <li class="flex gap-2">✅ Automated audit export</li>
             <li class="flex gap-2">✅ Tamper-evidence log</li>
           </ul>
-          <a href="mailto:contact@ai-cage.io?subject=AI CAGE Compliance Module" class="block text-center bg-slate-200 text-slate-800 py-2.5 rounded-lg font-semibold hover:bg-slate-300 transition text-sm">Request Demo</a>
+          <!-- Same modal pattern — no mailto: -->
+          <button
+            id="compliance-btn"
+            class="block w-full text-center bg-slate-200 text-slate-800 py-2.5 rounded-lg font-semibold hover:bg-slate-300 transition text-sm cursor-pointer">
+            Request Demo
+          </button>
         </div>
       </div>
 
@@ -355,7 +365,7 @@
         </div>
       </div>
 
-      <a href="https://github.com/smartsniper31/ai-cage/blob/main/docs/PRIVACY_GUARANTEE.md" class="inline-block mt-8 text-green-200 underline hover:text-white transition text-sm">
+      <a href="https://github.com/smartsniper31/ai-cage/blob/master/docs/PRIVACY_GUARANTEE.md" class="inline-block mt-8 text-green-200 underline hover:text-white transition text-sm">
         Read the full Privacy Guarantee →
       </a>
     </div>
@@ -407,9 +417,9 @@
           <h4 class="font-semibold text-white mb-3 text-sm uppercase tracking-wide">Resources</h4>
           <ul class="space-y-2 text-sm">
             <li><a href="https://github.com/smartsniper31/ai-cage" class="hover:text-white transition">GitHub (MIT License)</a></li>
-            <li><a href="https://github.com/smartsniper31/ai-cage/blob/main/docs/THREAT_MODEL.md" class="hover:text-white transition">Threat Model</a></li>
-            <li><a href="https://github.com/smartsniper31/ai-cage/blob/main/SECURITY.md" class="hover:text-white transition">Security Policy</a></li>
-            <li><a href="https://github.com/smartsniper31/ai-cage/blob/main/docs/PRIVACY_GUARANTEE.md" class="hover:text-white transition">Privacy Guarantee</a></li>
+            <li><a href="https://github.com/smartsniper31/ai-cage/blob/master/docs/THREAT_MODEL.md" class="hover:text-white transition">Threat Model</a></li>
+            <li><a href="https://github.com/smartsniper31/ai-cage/blob/master/SECURITY.md" class="hover:text-white transition">Security Policy</a></li>
+            <li><a href="https://github.com/smartsniper31/ai-cage/blob/master/docs/PRIVACY_GUARANTEE.md" class="hover:text-white transition">Privacy Guarantee</a></li>
           </ul>
         </div>
       </div>
@@ -433,51 +443,51 @@
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
-          <div style="font-size:20px;font-weight:800;color:#0f172a" id="pro-modal-title">🚀 Essai Pro — 5€/mois</div>
-          <div style="font-size:13px;color:#64748b;margin-top:2px">Cages illimitées · Annulation à tout moment</div>
+          <div style="font-size:20px;font-weight:800;color:#0f172a" id="pro-modal-title">🚀 Pro Trial — €5/user/mo</div>
+          <div style="font-size:13px;color:#64748b;margin-top:2px" id="pro-modal-subtitle">Unlimited cages · Cancel anytime</div>
         </div>
         <button id="pro-modal-close"
                 style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1"
-                aria-label="Fermer">×</button>
+                aria-label="Close">×</button>
       </div>
 
       <!-- What you get -->
       <ul style="font-size:13px;color:#374151;margin-bottom:20px;list-style:none;display:flex;flex-direction:column;gap:6px">
-        <li>✅ Cages PII illimitées</li>
-        <li>✅ Agent Cage + détection d'injections</li>
-        <li>✅ Export CSV pour votre auditeur GDPR</li>
-        <li>✅ Support prioritaire par email</li>
-        <li style="color:#15803d;font-weight:700">✅ 14 jours d'essai gratuit — aucune CB requise</li>
+        <li>✅ Unlimited PII cages</li>
+        <li>✅ Agent Cage + injection detection</li>
+        <li>✅ CSV export for your GDPR auditor</li>
+        <li>✅ Priority email support</li>
+        <li style="color:#15803d;font-weight:700">✅ 14-day free trial — no credit card required</li>
       </ul>
 
-      <!-- Form — no server, just mailto with pre-filled content for now -->
+      <!-- Form -->
       <div id="pro-modal-form">
         <input id="pro-modal-email"
                type="email"
-               placeholder="votre@email.com"
+               placeholder="your@email.com"
                required
                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:12px;box-sizing:border-box;outline:none;"
                onfocus="this.style.borderColor='#15803d'" onblur="this.style.borderColor='#e2e8f0'" />
         <input id="pro-modal-name"
                type="text"
-               placeholder="Votre nom ou société"
+               placeholder="Your name or company"
                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:16px;box-sizing:border-box;outline:none;"
                onfocus="this.style.borderColor='#15803d'" onblur="this.style.borderColor='#e2e8f0'" />
         <button id="pro-modal-submit"
                 style="width:100%;padding:12px;background:#15803d;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">
-          💳 Démarrer mon essai gratuit →
+          💳 Start my free trial →
         </button>
         <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px">
-          En soumettant, vous acceptez d'être contacté par <strong>support@ai-cage.io</strong> pour activer votre accès Pro.
+          By submitting, you agree to be contacted by <strong>support@ai-cage.io</strong> to activate your access.
         </p>
       </div>
 
-      <!-- Success state (hidden until submit) -->
+      <!-- Success state -->
       <div id="pro-modal-success" style="display:none;text-align:center;padding:16px 0">
         <div style="font-size:48px;margin-bottom:12px">✅</div>
-        <div style="font-size:18px;font-weight:800;color:#15803d;margin-bottom:8px">Demande envoyée !</div>
+        <div style="font-size:18px;font-weight:800;color:#15803d;margin-bottom:8px">Request sent!</div>
         <p style="font-size:13px;color:#64748b;line-height:1.6">
-          Vous recevrez un email à <strong id="pro-modal-confirm-email"></strong> dans les 24h avec vos instructions d'activation Pro.
+          You will receive an email at <strong id="pro-modal-confirm-email"></strong> within 24h with your activation instructions.
         </p>
       </div>
     </div>
@@ -508,22 +518,46 @@
     var nameIn   = document.getElementById('pro-modal-name');
     var confirmEl= document.getElementById('pro-modal-confirm-email');
 
-    function openModal() {
+    function openModal(plan) {
+      // Update modal title based on plan
+      var titleEl = document.getElementById('pro-modal-title');
+      var subtitleEl = document.getElementById('pro-modal-subtitle');
+      var submitEl = document.getElementById('pro-modal-submit');
+      if (plan === 'enterprise') {
+        if (titleEl) titleEl.textContent = '🏢 Enterprise Plan — €15/user/mo';
+        if (subtitleEl) subtitleEl.textContent = 'Min 10 seats · SSO · Priority support';
+        if (submitEl) submitEl.textContent = 'Contact Sales →';
+        overlay.dataset.plan = 'enterprise';
+      } else if (plan === 'compliance') {
+        if (titleEl) titleEl.textContent = '📋 Compliance Add-on — €199/mo flat';
+        if (subtitleEl) subtitleEl.textContent = 'GDPR Art. 30 · SOC 2 · Audit export';
+        if (submitEl) submitEl.textContent = 'Request Demo →';
+        overlay.dataset.plan = 'compliance';
+      } else {
+        if (titleEl) titleEl.textContent = '🚀 Pro Trial — €5/user/mo';
+        if (subtitleEl) subtitleEl.textContent = 'Unlimited cages · Cancel anytime';
+        if (submitEl) submitEl.textContent = '💳 Start my free trial →';
+        overlay.dataset.plan = 'pro';
+      }
       overlay.style.display = 'flex';
       document.body.style.overflow = 'hidden';
+      // Reset form state
+      if (form)    form.style.display = 'block';
+      if (success) success.style.display = 'none';
+      if (emailIn) emailIn.value = '';
+      if (nameIn)  nameIn.value  = '';
       setTimeout(function(){ emailIn && emailIn.focus(); }, 100);
     }
     function closeModal() {
       overlay.style.display = 'none';
       document.body.style.overflow = '';
-      // Reset form for next open
-      if (form)    form.style.display = 'block';
-      if (success) success.style.display = 'none';
-      if (emailIn) emailIn.value = '';
-      if (nameIn)  nameIn.value  = '';
     }
 
-    if (proBtn)   proBtn.addEventListener('click', openModal);
+    if (proBtn)   proBtn.addEventListener('click', function() { openModal('pro'); });
+    var entBtn = document.getElementById('enterprise-btn');
+    var compBtn = document.getElementById('compliance-btn');
+    if (entBtn)  entBtn.addEventListener('click',  function() { openModal('enterprise'); });
+    if (compBtn) compBtn.addEventListener('click', function() { openModal('compliance'); });
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
     // Close on overlay click (outside dialog)
@@ -536,19 +570,19 @@
       if (e.key === 'Escape' && overlay.style.display === 'flex') closeModal();
     });
 
-    // Submit — sends via mailto as fallback; replace with Stripe when ready
+    // Submit
     submitBtn && submitBtn.addEventListener('click', function() {
       var email = emailIn ? emailIn.value.trim() : '';
       var name  = nameIn  ? nameIn.value.trim()  : '';
       if (!email || !email.includes('@')) {
-        if (emailIn) emailIn.style.borderColor = '#dc2626';
+        if (emailIn) { emailIn.style.borderColor = '#dc2626'; emailIn.focus(); }
         return;
       }
-      // Fire mailto in background (non-blocking)
-      var subject = encodeURIComponent('AI CAGE Pro Trial — ' + name);
-      var body    = encodeURIComponent('Bonjour,\n\nJe souhaite démarrer un essai Pro AI CAGE.\n\nEmail: ' + email + '\nNom/Société: ' + name + '\n\nMerci.');
+      var plan    = overlay.dataset.plan || 'pro';
+      var subject = encodeURIComponent('AI CAGE ' + (plan === 'enterprise' ? 'Enterprise' : plan === 'compliance' ? 'Compliance' : 'Pro Trial') + ' — ' + name);
+      var body    = encodeURIComponent('Hello,\n\nI am interested in the AI CAGE ' + plan + ' plan.\n\nEmail: ' + email + '\nName/Company: ' + name + '\n\nThank you.');
       window.open('mailto:support@ai-cage.io?subject=' + subject + '&body=' + body, '_blank');
-      // Show success state immediately — don't make user wait for email client
+      // Show success immediately
       if (form)    form.style.display = 'none';
       if (success) success.style.display = 'block';
       if (confirmEl) confirmEl.textContent = email;
