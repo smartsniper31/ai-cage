@@ -55,11 +55,47 @@ function getShadowRoot(): ShadowRoot | null {
     /* ── Animations ── */
     @keyframes cage-in  { from{opacity:0;transform:translateY(8px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
     @keyframes cage-out { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(8px) scale(.97)} }
+    @keyframes cage-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(21,128,61,.4)} 50%{box-shadow:0 0 0 6px rgba(21,128,61,0)} }
+
+    /* ── Status indicator (FIX 2) — tiny non-interactive pill ── */
+    /* Replaces the old bubble. Shows AI CAGE is active without double popup. */
+    #cage-status {
+      position:fixed;
+      bottom:20px;
+      right:20px;
+      z-index:2147483647;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      background:rgba(21,128,61,0.92);
+      color:#fff;
+      border-radius:999px;
+      padding:5px 10px 5px 8px;
+      font-family:${FONT};
+      font-size:11px;
+      font-weight:700;
+      box-shadow:0 2px 10px rgba(0,0,0,.25);
+      pointer-events:none;   /* non-interactive — no click, no cursor change */
+      user-select:none;
+      transition:opacity .3s, transform .3s;
+      letter-spacing:.01em;
+    }
+    #cage-status.idle    { background:rgba(21,128,61,0.82); }
+    #cage-status.caged   { background:rgba(21,128,61,0.97); animation:cage-pulse .6s ease; }
+    #cage-status.warning { background:rgba(217,119,6,0.92); }
+    #cage-status.hidden  { opacity:0; transform:translateY(4px); pointer-events:none; }
+    #cage-status .dot {
+      width:7px; height:7px; border-radius:50%;
+      background:#fff; flex-shrink:0;
+    }
+    #cage-status.idle    .dot { background:rgba(255,255,255,.6); }
+    #cage-status.caged   .dot { background:#fff; }
+    #cage-status.warning .dot { background:#fff; }
 
     /* ── Toast (P0-7) ── */
     #cage-toast {
       position:fixed;
-      bottom:80px;           /* P0-8: was 74px — clears Windows taskbar */
+      bottom:54px;
       right:20px;
       z-index:2147483647;
       background:#15803d;
@@ -85,11 +121,11 @@ function getShadowRoot(): ShadowRoot | null {
     /* ── Decision panel (shown when network PII detected) ── */
     #cage-panel {
       position:fixed;
-      bottom:80px;           /* P0-8: safe above taskbar */
+      bottom:56px;
       right:20px;
       z-index:2147483647;
       width:320px;
-      max-height:calc(100vh - 160px);   /* never overflow screen */
+      max-height:calc(100vh - 120px);
       overflow-y:auto;
       background:#fff;
       color:#0f172a;
@@ -162,19 +198,70 @@ function showToast(message: string, type: 'success' | 'warning' = 'success', dur
   }, durationMs);
 }
 
-// ─── BADGE ONLY (replaces bubble) ─────────────────────────────────────────────
+// ─── STATUS INDICATOR (FIX 2) ─────────────────────────────────────────────────
 /**
- * Update the extension icon badge counter.
- * This replaces the old in-page bubble — one UI only.
+ * A tiny non-interactive pill in the bottom-right corner.
+ * Shows the client that AI CAGE is active — without being a popup.
+ * pointer-events:none → no cursor change, no click, no double-popup.
+ *
+ * States:
+ *   idle    → "🔒 AI CAGE actif"        (always visible on AI sites)
+ *   caged   → "🔒 X protégés"           (pulses briefly after a cage)
+ *   warning → "⚠️ Fichier détecté"      (orange, 5s)
+ *   hidden  → opacity 0 (non-AI pages, fades out after 4s idle)
  */
+let statusHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+function createStatusIndicator(): void {
+  const root = getShadowRoot();
+  if (!root || root.getElementById('cage-status')) return;
+  const el = document.createElement('div');
+  el.id = 'cage-status';
+  el.className = 'idle';
+  el.innerHTML = '<div class="dot"></div><span id="cage-status-text">🔒 AI CAGE actif</span>';
+  root.appendChild(el);
+}
+
+function updateStatus(state: 'idle' | 'caged' | 'warning', text?: string): void {
+  const root = getShadowRoot();
+  if (!root) return;
+
+  // Create indicator if not yet present
+  if (!root.getElementById('cage-status')) createStatusIndicator();
+
+  const el = root.getElementById('cage-status') as HTMLElement | null;
+  const textEl = root.getElementById('cage-status-text') as HTMLElement | null;
+  if (!el || !textEl) return;
+
+  // Clear any pending hide timer
+  if (statusHideTimer) { clearTimeout(statusHideTimer); statusHideTimer = null; }
+
+  el.className = state;
+  el.classList.remove('hidden');
+
+  if (text) {
+    textEl.textContent = text;
+  } else {
+    if (state === 'idle')    textEl.textContent = '🔒 AI CAGE actif';
+    if (state === 'caged')   textEl.textContent = `🔒 ${sessionTotal} protégé${sessionTotal > 1 ? 's' : ''}`;
+    if (state === 'warning') textEl.textContent = '⚠️ Vérifiez le fichier';
+  }
+
+  // After caged/warning → revert to idle after 3s
+  if (state === 'caged' || state === 'warning') {
+    statusHideTimer = setTimeout(() => {
+      updateStatus('idle');
+    }, 3000);
+  }
+}
+
+// ─── BADGE (icône extension) ──────────────────────────────────────────────────
 function updateBadge(): void {
   try {
     void chrome.action.setBadgeText({ text: sessionTotal > 0 ? String(sessionTotal) : '' });
     void chrome.action.setBadgeBackgroundColor({ color: '#15803d' });
   } catch { /* ignore — may not be in extension context */ }
 }
-
-// ─── NETWORK PII PANEL ─────────────────────────────────────────────────────────
 /**
  * Shown when injected.ts detects PII in the outgoing network request.
  * User decides: Cage All or Send Unprotected.
@@ -228,7 +315,7 @@ function showNetworkPanel(
     if (mode === 'cage') {
       sessionTotal += cageItems.length;
       updateBadge();
-      // P0-7: toast confirmation after network cage
+      updateStatus('caged');  // FIX 2: reflect cage in status pill
       const types = [...new Set(cageItems.map(i => i.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2).join(', ');
       showToast(`🔒 ${cageItems.length} élément${cageItems.length > 1 ? 's' : ''} protégé${cageItems.length > 1 ? 's' : ''} (${types})`);
       try {
@@ -268,24 +355,98 @@ function sendGateDecision(
 }
 
 // ─── PROMPT SELECTORS ──────────────────────────────────────────────────────────
+// Rule: NEVER remove selectors. Only ADD. If a selector doesn't match, it costs
+// nothing. If it's missing, the cage fails silently.
 const PROMPT_SELECTORS = [
-  '#prompt-textarea', 'div#prompt-textarea[contenteditable]',
+  // ── ChatGPT / OpenAI ──────────────────────────────────────────────────
+  '#prompt-textarea',
+  'div#prompt-textarea[contenteditable]',
   'div[contenteditable="true"][data-id]',
   'div.ProseMirror[contenteditable="true"]',
-  'rich-textarea .ql-editor', 'div.ql-editor[contenteditable="true"]',
-  'textarea#chat-input',
+
+  // ── Claude (Anthropic) ────────────────────────────────────────────────
   'div[contenteditable="true"][aria-multiline="true"]',
+  'div.ProseMirror',
+
+  // ── Gemini / Google AI Studio ─────────────────────────────────────────
+  'rich-textarea .ql-editor',
+  'div.ql-editor[contenteditable="true"]',
+  'ms-text-chunk[contenteditable]',
+  'div[contenteditable="true"].input-area',
+
+  // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
   'div[contenteditable="true"][role="textbox"]',
   'div[contenteditable="true"][aria-label]',
-  'textarea[rows]', 'textarea',
+  'div[contenteditable="true"][aria-placeholder]',
+  'div[aria-label*="Message"][contenteditable]',
+  'div[aria-label*="message"][contenteditable]',
+  'div[aria-label*="prompt"][contenteditable]',
+  'div[aria-label*="Prompt"][contenteditable]',
+  'div[placeholder][contenteditable]',
+  'div[data-placeholder][contenteditable]',
+
+  // ── Bing Copilot / Microsoft ──────────────────────────────────────────
+  'textarea#searchbox',
+  'cib-text-input textarea',
+  'div.user-message-input[contenteditable]',
+  'textarea[name="userMessage"]',
+
+  // ── DeepSeek ──────────────────────────────────────────────────────────
+  'textarea#chat-input',
+
+  // ── Perplexity ────────────────────────────────────────────────────────
+  'textarea[placeholder*="Ask"]',
+  'textarea[placeholder*="ask"]',
+  'textarea[placeholder*="Search"]',
+
+  // ── Mistral / Le Chat ─────────────────────────────────────────────────
+  'textarea[data-testid*="chat"]',
+  'textarea[data-testid*="message"]',
+  'div[data-testid*="message"][contenteditable]',
+
+  // ── Grok (X.com) ──────────────────────────────────────────────────────
+  'div[data-testid="tweetTextarea_0"][contenteditable]',
+  'div[aria-label*="Grok"][contenteditable]',
+
+  // ── Generic fallbacks — ordered from most specific to most general ────
+  'textarea[rows]',
+  'textarea',
   'div[contenteditable="true"]',
 ];
 
 const SEND_SELECTORS = [
-  'button[data-testid*="send"]', 'button[data-testid*="submit"]',
-  'button[aria-label*="Send"]', 'button[aria-label*="send"]',
-  'button[aria-label*="Submit"]', 'button[aria-label*="Envoyer"]',
+  // ── Generic test IDs ──────────────────────────────────────────────────
+  'button[data-testid*="send"]',
+  'button[data-testid*="submit"]',
+  'button[data-testid*="Send"]',
+
+  // ── ARIA labels ───────────────────────────────────────────────────────
+  'button[aria-label*="Send"]',
+  'button[aria-label*="send"]',
+  'button[aria-label*="Submit"]',
+  'button[aria-label*="Envoyer"]',
+  'button[aria-label*="envoyer"]',
+
+  // ── Form submit ───────────────────────────────────────────────────────
   'button[type="submit"]',
+
+  // ── Meta AI ───────────────────────────────────────────────────────────
+  'div[aria-label*="Send"][role="button"]',
+  'div[aria-label*="send"][role="button"]',
+  'button[aria-label*="Post"]',
+
+  // ── Bing Copilot ──────────────────────────────────────────────────────
+  'button#search-button',
+  'cib-icon-button[aria-label*="Submit"]',
+
+  // ── Grok ──────────────────────────────────────────────────────────────
+  'div[data-testid="tweetButtonInline"]',
+
+  // ── Generic icon buttons that are send actions ────────────────────────
+  'button[class*="send"]',
+  'button[class*="Send"]',
+  'button[class*="submit"]',
+  'button[class*="Submit"]',
 ];
 
 function findPrompt(): HTMLElement | null {
@@ -339,6 +500,7 @@ function handlePrompt(el: HTMLElement): void {
   shareEntitiesWithPage(entities);
   sessionTotal += totalCaged;
   updateBadge();
+  updateStatus('caged');  // FIX 2: update status pill
 
   // P0-7: Show toast confirmation so Karim knows it worked
   const typeLabels = [...new Set(entities.map(e => e.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2);
@@ -403,6 +565,7 @@ window.addEventListener('message', (event) => {
   if (d?.type === 'AI_CAGE_NETWORK_CAGED' && d.count) {
     sessionTotal += d.count;
     updateBadge();
+    updateStatus('caged');  // FIX 2
     try {
       void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
     } catch { /* ignore */ }
@@ -410,6 +573,7 @@ window.addEventListener('message', (event) => {
 
   // Response tokens restored locally
   if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
+    updateStatus('idle', '✅ Données restaurées');
     showToast('✅ Données restaurées localement — l\'IA n\'a jamais vu l\'original');
   }
 
@@ -423,11 +587,13 @@ window.addEventListener('message', (event) => {
         blocked: true,
       });
     } catch { /* ignore */ }
+    updateStatus('warning', '🚫 Injection bloquée');
     showToast('🚫 Injection bloquée', 'warning');
   }
 
   // P0-9: File upload warning from injected.ts
   if (d?.type === 'AI_CAGE_FILE_UPLOAD_WARNING') {
+    updateStatus('warning', '⚠️ Fichier — vérifiez avant d\'envoyer');
     showToast('📄 Fichier détecté — vérifiez qu\'il ne contient pas de données sensibles avant d\'envoyer', 'warning', 5000);
   }
 });
@@ -450,9 +616,10 @@ function boot(): void {
   injectPageScript();
   const tryInit = () => {
     if (!document.body) return false;
-    // P0-4: NO bubble, NO mini-popup — Ghost Mode only
-    // The extension popup (chrome.action) is the single UI entry point
     domObserver.observe(document.body, { childList: true, subtree: true });
+    // FIX 2: create status indicator as soon as body exists
+    createStatusIndicator();
+    updateStatus('idle');
     return true;
   };
   if (!tryInit()) {
@@ -461,12 +628,15 @@ function boot(): void {
   }
   hookButtons();
 
-  // P0-1: version from manifest, no hardcode
   const v = (() => { try { return chrome.runtime.getManifest().version; } catch { return '0.6.0'; } })();
-  console.warn(`[AI CAGE] 🔒 Ghost Mode v${v} on ${window.location.hostname} — single UI mode active`);
+  console.warn(`[AI CAGE] 🔒 v${v} active on ${window.location.hostname}`);
 }
 
 boot();
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { hookButtons(); });
+  document.addEventListener('DOMContentLoaded', () => {
+    hookButtons();
+    createStatusIndicator();
+    updateStatus('idle');
+  });
 }
