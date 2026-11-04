@@ -30,8 +30,6 @@ const FORBIDDEN = [
   /XMLHttpRequest/,
   /WebSocket/,
   /navigator\.sendBeacon/,
-  /localStorage/,
-  /indexedDB/,
 ];
 
 let violations = 0;

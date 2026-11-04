@@ -796,6 +796,11 @@
   chrome.tabs.onRemoved.addListener((tabId) => {
     tabCageCounts.delete(tabId);
   });
+  chrome.runtime.onInstalled.addListener(({ reason }) => {
+    if (reason === chrome.runtime.OnInstalledReason.INSTALL) {
+      void chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+    }
+  });
   registerShadowAiObserver();
   void logEvent(
     {
@@ -806,5 +811,5 @@
     },
     chromeStorageAdapter
   );
-  console.warn("[AI CAGE] Background service worker v0.4.5 — Cage 1+2+3 active.");
+  console.warn("[AI CAGE] Background service worker v0.6.0 — Cage 1+2+3 active.");
 })();

@@ -320,11 +320,10 @@
       totalCaged: entities.length
     };
   }
-  const SHADOW_HOST_ID = "ai-cage-host-v5";
+  const SHADOW_HOST_ID = "ai-cage-host-v6";
   const CAGED_ATTR = "data-ai-cage-done";
   const FONT = "system-ui,-apple-system,sans-serif";
   let sessionTotal = 0;
-  let bubbleState = "idle";
   let pendingEntities = [];
   let shadowRoot = null;
   function getShadowRoot() {
@@ -337,46 +336,65 @@
     document.body.appendChild(host);
     const style = document.createElement("style");
     style.textContent = `
-    @keyframes cage-in { from{opacity:0;transform:translateY(10px) scale(.96)} to{opacity:1;transform:translateY(0) scale(1)} }
-    #cage-bubble {
-      position:fixed;bottom:20px;right:20px;z-index:2147483647;
-      width:44px;height:44px;border-radius:50%;
-      background:#15803d;color:#fff;
-      display:flex;align-items:center;justify-content:center;
-      cursor:pointer;font-size:18px;font-weight:800;
-      box-shadow:0 2px 12px rgba(0,0,0,.35);
-      user-select:none;transition:all .25s;
-      border:2px solid rgba(255,255,255,.25);
+    /* ── Animations ── */
+    @keyframes cage-in  { from{opacity:0;transform:translateY(8px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+    @keyframes cage-out { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(8px) scale(.97)} }
+
+    /* ── Toast (P0-7) ── */
+    #cage-toast {
+      position:fixed;
+      bottom:80px;           /* P0-8: was 74px — clears Windows taskbar */
+      right:20px;
+      z-index:2147483647;
+      background:#15803d;
+      color:#fff;
+      border-radius:10px;
+      padding:10px 16px;
+      font-size:13px;
+      font-weight:700;
       font-family:${FONT};
+      box-shadow:0 4px 16px rgba(0,0,0,.28);
+      animation:cage-in .18s ease;
+      pointer-events:none;
+      max-width:280px;
+      line-height:1.4;
     }
-    #cage-bubble.amber{background:#d97706}
-    #cage-bubble.blue{background:#0369a1}
-    #cage-badge{
-      position:absolute;top:-4px;right:-4px;
-      background:#dc2626;color:#fff;border-radius:999px;
-      font-size:10px;font-weight:800;min-width:16px;height:16px;
-      display:none;align-items:center;justify-content:center;padding:0 3px;
+    #cage-toast.warning {
+      background:#d97706;
     }
-    #cage-panel{
-      position:fixed;bottom:74px;right:20px;z-index:2147483647;
-      width:310px;max-height:440px;
-      background:#fff;color:#0f172a;border-radius:14px;
+    #cage-toast.fading {
+      animation:cage-out .25s ease forwards;
+    }
+
+    /* ── Decision panel (shown when network PII detected) ── */
+    #cage-panel {
+      position:fixed;
+      bottom:80px;           /* P0-8: safe above taskbar */
+      right:20px;
+      z-index:2147483647;
+      width:320px;
+      max-height:calc(100vh - 160px);   /* never overflow screen */
+      overflow-y:auto;
+      background:#fff;
+      color:#0f172a;
+      border-radius:14px;
       box-shadow:0 8px 32px rgba(0,0,0,.28);
-      font-family:${FONT};font-size:13px;overflow:hidden;
+      font-family:${FONT};
+      font-size:13px;
       animation:cage-in .2s ease;
     }
-    .ch{background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px}
-    .ch.amber{background:#d97706}
-    .cs{padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;gap:16px}
-    .cl{max-height:200px;overflow-y:auto;padding:6px 0}
-    .cr{padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px}
-    .ca{padding:10px 14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .cw{padding:8px 14px;background:#fef2f2;border-top:1px solid #fecaca;font-size:11px;color:#991b1b}
-    .cf{padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
-    .bg{background:#15803d;color:#fff;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
-    .gg{background:#e2e8f0;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
-    .bs{background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
-    .gs{background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+
+    /* ── Panel internals ── */
+    .ch  { background:#15803d;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;border-radius:14px 14px 0 0 }
+    .ch.amber { background:#d97706 }
+    .cl  { max-height:200px;overflow-y:auto;padding:6px 0 }
+    .cr  { padding:8px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px }
+    .ca  { padding:10px 14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr;gap:8px }
+    .cw  { padding:8px 14px;background:#fef2f2;border-top:1px solid #fecaca;font-size:11px;color:#991b1b }
+    .bg  { background:#15803d;color:#fff;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;width:100% }
+    .gg  { background:#e2e8f0;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;width:100% }
+    .bs  { background:#15803d;color:#fff;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer }
+    .gs  { background:#e2e8f0;color:#374151;border:none;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer }
   `;
     shadowRoot.appendChild(style);
     return shadowRoot;
@@ -395,88 +413,37 @@
     }
   }
   function shareEntitiesWithPage(entities) {
-    window.postMessage({ type: "AI_CAGE_ENTITIES", entities: entities.map((e) => ({ placeholder: e.placeholder, originalValue: e.originalValue })) }, "*");
+    window.postMessage({
+      type: "AI_CAGE_ENTITIES",
+      entities: entities.map((e) => ({ placeholder: e.placeholder, originalValue: e.originalValue }))
+    }, "*");
   }
-  function createBubble() {
-    const root = getShadowRoot();
-    if (!root || root.getElementById("cage-bubble")) return;
-    const b = document.createElement("div");
-    b.id = "cage-bubble";
-    b.setAttribute("role", "button");
-    b.setAttribute("aria-label", "AI CAGE");
-    b.innerHTML = "🔒";
-    b.addEventListener("click", togglePanel);
-    const badge = document.createElement("span");
-    badge.id = "cage-badge";
-    b.appendChild(badge);
-    root.appendChild(b);
-  }
-  function updateBubble() {
+  function showToast(message, type = "success", durationMs = 2500) {
+    var _a;
     const root = getShadowRoot();
     if (!root) return;
-    const b = root.getElementById("cage-bubble");
-    const badge = root.getElementById("cage-badge");
-    if (!b) return;
-    b.className = bubbleState === "detected" ? "amber" : bubbleState === "caged" ? "blue" : "";
-    const icon = b.childNodes[0];
-    if (icon) icon.textContent = bubbleState === "detected" ? "⚠️" : bubbleState === "restored" ? "✅" : "🔒";
-    if (badge) b.appendChild(badge);
-    if (sessionTotal > 0 && badge) {
-      badge.style.display = "flex";
-      badge.textContent = String(sessionTotal);
-    }
-    b.style.transform = "scale(1.15)";
+    (_a = root.getElementById("cage-toast")) == null ? void 0 : _a.remove();
+    const toast = document.createElement("div");
+    toast.id = "cage-toast";
+    if (type === "warning") toast.classList.add("warning");
+    toast.textContent = message;
+    root.appendChild(toast);
     setTimeout(() => {
-      b.style.transform = "scale(1)";
-    }, 250);
+      const el = root.getElementById("cage-toast");
+      if (!el) return;
+      el.classList.add("fading");
+      setTimeout(() => el.remove(), 260);
+    }, durationMs);
+  }
+  function updateBadge() {
     try {
       void chrome.action.setBadgeText({ text: sessionTotal > 0 ? String(sessionTotal) : "" });
+      void chrome.action.setBadgeBackgroundColor({ color: "#15803d" });
     } catch {
     }
   }
-  function togglePanel() {
-    const root = getShadowRoot();
-    if (!root) return;
-    const existing = root.getElementById("cage-panel");
-    if (existing) {
-      existing.remove();
-      return;
-    }
-    showStatusPanel();
-  }
-  function showStatusPanel() {
-    var _a, _b;
-    const root = getShadowRoot();
-    if (!root) return;
-    (_a = root.getElementById("cage-panel")) == null ? void 0 : _a.remove();
-    const panel = document.createElement("div");
-    panel.id = "cage-panel";
-    panel.innerHTML = `
-    <div class="ch">
-      <span style="font-size:16px">🔒</span>
-      <div style="flex:1"><div style="font-weight:700;font-size:13px">AI CAGE</div><div style="font-size:11px;opacity:.8">${window.location.hostname}</div></div>
-      <button id="cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;padding:2px">×</button>
-    </div>
-    <div class="cs">
-      <div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#15803d">${sessionTotal}</div><div style="font-size:10px;color:#64748b">Total caged</div></div>
-      <div style="margin-left:auto;align-self:center;font-size:11px;color:#166534;font-weight:600">✅ Zero data sent</div>
-    </div>
-    <div style="padding:14px;font-size:12px;color:#64748b;text-align:center">
-      ${sessionTotal > 0 ? `✅ ${sessionTotal} item(s) caged this session` : "🔍 Monitoring... Type a prompt with sensitive data."}
-    </div>
-    <div class="cf"><span>🇹🇳 Made in Tunisia</span><span>v0.5.0</span></div>`;
-    root.appendChild(panel);
-    (_b = root.getElementById("cage-close")) == null ? void 0 : _b.addEventListener("click", () => panel.remove());
-    setTimeout(() => {
-      document.addEventListener("click", (e) => {
-        var _a2;
-        const host = document.getElementById(SHADOW_HOST_ID);
-        if (host && !host.contains(e.target)) (_a2 = root.getElementById("cage-panel")) == null ? void 0 : _a2.remove();
-      }, { once: true });
-    }, 150);
-  }
   function showNetworkPanel(gateId, items) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const root = getShadowRoot();
     if (!root) {
       sendGateDecision(gateId, "pass", []);
@@ -490,8 +457,8 @@
         <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.preview}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cage</button>
-        <button class="gs" data-idx="${idx}" data-act="pass">Pass</button>
+        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cager</button>
+        <button class="gs" data-idx="${idx}" data-act="pass">Ignorer</button>
       </div>
     </div>`).join("");
     const panel = document.createElement("div");
@@ -500,19 +467,18 @@
     <div class="ch amber">
       <span style="font-size:16px">⚠️</span>
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
-        <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? "s" : ""} — choose action</div>
+        <div style="font-weight:800;font-size:13px">Données sensibles détectées !</div>
+        <div style="font-size:11px;opacity:.9">${items.length} élément${items.length > 1 ? "s" : ""} — choisissez une action</div>
       </div>
+      <button id="cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:20px;padding:2px 6px">×</button>
     </div>
     <div class="cl">${itemsHtml}</div>
     <div class="ca">
-      <button class="bg" id="cage-all">🔒 Cage All & Send</button>
-      <button class="gg" id="pass-all">⚡ Send Unprotected</button>
+      <button class="bg" id="cage-all">🔒 Tout cager &amp; envoyer</button>
+      <button class="gg" id="pass-all">⚡ Envoyer sans protection</button>
     </div>
-    <div class="cw">⚠️ "Send Unprotected" sends your real data to the AI.</div>`;
+    <div class="cw">⚠️ "Envoyer sans protection" transmet vos vraies données à l'IA.</div>`;
     root.appendChild(panel);
-    bubbleState = "detected";
-    updateBubble();
     let sent = false;
     function decide(mode, cageItems) {
       var _a2;
@@ -522,20 +488,21 @@
       sendGateDecision(gateId, mode, cageItems);
       if (mode === "cage") {
         sessionTotal += cageItems.length;
-        bubbleState = "caged";
-      } else {
-        bubbleState = "idle";
-      }
-      updateBubble();
-      if (mode === "cage") {
+        updateBadge();
+        const types = [...new Set(cageItems.map((i) => i.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2).join(", ");
+        showToast(`🔒 ${cageItems.length} élément${cageItems.length > 1 ? "s" : ""} protégé${cageItems.length > 1 ? "s" : ""} (${types})`);
         try {
           void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
         } catch {
         }
       }
     }
-    (_b = root.getElementById("cage-all")) == null ? void 0 : _b.addEventListener("click", () => decide("cage", items));
-    (_c = root.getElementById("pass-all")) == null ? void 0 : _c.addEventListener("click", () => decide("pass", []));
+    (_b = root.getElementById("cage-close")) == null ? void 0 : _b.addEventListener("click", () => {
+      panel.remove();
+      sendGateDecision(gateId, "pass", []);
+    });
+    (_c = root.getElementById("cage-all")) == null ? void 0 : _c.addEventListener("click", () => decide("cage", items));
+    (_d = root.getElementById("pass-all")) == null ? void 0 : _d.addEventListener("click", () => decide("pass", []));
     root.querySelectorAll("button[data-act]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const t = e.currentTarget;
@@ -544,7 +511,9 @@
         const row = root.getElementById(`cr-${idx}`);
         if (row) {
           row.style.background = act === "cage" ? "#f0fdf4" : "#fef2f2";
-          row.querySelectorAll("button").forEach((b) => b.disabled = true);
+          row.querySelectorAll("button").forEach((b) => {
+            b.disabled = true;
+          });
         }
         if (items.length === 1) decide(act, act === "cage" ? [items[0]] : []);
       });
@@ -552,9 +521,6 @@
   }
   function sendGateDecision(gateId, mode, items) {
     window.postMessage({ type: "AI_CAGE_PROCEED", gateId, mode, items }, "*");
-  }
-  function handleNetworkPII(gateId, items) {
-    showNetworkPanel(gateId, items);
   }
   const PROMPT_SELECTORS = [
     "#prompt-textarea",
@@ -622,13 +588,20 @@
     const { cagedText, entities, totalCaged } = cageText(raw);
     if (totalCaged === 0) return;
     pendingEntities = [...pendingEntities, ...entities];
-    bubbleState = "detected";
-    updateBubble();
     writeText(el, cagedText);
     shareEntitiesWithPage(entities);
     sessionTotal += totalCaged;
+    updateBadge();
+    const typeLabels = [...new Set(entities.map((e) => e.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2);
+    const more = entities.length > 2 ? ` +${entities.length - 2}` : "";
+    showToast(`🔒 ${totalCaged} protégé${totalCaged > 1 ? "s" : ""} (${typeLabels.join(", ")}${more})`);
     try {
-      void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities });
+      void chrome.runtime.sendMessage({
+        type: "CAGE_REPORT",
+        tabId: 0,
+        site: window.location.hostname,
+        entities
+      });
     } catch {
     }
   }
@@ -668,45 +641,49 @@
     if (event.source !== window) return;
     const d = event.data;
     if ((d == null ? void 0 : d.type) === "AI_CAGE_PII_DETECTED" && d.gateId && d.items) {
-      handleNetworkPII(d.gateId, d.items);
+      showNetworkPanel(d.gateId, d.items);
       return;
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_CAGED" && d.count) {
       sessionTotal += d.count;
-      bubbleState = "caged";
-      updateBubble();
+      updateBadge();
       try {
         void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
       } catch {
       }
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
-      bubbleState = "restored";
-      updateBubble();
-      setTimeout(() => {
-        bubbleState = "idle";
-        updateBubble();
-      }, 3e3);
+      showToast("✅ Données restaurées localement — l'IA n'a jamais vu l'original");
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_INJECTION_DETECTED") {
       try {
-        void chrome.runtime.sendMessage({ type: "AGENT_EVENT", site: window.location.hostname, detail: d.detail ?? "Injection detected", blocked: true });
+        void chrome.runtime.sendMessage({
+          type: "AGENT_EVENT",
+          site: window.location.hostname,
+          detail: d.detail ?? "Injection detected",
+          blocked: true
+        });
       } catch {
       }
-      bubbleState = "detected";
-      updateBubble();
+      showToast("🚫 Injection bloquée", "warning");
+    }
+    if ((d == null ? void 0 : d.type) === "AI_CAGE_FILE_UPLOAD_WARNING") {
+      showToast("📄 Fichier détecté — vérifiez qu'il ne contient pas de données sensibles avant d'envoyer", "warning", 5e3);
     }
   });
+  let hookDebounce = null;
   const domObserver = new MutationObserver(() => {
-    hookButtons();
-    const root = getShadowRoot();
-    if (root && !root.getElementById("cage-bubble")) createBubble();
+    if (!hookDebounce) {
+      hookDebounce = setTimeout(() => {
+        hookButtons();
+        hookDebounce = null;
+      }, 500);
+    }
   });
   function boot() {
     injectPageScript();
     const tryInit = () => {
       if (!document.body) return false;
-      createBubble();
       domObserver.observe(document.body, { childList: true, subtree: true });
       return true;
     };
@@ -717,13 +694,19 @@
       w.observe(document.documentElement, { childList: true });
     }
     hookButtons();
-    console.warn(`[AI CAGE] 🔒 Ghost Mode v0.5.0 on ${window.location.hostname}`);
+    const v = (() => {
+      try {
+        return chrome.runtime.getManifest().version;
+      } catch {
+        return "0.6.0";
+      }
+    })();
+    console.warn(`[AI CAGE] 🔒 Ghost Mode v${v} on ${window.location.hostname} — single UI mode active`);
   }
   boot();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       hookButtons();
-      createBubble();
     });
   }
 })();

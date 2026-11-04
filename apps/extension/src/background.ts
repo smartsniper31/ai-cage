@@ -5,14 +5,14 @@
 
 /**
  * @file background.ts
- * AI CAGE — MV3 Service Worker v0.4.5
+ * AI CAGE — MV3 Service Worker v0.6.0
  *
- * ÉTAPE 2 FIX:
+ * v0.6.0 changes:
+ *   - P0-6: onInstalled → opens welcome.html on first install
  *   - webRequest 'responseHeaders' removed (not available in MV3 Chrome)
  *   - Use onBeforeRequest (works in MV3) for Shadow AI detection
  *   - Graceful fallback if webRequest unavailable
- *   - Badge shows AI CAGE icon correctly
- *   - Version updated to 0.4.5
+ *   - Version unified to 0.6.0
  */
 
 import { summariseCaged, matchAiEndpoint, logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV } from '@ai-cage/core';
@@ -275,6 +275,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Boot
 // ---------------------------------------------------------------------------
 
+// P0-6: Open welcome page on first install
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === chrome.runtime.OnInstalledReason.INSTALL) {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+  }
+});
+
 registerShadowAiObserver();
 
 void logEvent(
@@ -287,4 +294,4 @@ void logEvent(
   chromeStorageAdapter,
 );
 
-console.warn('[AI CAGE] Background service worker v0.4.5 — Cage 1+2+3 active.');
+console.warn('[AI CAGE] Background service worker v0.6.0 — Cage 1+2+3 active.');

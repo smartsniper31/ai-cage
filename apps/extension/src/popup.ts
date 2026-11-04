@@ -68,15 +68,34 @@ async function renderOverview(): Promise<void> {
 
   const status = document.getElementById('status-text');
   if (status) {
-    if ((resp?.sessionShadowCount ?? 0) > 0) {
-      status.textContent = '⚠️ Shadow AI detected';
+    const monthly = resp?.monthlyPiiCaged ?? 0;
+    const session = resp?.sessionCageCount ?? 0;
+    const shadow  = resp?.sessionShadowCount ?? 0;
+
+    if (shadow > 0) {
+      // Shadow AI detected — red alert
+      status.textContent = `⚠️ Shadow AI détecté — ${shadow} appel${shadow > 1 ? 's' : ''} suspect${shadow > 1 ? 's' : ''}`;
       status.style.background = '#fef2f2';
       status.style.color = '#991b1b';
       status.style.borderColor = '#fecaca';
-    } else if ((resp?.sessionCageCount ?? 0) > 0) {
-      status.textContent = '🔒 Protecting your data';
+    } else if (session > 0) {
+      // Active protection this session
+      status.textContent = `🔒 Protection active — ${session} élément${session > 1 ? 's' : ''} protégé${session > 1 ? 's' : ''} cette session`;
+      status.style.background = '#f0fdf4';
+      status.style.color = '#15803d';
+      status.style.borderColor = '#bbf7d0';
+    } else if (monthly > 0) {
+      // P0-5 FIX: monthly > 0 but session = 0 → say "active this month", not "no PII detected"
+      status.textContent = `✅ Actif — ${monthly} élément${monthly > 1 ? 's' : ''} protégé${monthly > 1 ? 's' : ''} ce mois`;
+      status.style.background = '#f0fdf4';
+      status.style.color = '#15803d';
+      status.style.borderColor = '#bbf7d0';
     } else {
-      status.textContent = '✅ Monitoring — no PII detected yet';
+      // Truly nothing yet
+      status.textContent = '🛡️ Surveillance active — tapez un prompt sur une IA pour tester';
+      status.style.background = '#f0fdf4';
+      status.style.color = '#15803d';
+      status.style.borderColor = '#bbf7d0';
     }
   }
 
@@ -110,7 +129,7 @@ async function renderShadowAi(): Promise<void> {
 
   const entries = resp?.entries ?? [];
   if (entries.length === 0) {
-    listEl.innerHTML = '<li class="empty">No shadow AI calls detected yet.<br>Keep browsing — AI is everywhere.</li>';
+    listEl.innerHTML = '<li class="empty">Aucune IA cachée détectée pour l\'instant.<br>Continuez à naviguer — on surveille pour vous.</li>';
     return;
   }
 
@@ -151,7 +170,7 @@ async function exportCSV(): Promise<void> {
   );
 
   if (!resp?.csv) {
-    alert('Audit log is empty.');
+    alert('Le journal d\'audit est vide.');
     return;
   }
 
@@ -196,6 +215,26 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ── P0-1: inject real version from manifest ──────────────────────────────
+  try {
+    const { version } = chrome.runtime.getManifest();
+    const el = document.getElementById('popup-version');
+    if (el) el.textContent = `v${version}`;
+  } catch { /* ignore in tests */ }
+
+  // ── P0-2: fix upgrade-link ───────────────────────────────────────────────
+  const upgradeLink = document.getElementById('upgrade-link') as HTMLAnchorElement | null;
+  if (upgradeLink) {
+    upgradeLink.href = 'https://ai-cage-gamma.vercel.app/#pricing';
+    upgradeLink.target = '_blank';
+    upgradeLink.rel = 'noopener noreferrer';
+    upgradeLink.textContent = '🚀 Passer à Pro — 5€/mois';
+    upgradeLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      void chrome.tabs.create({ url: 'https://ai-cage-gamma.vercel.app/#pricing' });
+    });
+  }
+
   // Tab buttons
   document.getElementById('tab-overview')?.addEventListener('click', () => {
     activateTab('overview');

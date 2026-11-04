@@ -1,6 +1,6 @@
 {
   "name": "@ai-cage/landing",
-  "version": "0.4.5",
+  "version": "0.6.0",
   "description": "AI CAGE landing page — Use Monster AI. Leak Zero Data.",
   "private": true,
   "type": "module",

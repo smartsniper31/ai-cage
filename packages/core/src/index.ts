@@ -1,9 +1,12 @@
 /**
  * @file index.ts
- * Public API for @ai-cage/core — v0.4.0
+ * Public API for @ai-cage/core — v0.6.0
  *
  * This is the only module consumers (extension, desktop, VS Code, CLI) import.
  */
+
+// ── Version (single source of truth) ─────────────────────────────────────
+export { VERSION } from './version.js';
 
 // ── Caging engine (Phase 1) ──────────────────────────────────────────────
 export { cageText, uncageText, summariseCaged } from './cage.js';

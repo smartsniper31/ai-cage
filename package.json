@@ -1,6 +1,6 @@
 {
   "name": "ai-cage",
-  "version": "0.4.5",
+  "version": "0.6.0",
   "private": true,
   "description": "AI CAGE - Enterprise Grade AI Data Protection. Zero Data Leaves The Cage.",
   "scripts": {

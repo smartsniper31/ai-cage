@@ -64,8 +64,8 @@ if (manifest['background']?.['service_worker']) {
   // Keep service_worker for Firefox 121+ but also add scripts for older versions
 }
 
-// Bump version for Firefox
-manifest['version'] = '0.4.0';
+// Bump version for Firefox (match main version)
+manifest['version'] = '0.6.0';
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log('[AI CAGE] Patched manifest.json for Firefox');

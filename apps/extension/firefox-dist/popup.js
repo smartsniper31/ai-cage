@@ -25,15 +25,29 @@
     setText("monthly-shadow", (resp == null ? void 0 : resp.monthlyShadowAi) ?? 0);
     const status = document.getElementById("status-text");
     if (status) {
-      if (((resp == null ? void 0 : resp.sessionShadowCount) ?? 0) > 0) {
-        status.textContent = "⚠️ Shadow AI detected";
+      const monthly = (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0;
+      const session = (resp == null ? void 0 : resp.sessionCageCount) ?? 0;
+      const shadow = (resp == null ? void 0 : resp.sessionShadowCount) ?? 0;
+      if (shadow > 0) {
+        status.textContent = `⚠️ Shadow AI détecté — ${shadow} appel${shadow > 1 ? "s" : ""} suspect${shadow > 1 ? "s" : ""}`;
         status.style.background = "#fef2f2";
         status.style.color = "#991b1b";
         status.style.borderColor = "#fecaca";
-      } else if (((resp == null ? void 0 : resp.sessionCageCount) ?? 0) > 0) {
-        status.textContent = "🔒 Protecting your data";
+      } else if (session > 0) {
+        status.textContent = `🔒 Protection active — ${session} élément${session > 1 ? "s" : ""} protégé${session > 1 ? "s" : ""} cette session`;
+        status.style.background = "#f0fdf4";
+        status.style.color = "#15803d";
+        status.style.borderColor = "#bbf7d0";
+      } else if (monthly > 0) {
+        status.textContent = `✅ Actif — ${monthly} élément${monthly > 1 ? "s" : ""} protégé${monthly > 1 ? "s" : ""} ce mois`;
+        status.style.background = "#f0fdf4";
+        status.style.color = "#15803d";
+        status.style.borderColor = "#bbf7d0";
       } else {
-        status.textContent = "✅ Monitoring — no PII detected yet";
+        status.textContent = "🛡️ Surveillance active — tapez un prompt sur une IA pour tester";
+        status.style.background = "#f0fdf4";
+        status.style.color = "#15803d";
+        status.style.borderColor = "#bbf7d0";
       }
     }
     if (((resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0) >= 100) {
@@ -53,7 +67,7 @@
     if (!listEl) return;
     const entries = (resp == null ? void 0 : resp.entries) ?? [];
     if (entries.length === 0) {
-      listEl.innerHTML = '<li class="empty">No shadow AI calls detected yet.<br>Keep browsing — AI is everywhere.</li>';
+      listEl.innerHTML = `<li class="empty">Aucune IA cachée détectée pour l'instant.<br>Continuez à naviguer — on surveille pour vous.</li>`;
       return;
     }
     const bysite = /* @__PURE__ */ new Map();
@@ -82,7 +96,7 @@
       { type: "EXPORT_AUDIT_CSV" }
     );
     if (!(resp == null ? void 0 : resp.csv)) {
-      alert("Audit log is empty.");
+      alert("Le journal d'audit est vide.");
       return;
     }
     const blob = new Blob([resp.csv], { type: "text/csv" });
@@ -114,6 +128,23 @@
   }
   document.addEventListener("DOMContentLoaded", () => {
     var _a, _b, _c, _d;
+    try {
+      const { version } = chrome.runtime.getManifest();
+      const el = document.getElementById("popup-version");
+      if (el) el.textContent = `v${version}`;
+    } catch {
+    }
+    const upgradeLink = document.getElementById("upgrade-link");
+    if (upgradeLink) {
+      upgradeLink.href = "https://ai-cage-gamma.vercel.app/#pricing";
+      upgradeLink.target = "_blank";
+      upgradeLink.rel = "noopener noreferrer";
+      upgradeLink.textContent = "🚀 Passer à Pro — 5€/mois";
+      upgradeLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        void chrome.tabs.create({ url: "https://ai-cage-gamma.vercel.app/#pricing" });
+      });
+    }
     (_a = document.getElementById("tab-overview")) == null ? void 0 : _a.addEventListener("click", () => {
       activateTab("overview");
       void renderOverview();

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI CAGE — Enterprise AI Data Protection",
   "short_name": "AI CAGE",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "description": "Cages PII. Detects Shadow AI. Blocks Agent Rogue attacks. Works on ALL AI chat platforms. Zero data leaves your device.",
   "permissions": [
     "activeTab",
@@ -79,6 +79,7 @@
     {
       "resources": [
         "popup.html",
+        "welcome.html",
         "injected.js"
       ],
       "matches": [

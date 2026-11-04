@@ -1,9 +1,14 @@
 /**
  * @file injected.ts
- * AI CAGE — Page-Context Network Gate v0.4.5
+ * AI CAGE — Page-Context Network Gate v0.6.0
  *
- * ARCHITECTURE FIX:
+ * v0.6.0 changes:
+ *   P0-9: Detect FormData/Blob/ArrayBuffer uploads → send AI_CAGE_FILE_UPLOAD_WARNING
+ *         to content.ts which shows a 5s orange toast to Karim.
+ *         Binary bodies are passed through unchanged (we can't scan them reliably),
+ *         but the user now knows to check before sending.
  *
+ * Architecture (unchanged):
  *   OLD (broken): injected.js cages independently → ignores user "Pass" decision
  *   NEW (correct): injected.js HOLDS the request until content.ts sends a decision
  *
@@ -277,6 +282,14 @@
     if (!isAI(url)) return _fetch(input, init);
 
     let body = init?.body;
+
+    // P0-9: Detect file/FormData uploads — warn content.ts, don't silently pass
+    if (body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer) {
+      window.postMessage({ type: 'AI_CAGE_FILE_UPLOAD_WARNING', url }, '*');
+      // Do NOT cage — we can't scan binary/FormData reliably; warn and pass through
+      return _fetch(input, init);
+    }
+
     if (typeof body === 'string' && body.length > 2) {
       body = await processRequestBody(body);
     }
@@ -315,9 +328,17 @@
     };
     const _send = xhr.send.bind(xhr);
     (xhr as { send: typeof xhr.send }).send = function (body?: Document | XMLHttpRequestBodyInit | null) {
-      if (isAI(_url) && typeof body === 'string' && body.length > 2) {
-        processRequestBody(body).then(processed => _send(processed));
-        return;
+      if (isAI(_url)) {
+        // P0-9: Detect FormData/Blob uploads via XHR — warn, don't silently pass
+        if (body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer) {
+          window.postMessage({ type: 'AI_CAGE_FILE_UPLOAD_WARNING', url: _url }, '*');
+          _send(body);
+          return;
+        }
+        if (typeof body === 'string' && body.length > 2) {
+          processRequestBody(body).then(processed => _send(processed));
+          return;
+        }
       }
       _send(body);
     };

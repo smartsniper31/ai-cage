@@ -103,6 +103,11 @@ export default defineConfig({
           resolve(distDir, 'popup.html'),
         );
 
+        copyFileSync(
+          resolve(__dirname, 'src/welcome.html'),
+          resolve(distDir, 'welcome.html'),
+        );
+
         const iconsDir = resolve(__dirname, 'src/icons');
         const distIconsDir = resolve(distDir, 'icons');
         mkdirSync(distIconsDir, { recursive: true });

@@ -1,0 +1,35 @@
+AI CAGE v0.6.0 — Test Results
+Date: 2026-11-04
+==============================
+
+PRESIDIO-LITE (74/74)
+  ✓ tests/injection.test.ts  (35) 646ms
+  ✓ tests/scan.test.ts       (39) 550ms
+  Test Files: 2 passed (2)
+  Tests: 74 passed (74)
+  Duration: 11.71s
+
+CORE (128/128)
+  ✓ tests/license.test.ts        (19) 558ms
+  ✓ tests/cage.test.ts           (21) 1239ms
+  ✓ tests/mcpMonitor.test.ts     (20) 1100ms
+  ✓ tests/auditLog.test.ts       (16)
+  ✓ tests/cageTranscript.test.ts (17) 2008ms
+  ✓ tests/agentCage.test.ts      (19) 444ms
+  ✓ tests/shadowAi.test.ts       (16) 302ms
+  Test Files: 7 passed (7)
+  Tests: 128 passed (128)
+  Duration: 32.54s
+
+TOTAL: 202/202 PASS ✅
+
+BUILD SIZES (extension dist/):
+  background.js  21.29 kB  (gzip: 5.53 kB)
+  content.js     25.55 kB  (gzip: 8.39 kB)
+  injected.js     9.94 kB  (gzip: 3.21 kB)
+  popup.js        8.54 kB  (gzip: 2.71 kB)
+
+LANDING BUILD:
+  dist/index.html  32.80 kB  (gzip: 8.02 kB)
+
+QUALITY GATE: 12/12 ✅

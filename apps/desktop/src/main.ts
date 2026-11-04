@@ -344,4 +344,4 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 activatePanel('cage');
 void renderAgentPolicy();
-console.warn('[AI CAGE] Desktop v0.3.0 loaded. Cage 3: Agent Rogue active.');
+console.warn('[AI CAGE] Desktop v0.6.0 loaded. Cage 3: Agent Rogue active.');

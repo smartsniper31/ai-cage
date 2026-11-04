@@ -188,6 +188,10 @@
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (!isAI(url)) return _fetch(input, init);
       let body = init == null ? void 0 : init.body;
+      if (body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer) {
+        window2.postMessage({ type: "AI_CAGE_FILE_UPLOAD_WARNING", url }, "*");
+        return _fetch(input, init);
+      }
       if (typeof body === "string" && body.length > 2) {
         body = await processRequestBody(body);
       }
@@ -224,9 +228,16 @@
       };
       const _send = xhr.send.bind(xhr);
       xhr.send = function(body) {
-        if (isAI(_url) && typeof body === "string" && body.length > 2) {
-          processRequestBody(body).then((processed) => _send(processed));
-          return;
+        if (isAI(_url)) {
+          if (body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer) {
+            window2.postMessage({ type: "AI_CAGE_FILE_UPLOAD_WARNING", url: _url }, "*");
+            _send(body);
+            return;
+          }
+          if (typeof body === "string" && body.length > 2) {
+            processRequestBody(body).then((processed) => _send(processed));
+            return;
+          }
         }
         _send(body);
       };
