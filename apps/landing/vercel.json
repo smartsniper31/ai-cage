@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "installCommand": "echo skip",
-  "buildCommand": "echo skip",
-  "outputDirectory": ".",
-  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "cleanUrls": true,
   "trailingSlash": false
 }
