@@ -11,7 +11,7 @@
  *   → No more double-popup confusion for Karim.
  *
  * P0-7 FIX: Toast notification added after every cage.
- *   → "🔒 1 email protégé" appears 2.5s, then auto-dismisses.
+ *   → "🔒 1 email protected" appears 2.5s, then auto-dismisses.
  *
  * P0-8 FIX: bottom:74px clip on Windows fixed.
  *   → Toast uses bottom:80px + max-height:calc(100vh - 160px).
@@ -205,10 +205,10 @@ function showToast(message: string, type: 'success' | 'warning' = 'success', dur
  * pointer-events:none → no cursor change, no click, no double-popup.
  *
  * States:
- *   idle    → "🔒 AI CAGE actif"        (always visible on AI sites)
- *   caged   → "🔒 X protégés"           (pulses briefly after a cage)
- *   warning → "⚠️ Fichier détecté"      (orange, 5s)
- *   hidden  → opacity 0 (non-AI pages, fades out after 4s idle)
+ *   idle    → "🔒 AI CAGE active"      (always visible on AI sites)
+ *   caged   → "🔒 X protected"         (pulses briefly after a cage)
+ *   warning → "⚠️ Check before sending" (orange, 5s)
+ *   hidden  → opacity 0 (non-AI pages)
  */
 let statusHideTimer: ReturnType<typeof setTimeout> | null = null;
 

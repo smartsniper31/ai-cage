@@ -339,11 +339,47 @@
     /* ── Animations ── */
     @keyframes cage-in  { from{opacity:0;transform:translateY(8px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
     @keyframes cage-out { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(8px) scale(.97)} }
+    @keyframes cage-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(21,128,61,.4)} 50%{box-shadow:0 0 0 6px rgba(21,128,61,0)} }
+
+    /* ── Status indicator (FIX 2) — tiny non-interactive pill ── */
+    /* Replaces the old bubble. Shows AI CAGE is active without double popup. */
+    #cage-status {
+      position:fixed;
+      bottom:20px;
+      right:20px;
+      z-index:2147483647;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      background:rgba(21,128,61,0.92);
+      color:#fff;
+      border-radius:999px;
+      padding:5px 10px 5px 8px;
+      font-family:${FONT};
+      font-size:11px;
+      font-weight:700;
+      box-shadow:0 2px 10px rgba(0,0,0,.25);
+      pointer-events:none;   /* non-interactive — no click, no cursor change */
+      user-select:none;
+      transition:opacity .3s, transform .3s;
+      letter-spacing:.01em;
+    }
+    #cage-status.idle    { background:rgba(21,128,61,0.82); }
+    #cage-status.caged   { background:rgba(21,128,61,0.97); animation:cage-pulse .6s ease; }
+    #cage-status.warning { background:rgba(217,119,6,0.92); }
+    #cage-status.hidden  { opacity:0; transform:translateY(4px); pointer-events:none; }
+    #cage-status .dot {
+      width:7px; height:7px; border-radius:50%;
+      background:#fff; flex-shrink:0;
+    }
+    #cage-status.idle    .dot { background:rgba(255,255,255,.6); }
+    #cage-status.caged   .dot { background:#fff; }
+    #cage-status.warning .dot { background:#fff; }
 
     /* ── Toast (P0-7) ── */
     #cage-toast {
       position:fixed;
-      bottom:80px;           /* P0-8: was 74px — clears Windows taskbar */
+      bottom:54px;
       right:20px;
       z-index:2147483647;
       background:#15803d;
@@ -369,11 +405,11 @@
     /* ── Decision panel (shown when network PII detected) ── */
     #cage-panel {
       position:fixed;
-      bottom:80px;           /* P0-8: safe above taskbar */
+      bottom:56px;
       right:20px;
       z-index:2147483647;
       width:320px;
-      max-height:calc(100vh - 160px);   /* never overflow screen */
+      max-height:calc(100vh - 120px);
       overflow-y:auto;
       background:#fff;
       color:#0f172a;
@@ -435,6 +471,42 @@
       setTimeout(() => el.remove(), 260);
     }, durationMs);
   }
+  let statusHideTimer = null;
+  function createStatusIndicator() {
+    const root = getShadowRoot();
+    if (!root || root.getElementById("cage-status")) return;
+    const el = document.createElement("div");
+    el.id = "cage-status";
+    el.className = "idle";
+    el.innerHTML = '<div class="dot"></div><span id="cage-status-text">🔒 AI CAGE active</span>';
+    root.appendChild(el);
+  }
+  function updateStatus(state, text) {
+    const root = getShadowRoot();
+    if (!root) return;
+    if (!root.getElementById("cage-status")) createStatusIndicator();
+    const el = root.getElementById("cage-status");
+    const textEl = root.getElementById("cage-status-text");
+    if (!el || !textEl) return;
+    if (statusHideTimer) {
+      clearTimeout(statusHideTimer);
+      statusHideTimer = null;
+    }
+    el.className = state;
+    el.classList.remove("hidden");
+    if (text) {
+      textEl.textContent = text;
+    } else {
+      if (state === "idle") textEl.textContent = "🔒 AI CAGE active";
+      if (state === "caged") textEl.textContent = `🔒 ${sessionTotal} protected`;
+      if (state === "warning") textEl.textContent = "⚠️ Check before sending";
+    }
+    if (state === "caged" || state === "warning") {
+      statusHideTimer = setTimeout(() => {
+        updateStatus("idle");
+      }, 3e3);
+    }
+  }
   function updateBadge() {
     try {
       void chrome.action.setBadgeText({ text: sessionTotal > 0 ? String(sessionTotal) : "" });
@@ -457,8 +529,8 @@
         <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.preview}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cager</button>
-        <button class="gs" data-idx="${idx}" data-act="pass">Ignorer</button>
+        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cage</button>
+        <button class="gs" data-idx="${idx}" data-act="pass">Skip</button>
       </div>
     </div>`).join("");
     const panel = document.createElement("div");
@@ -467,17 +539,17 @@
     <div class="ch amber">
       <span style="font-size:16px">⚠️</span>
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13px">Données sensibles détectées !</div>
-        <div style="font-size:11px;opacity:.9">${items.length} élément${items.length > 1 ? "s" : ""} — choisissez une action</div>
+        <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
+        <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? "s" : ""} — choose an action</div>
       </div>
       <button id="cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:20px;padding:2px 6px">×</button>
     </div>
     <div class="cl">${itemsHtml}</div>
     <div class="ca">
-      <button class="bg" id="cage-all">🔒 Tout cager &amp; envoyer</button>
-      <button class="gg" id="pass-all">⚡ Envoyer sans protection</button>
+      <button class="bg" id="cage-all">🔒 Cage All &amp; Send</button>
+      <button class="gg" id="pass-all">⚡ Send Without Protection</button>
     </div>
-    <div class="cw">⚠️ "Envoyer sans protection" transmet vos vraies données à l'IA.</div>`;
+    <div class="cw">⚠️ "Send Without Protection" sends your real data to the AI.</div>`;
     root.appendChild(panel);
     let sent = false;
     function decide(mode, cageItems) {
@@ -489,8 +561,9 @@
       if (mode === "cage") {
         sessionTotal += cageItems.length;
         updateBadge();
+        updateStatus("caged");
         const types = [...new Set(cageItems.map((i) => i.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2).join(", ");
-        showToast(`🔒 ${cageItems.length} élément${cageItems.length > 1 ? "s" : ""} protégé${cageItems.length > 1 ? "s" : ""} (${types})`);
+        showToast(`🔒 ${cageItems.length} item${cageItems.length > 1 ? "s" : ""} protected (${types})`);
         try {
           void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
         } catch {
@@ -523,28 +596,79 @@
     window.postMessage({ type: "AI_CAGE_PROCEED", gateId, mode, items }, "*");
   }
   const PROMPT_SELECTORS = [
+    // ── ChatGPT / OpenAI ──────────────────────────────────────────────────
     "#prompt-textarea",
     "div#prompt-textarea[contenteditable]",
     'div[contenteditable="true"][data-id]',
     'div.ProseMirror[contenteditable="true"]',
+    // ── Claude (Anthropic) ────────────────────────────────────────────────
+    'div[contenteditable="true"][aria-multiline="true"]',
+    "div.ProseMirror",
+    // ── Gemini / Google AI Studio ─────────────────────────────────────────
     "rich-textarea .ql-editor",
     'div.ql-editor[contenteditable="true"]',
-    "textarea#chat-input",
-    'div[contenteditable="true"][aria-multiline="true"]',
+    "ms-text-chunk[contenteditable]",
+    'div[contenteditable="true"].input-area',
+    // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
     'div[contenteditable="true"][role="textbox"]',
     'div[contenteditable="true"][aria-label]',
+    'div[contenteditable="true"][aria-placeholder]',
+    'div[aria-label*="Message"][contenteditable]',
+    'div[aria-label*="message"][contenteditable]',
+    'div[aria-label*="prompt"][contenteditable]',
+    'div[aria-label*="Prompt"][contenteditable]',
+    "div[placeholder][contenteditable]",
+    "div[data-placeholder][contenteditable]",
+    // ── Bing Copilot / Microsoft ──────────────────────────────────────────
+    "textarea#searchbox",
+    "cib-text-input textarea",
+    "div.user-message-input[contenteditable]",
+    'textarea[name="userMessage"]',
+    // ── DeepSeek ──────────────────────────────────────────────────────────
+    "textarea#chat-input",
+    // ── Perplexity ────────────────────────────────────────────────────────
+    'textarea[placeholder*="Ask"]',
+    'textarea[placeholder*="ask"]',
+    'textarea[placeholder*="Search"]',
+    // ── Mistral / Le Chat ─────────────────────────────────────────────────
+    'textarea[data-testid*="chat"]',
+    'textarea[data-testid*="message"]',
+    'div[data-testid*="message"][contenteditable]',
+    // ── Grok (X.com) ──────────────────────────────────────────────────────
+    'div[data-testid="tweetTextarea_0"][contenteditable]',
+    'div[aria-label*="Grok"][contenteditable]',
+    // ── Generic fallbacks — ordered from most specific to most general ────
     "textarea[rows]",
     "textarea",
     'div[contenteditable="true"]'
   ];
   const SEND_SELECTORS = [
+    // ── Generic test IDs ──────────────────────────────────────────────────
     'button[data-testid*="send"]',
     'button[data-testid*="submit"]',
+    'button[data-testid*="Send"]',
+    // ── ARIA labels ───────────────────────────────────────────────────────
     'button[aria-label*="Send"]',
     'button[aria-label*="send"]',
     'button[aria-label*="Submit"]',
     'button[aria-label*="Envoyer"]',
-    'button[type="submit"]'
+    'button[aria-label*="envoyer"]',
+    // ── Form submit ───────────────────────────────────────────────────────
+    'button[type="submit"]',
+    // ── Meta AI ───────────────────────────────────────────────────────────
+    'div[aria-label*="Send"][role="button"]',
+    'div[aria-label*="send"][role="button"]',
+    'button[aria-label*="Post"]',
+    // ── Bing Copilot ──────────────────────────────────────────────────────
+    "button#search-button",
+    'cib-icon-button[aria-label*="Submit"]',
+    // ── Grok ──────────────────────────────────────────────────────────────
+    'div[data-testid="tweetButtonInline"]',
+    // ── Generic icon buttons that are send actions ────────────────────────
+    'button[class*="send"]',
+    'button[class*="Send"]',
+    'button[class*="submit"]',
+    'button[class*="Submit"]'
   ];
   function findPrompt() {
     for (const sel of PROMPT_SELECTORS) {
@@ -592,9 +716,10 @@
     shareEntitiesWithPage(entities);
     sessionTotal += totalCaged;
     updateBadge();
+    updateStatus("caged");
     const typeLabels = [...new Set(entities.map((e) => e.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2);
     const more = entities.length > 2 ? ` +${entities.length - 2}` : "";
-    showToast(`🔒 ${totalCaged} protégé${totalCaged > 1 ? "s" : ""} (${typeLabels.join(", ")}${more})`);
+    showToast(`🔒 ${totalCaged} protected (${typeLabels.join(", ")}${more})`);
     try {
       void chrome.runtime.sendMessage({
         type: "CAGE_REPORT",
@@ -647,13 +772,15 @@
     if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_CAGED" && d.count) {
       sessionTotal += d.count;
       updateBadge();
+      updateStatus("caged");
       try {
         void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
       } catch {
       }
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_NETWORK_RESTORED") {
-      showToast("✅ Données restaurées localement — l'IA n'a jamais vu l'original");
+      updateStatus("idle", "✅ Data restored locally");
+      showToast("✅ Data restored — the AI never saw your real information");
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_INJECTION_DETECTED") {
       try {
@@ -665,10 +792,12 @@
         });
       } catch {
       }
-      showToast("🚫 Injection bloquée", "warning");
+      updateStatus("warning", "🚫 Injection blocked");
+      showToast("🚫 Prompt injection attack blocked", "warning");
     }
     if ((d == null ? void 0 : d.type) === "AI_CAGE_FILE_UPLOAD_WARNING") {
-      showToast("📄 Fichier détecté — vérifiez qu'il ne contient pas de données sensibles avant d'envoyer", "warning", 5e3);
+      updateStatus("warning", "⚠️ File detected — check before sending");
+      showToast("📄 File upload detected — verify it contains no sensitive data before sending", "warning", 5e3);
     }
   });
   let hookDebounce = null;
@@ -685,6 +814,8 @@
     const tryInit = () => {
       if (!document.body) return false;
       domObserver.observe(document.body, { childList: true, subtree: true });
+      createStatusIndicator();
+      updateStatus("idle");
       return true;
     };
     if (!tryInit()) {
@@ -701,12 +832,14 @@
         return "0.6.0";
       }
     })();
-    console.warn(`[AI CAGE] 🔒 Ghost Mode v${v} on ${window.location.hostname} — single UI mode active`);
+    console.warn(`[AI CAGE] 🔒 v${v} active on ${window.location.hostname}`);
   }
   boot();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       hookButtons();
+      createStatusIndicator();
+      updateStatus("idle");
     });
   }
 })();

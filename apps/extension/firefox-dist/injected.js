@@ -60,21 +60,88 @@
       return result;
     }
     const AI_PATTERNS = [
+      // ── OpenAI / ChatGPT ──────────────────────────────────────────────────
       /api\.openai\.com/,
       /chatgpt\.com\/backend-api/,
       /chat\.openai\.com\/backend-api/,
+      // ── Anthropic / Claude ────────────────────────────────────────────────
       /api\.anthropic\.com/,
       /claude\.ai\/api/,
+      /claude\.ai\/chat/,
+      // ── Google ────────────────────────────────────────────────────────────
       /generativelanguage\.googleapis\.com/,
       /gemini\.google\.com/,
+      /bard\.google\.com/,
+      /aistudio\.google\.com/,
+      // ── Meta AI ───────────────────────────────────────────────────────────
+      /meta\.ai/,
+      /www\.meta\.ai/,
+      /ai\.meta\.com/,
+      /graph\.facebook\.com\/.*\/ai/,
+      // Meta AI via Facebook Graph
+      /\/api\/chat.*meta/,
+      // ── Microsoft Copilot / Bing ──────────────────────────────────────────
+      /copilot\.microsoft\.com/,
+      /bing\.com\/chat/,
+      /sydney\.bing\.com/,
+      /\/api\/copilot/,
+      /api\.bing\.com/,
+      // ── DeepSeek ──────────────────────────────────────────────────────────
+      /chat\.deepseek\.com/,
+      /api\.deepseek\.com/,
+      // ── Mistral ───────────────────────────────────────────────────────────
       /api\.mistral\.ai/,
+      /chat\.mistral\.ai/,
+      /mistral\.ai\/api/,
+      // ── Groq ──────────────────────────────────────────────────────────────
       /api\.groq\.com/,
+      // ── Perplexity ────────────────────────────────────────────────────────
       /api\.perplexity\.ai/,
+      /perplexity\.ai\/api/,
+      /www\.perplexity\.ai\/api/,
+      // ── Grok / xAI ───────────────────────────────────────────────────────
+      /grok\.x\.ai/,
+      /api\.x\.ai/,
+      /grok\.com/,
+      // ── Cohere ────────────────────────────────────────────────────────────
       /api\.cohere\.ai/,
+      /api\.cohere\.com/,
+      // ── OpenRouter (proxy for all models) ────────────────────────────────
       /openrouter\.ai/,
+      // ── Poe (Quora) ───────────────────────────────────────────────────────
       /poe\.com\/api/,
+      /poe\.com\/chat/,
+      // ── You.com ───────────────────────────────────────────────────────────
       /you\.com\/api/,
-      /chat\.deepseek\.com/
+      /you\.com\/search/,
+      // ── Llama / Meta open models ──────────────────────────────────────────
+      /llama\d*\.ai/,
+      /api\.llama\.com/,
+      // ── Hugging Face ──────────────────────────────────────────────────────
+      /huggingface\.co\/api/,
+      /api-inference\.huggingface\.co/,
+      // ── Together AI ───────────────────────────────────────────────────────
+      /api\.together\.ai/,
+      /api\.together\.xyz/,
+      // ── Replicate ─────────────────────────────────────────────────────────
+      /api\.replicate\.com/,
+      // ── Character.AI ─────────────────────────────────────────────────────
+      /character\.ai\/api/,
+      /neo\.character\.ai/,
+      /chat\.character\.ai/,
+      // ── Pi (Inflection) ───────────────────────────────────────────────────
+      /pi\.ai\/api/,
+      /inflection\.ai/,
+      // ── Generic patterns — catch-all for unknown AI endpoints ─────────────
+      // These match common API path conventions used by AI chat apps
+      /\/api\/chat$/,
+      /\/api\/chat\//,
+      /\/api\/completions/,
+      /\/api\/generate/,
+      /\/chat\/completions/,
+      /\/v1\/messages/,
+      /\/v1\/chat/,
+      /\/llm\//
     ];
     function isAI(url) {
       return AI_PATTERNS.some((p) => p.test(url));
