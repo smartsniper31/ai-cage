@@ -553,7 +553,10 @@
       document.body.style.overflow = '';
     }
 
-    if (proBtn)   proBtn.addEventListener('click', function() { openModal('pro'); });
+    if (proBtn)   proBtn.addEventListener('click', function() {
+      // Pro → Stripe Payment Link (direct checkout, no modal)
+      window.open('https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00', '_blank', 'noopener,noreferrer');
+    });
     var entBtn = document.getElementById('enterprise-btn');
     var compBtn = document.getElementById('compliance-btn');
     if (entBtn)  entBtn.addEventListener('click',  function() { openModal('enterprise'); });

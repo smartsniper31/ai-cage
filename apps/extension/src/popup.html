@@ -13,6 +13,7 @@
       --red-bg:     #fef2f2;
       --amber:      #d97706;
       --amber-bg:   #fffbeb;
+      --blue:       #0ea5e9;
       --bg:         #f8fafc;
       --surface:    #ffffff;
       --text:       #0f172a;
@@ -37,34 +38,23 @@
       align-items: center;
       gap: 10px;
     }
-    .header-icon    { font-size: 20px; }
-    .header-title   { font-size: 15px; font-weight: 700; }
-    .header-sub     { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+    .header-icon  { font-size: 20px; }
+    .header-title { font-size: 15px; font-weight: 700; }
+    .header-sub   { font-size: 10px; opacity: 0.8; margin-top: 1px; }
     .header-version {
-      margin-left: auto;
-      font-size: 10px;
-      opacity: 0.65;
-      cursor: pointer;
-      text-decoration: none;
-      color: #fff;
-      transition: opacity .15s;
+      font-size: 10px; opacity: 0.65; cursor: pointer;
+      text-decoration: none; color: #fff; transition: opacity .15s;
     }
     .header-version:hover { opacity: 1; }
 
-    /* ── Update available badge ── */
+    /* ── Update badge ── */
     .update-badge {
-      display: none;
-      margin-left: 6px;
-      background: #0ea5e9;
-      color: #fff;
-      font-size: 9px;
-      font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 999px;
-      cursor: pointer;
-      border: none;
-      letter-spacing: .03em;
-      white-space: nowrap;
+      display: none; margin-left: 6px;
+      background: var(--blue); color: #fff;
+      font-size: 9px; font-weight: 800;
+      padding: 2px 7px; border-radius: 999px;
+      cursor: pointer; border: none;
+      letter-spacing: .03em; white-space: nowrap;
       animation: badge-pulse 2s ease infinite;
     }
     .update-badge.show { display: inline-block; }
@@ -76,117 +66,75 @@
     /* ── Status pill ── */
     .status-pill {
       margin: 10px 12px 0;
-      background: var(--green-bg);
-      color: var(--green-dark);
-      border: 1px solid #bbf7d0;
-      border-radius: 9999px;
-      padding: 5px 12px;
-      font-size: 11px;
-      font-weight: 600;
+      background: var(--green-bg); color: var(--green-dark);
+      border: 1px solid #bbf7d0; border-radius: 9999px;
+      padding: 5px 12px; font-size: 11px; font-weight: 600;
       text-align: center;
       transition: background .2s, color .2s, border-color .2s;
     }
 
-    /* ── Tabs ── */
+    /* ── Tabs (4 tabs — smaller font) ── */
     .tabs {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      margin-top: 10px;
-      background: var(--surface);
+      display: flex; border-bottom: 1px solid var(--border);
+      margin-top: 10px; background: var(--surface);
     }
     .tab-btn {
-      flex: 1;
-      padding: 8px;
-      border: none;
-      background: none;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
+      flex: 1; padding: 7px 4px; border: none; background: none;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      cursor: pointer; border-bottom: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s;
     }
-    .tab-btn.active {
-      color: var(--green-dark);
-      border-bottom-color: var(--green-dark);
-    }
+    .tab-btn.active { color: var(--green-dark); border-bottom-color: var(--green-dark); }
     .tab-pane { padding: 10px 12px; }
 
     /* ── Stats grid ── */
     .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 10px;
     }
     .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px; text-align: center;
     }
-    .stat-number {
-      font-size: 26px;
-      font-weight: 800;
-      color: var(--green);
-      line-height: 1;
-    }
-    .stat-number.red    { color: var(--red); }
-    .stat-number.amber  { color: var(--amber); }
+    .stat-number { font-size: 26px; font-weight: 800; color: var(--green); line-height: 1; }
+    .stat-number.red   { color: var(--red); }
+    .stat-number.amber { color: var(--amber); }
     .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; }
 
-    /* ── Progress bar (free tier) ── */
+    /* ── Free tier progress bar ── */
     .free-progress-wrap {
-      margin-bottom: 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
+      margin-bottom: 10px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
     }
     .free-progress-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-      font-size: 11px;
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 6px; font-size: 11px;
     }
     .free-progress-label { color: var(--muted); font-weight: 600; }
     .free-progress-count { font-weight: 800; color: var(--green); }
     .free-progress-count.warning { color: var(--amber); }
     .free-progress-count.danger  { color: var(--red); }
     .progress-bar-bg {
-      background: #e2e8f0;
-      border-radius: 999px;
-      height: 6px;
-      overflow: hidden;
+      background: #e2e8f0; border-radius: 999px; height: 6px; overflow: hidden;
     }
     .progress-bar-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: var(--green);
+      height: 100%; border-radius: 999px; background: var(--green);
       transition: width .4s ease, background .3s;
     }
     .progress-bar-fill.warning { background: var(--amber); }
     .progress-bar-fill.danger  { background: var(--red); }
 
-    /* ── Top sites ── */
+    /* ── Section label ── */
     .section-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 4px;
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
     }
+
+    /* ── Top sites ── */
     #top-sites { list-style: none; }
     #top-sites li {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 11px;
     }
     #top-sites li:last-child { border-bottom: none; }
     .site-name  { color: var(--text); }
@@ -194,117 +142,112 @@
 
     /* ── Shadow AI list ── */
     #shadow-list { list-style: none; }
-    .shadow-item {
-      padding: 7px 0;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-    }
+    .shadow-item { padding: 7px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
     .shadow-item:last-child { border-bottom: none; }
     .shadow-site   { font-weight: 700; font-size: 12px; color: var(--red); }
     .shadow-meta   { font-size: 10px; color: var(--muted); margin-top: 1px; }
-    .shadow-detail { font-size: 10px; color: var(--muted); margin-top: 2px;
-                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shadow-detail {
+      font-size: 10px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .shadow-detail.expanded { white-space: normal; overflow: visible; }
     .empty {
       font-size: 12px; color: var(--muted);
       text-align: center; padding: 16px 0; line-height: 1.7;
     }
 
-    /* ── Upgrade banner (inline CTA) ── */
+    /* ── Upgrade banner ── */
     .upgrade-banner {
       background: linear-gradient(135deg, #15803d, #16a34a);
-      color: #fff;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 10px;
-      display: none;
+      color: #fff; border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 10px; display: none;
     }
     .upgrade-banner.show { display: block; }
-    .upgrade-banner-title {
-      font-size: 13px; font-weight: 800; margin-bottom: 3px;
-    }
-    .upgrade-banner-sub {
-      font-size: 11px; opacity: .88; margin-bottom: 10px; line-height: 1.4;
-    }
+    .upgrade-banner-title { font-size: 13px; font-weight: 800; margin-bottom: 3px; }
+    .upgrade-banner-sub   { font-size: 11px; opacity: .88; margin-bottom: 10px; line-height: 1.4; }
     .upgrade-banner-btn {
-      display: inline-block;
-      background: #fff;
-      color: #15803d;
-      font-size: 12px;
-      font-weight: 800;
-      padding: 7px 16px;
-      border-radius: 7px;
-      border: none;
-      cursor: pointer;
-      text-decoration: none;
-      transition: opacity .15s;
+      display: inline-block; background: #fff; color: #15803d;
+      font-size: 12px; font-weight: 800; padding: 7px 16px;
+      border-radius: 7px; border: none; cursor: pointer;
+      text-decoration: none; transition: opacity .15s;
     }
     .upgrade-banner-btn:hover { opacity: .9; }
 
+    /* ── Account tab (Pro activation) ── */
+    .account-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px; margin-bottom: 10px;
+    }
+    .account-section-title {
+      font-size: 12px; font-weight: 800; color: var(--text);
+      margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+    }
+    .plan-badge {
+      display: inline-block; font-size: 9px; font-weight: 800;
+      padding: 2px 8px; border-radius: 999px; letter-spacing: .04em;
+    }
+    .plan-badge.free { background: #e2e8f0; color: #64748b; }
+    .plan-badge.pro  { background: #dcfce7; color: #15803d; }
+    .plan-badge.exp  { background: #fef2f2; color: #dc2626; }
+
+    .license-input {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 12px; font-family: monospace;
+      margin-bottom: 8px; outline: none;
+      transition: border-color .15s;
+    }
+    .license-input:focus { border-color: var(--green-dark); }
+    .license-input.error { border-color: var(--red); }
+    .license-input.success { border-color: var(--green); }
+
+    .license-btn {
+      width: 100%; padding: 10px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .license-btn:hover { opacity: .9; }
+    .license-btn.activate   { background: var(--green-dark); color: #fff; }
+    .license-btn.deactivate { background: #e2e8f0; color: var(--text); }
+
+    .license-msg {
+      margin-top: 8px; font-size: 11px; line-height: 1.5;
+      padding: 7px 10px; border-radius: 6px; display: none;
+    }
+    .license-msg.show  { display: block; }
+    .license-msg.ok    { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .license-msg.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .license-msg.warn  { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+    .pro-features {
+      list-style: none; font-size: 11px;
+      color: #374151; display: flex; flex-direction: column; gap: 3px;
+    }
+
     /* ── Footer ── */
     .footer {
-      border-top: 1px solid var(--border);
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--green-bg);
+      border-top: 1px solid var(--border); padding: 8px 12px;
+      display: flex; align-items: center; gap: 8px; background: var(--green-bg);
     }
     .footer-text { font-size: 10px; color: #166534; flex: 1; }
     .export-btn {
-      background: var(--green-dark);
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      padding: 4px 10px;
-      font-size: 10px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
+      background: var(--green-dark); color: #fff; border: none;
+      border-radius: 5px; padding: 4px 10px; font-size: 10px;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
     }
     .export-btn:hover { opacity: 0.9; }
     .help-btn {
-      background: none;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      color: #166534;
-      padding: 0 2px;
-      line-height: 1;
-      text-decoration: none;
+      background: none; border: none; font-size: 16px; cursor: pointer;
+      color: #166534; padding: 0 2px; line-height: 1; text-decoration: none;
     }
 
-    /* ── Locked feature badge ── */
-    .locked-badge {
-      display: inline-block;
-      background: #e2e8f0;
-      color: #64748b;
-      font-size: 9px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      margin-left: 6px;
-    }
-
-    /* ── Watermark (100 cages limit) ── */
+    /* ── Watermark ── */
     #watermark {
-      display: none;
-      padding: 10px 14px;
-      background: var(--amber-bg);
-      color: #92400e;
-      font-size: 11px;
-      font-weight: 700;
-      text-align: center;
-      border-top: 1px solid #fde68a;
-      line-height: 1.5;
+      display: none; padding: 10px 14px; background: var(--amber-bg);
+      color: #92400e; font-size: 11px; font-weight: 700;
+      text-align: center; border-top: 1px solid #fde68a; line-height: 1.5;
     }
-    #watermark a {
-      color: #92400e;
-      text-decoration: underline;
-      font-weight: 800;
-    }
+    #watermark a { color: #92400e; text-decoration: underline; font-weight: 800; }
   </style>
 </head>
 <body>
@@ -319,12 +262,10 @@
     <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
       <a id="popup-version"
          href="https://github.com/smartsniper31/ai-cage/releases"
-         target="_blank"
-         rel="noopener noreferrer"
+         target="_blank" rel="noopener noreferrer"
          class="header-version"
          title="View all releases on GitHub"></a>
-      <button id="update-badge"
-              class="update-badge"
+      <button id="update-badge" class="update-badge"
               title="A new version is available — click to update">
         🆕 Update available
       </button>
@@ -334,19 +275,16 @@
   <!-- ── Status pill ── -->
   <div class="status-pill" id="status-text">Loading…</div>
 
-  <!-- ── Tabs ── -->
+  <!-- ── Tabs (4) ── -->
   <div class="tabs" role="tablist">
     <button class="tab-btn" id="tab-overview" role="tab" aria-selected="true">📊 Overview</button>
-    <button class="tab-btn" id="tab-shadow"   role="tab" aria-selected="false">👁️ Shadow AI</button>
+    <button class="tab-btn" id="tab-shadow"   role="tab" aria-selected="false">👁️ Shadow</button>
     <button class="tab-btn" id="tab-agent"    role="tab" aria-selected="false">🤖 Agent</button>
+    <button class="tab-btn" id="tab-account"  role="tab" aria-selected="false">⚙️ Account</button>
   </div>
 
-  <!-- ══════════════════════════════════════════════
-       OVERVIEW PANE
-  ══════════════════════════════════════════════ -->
+  <!-- ══ OVERVIEW ══ -->
   <div class="tab-pane" id="pane-overview">
-
-    <!-- Free tier progress bar -->
     <div class="free-progress-wrap" id="free-progress-wrap">
       <div class="free-progress-header">
         <span class="free-progress-label">Free tier usage this month</span>
@@ -357,11 +295,10 @@
       </div>
     </div>
 
-    <!-- Inline upgrade banner (shown at 80+ cages) -->
     <div class="upgrade-banner" id="upgrade-banner">
       <div class="upgrade-banner-title">⚡ Almost at your limit!</div>
       <div class="upgrade-banner-sub">
-        You're running low on free cages this month.<br>
+        You're running low on free cages.<br>
         Upgrade to Pro for <strong>unlimited protection</strong> — €5/user/month.
       </div>
       <button class="upgrade-banner-btn" id="upgrade-banner-btn">
@@ -369,7 +306,6 @@
       </button>
     </div>
 
-    <!-- Stats grid -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-number" id="monthly-caged">—</div>
@@ -398,9 +334,7 @@
     </ul>
   </div>
 
-  <!-- ══════════════════════════════════════════════
-       SHADOW AI PANE
-  ══════════════════════════════════════════════ -->
+  <!-- ══ SHADOW AI ══ -->
   <div class="tab-pane" id="pane-shadow" style="display:none">
     <p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6">
       These tools made requests to AI APIs from your browser.<br>
@@ -409,13 +343,11 @@
     <ul id="shadow-list"><li class="empty">Loading…</li></ul>
   </div>
 
-  <!-- ══════════════════════════════════════════════
-       AGENT PANE
-  ══════════════════════════════════════════════ -->
+  <!-- ══ AGENT ══ -->
   <div class="tab-pane" id="pane-agent" style="display:none">
-
-    <!-- Locked notice for Free tier -->
-    <div id="agent-locked-notice" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+    <div id="agent-locked-notice"
+         style="display:none;background:#fef3c7;border:1px solid #fde68a;
+                border-radius:8px;padding:12px 14px;margin-bottom:10px;">
       <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:4px">
         🔒 Agent Cage — Pro Feature
       </div>
@@ -428,7 +360,6 @@
         🚀 Upgrade to unlock Agent Cage →
       </button>
     </div>
-
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-number red" id="agent-blocked">—</div>
@@ -449,18 +380,84 @@
     </div>
   </div>
 
+  <!-- ══ ACCOUNT ══ -->
+  <div class="tab-pane" id="pane-account" style="display:none">
+
+    <!-- Current plan status -->
+    <div class="account-section">
+      <div class="account-section-title">
+        Current Plan
+        <span class="plan-badge free" id="plan-badge">FREE</span>
+      </div>
+      <div id="plan-details" style="font-size:11px;color:#64748b;line-height:1.6">
+        Free tier: 100 cages/month included.
+      </div>
+    </div>
+
+    <!-- Pro key activation -->
+    <div class="account-section" id="activation-section">
+      <div class="account-section-title">🔑 Activate Pro License</div>
+      <p style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5">
+        After purchase, you will receive a license key by email.<br>
+        Paste it below to unlock unlimited cages.
+      </p>
+      <input
+        type="text"
+        id="license-input"
+        class="license-input"
+        placeholder="Paste your license key here…"
+        spellcheck="false"
+        autocomplete="off" />
+      <button class="license-btn activate" id="license-activate-btn">
+        ✅ Activate Pro
+      </button>
+      <div class="license-msg" id="license-msg"></div>
+
+      <!-- Buy link -->
+      <div style="margin-top:12px;text-align:center">
+        <p style="font-size:11px;color:#64748b;margin-bottom:6px">Don't have a key yet?</p>
+        <button id="buy-pro-btn"
+                style="background:var(--green-dark);color:#fff;border:none;
+                       border-radius:8px;padding:9px 20px;font-size:12px;
+                       font-weight:700;cursor:pointer;width:100%">
+          💳 Get Pro — €5/month →
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Pro section (hidden until Pro activated) -->
+    <div class="account-section" id="pro-active-section" style="display:none">
+      <div class="account-section-title" style="color:#15803d">
+        ✅ Pro Plan Active
+        <span class="plan-badge pro">PRO</span>
+      </div>
+      <ul class="pro-features" id="pro-features-list">
+        <li>✅ Unlimited cages / month</li>
+        <li>✅ Agent Cage + injection detection</li>
+        <li>✅ CSV export for your auditor</li>
+        <li>✅ Priority support</li>
+      </ul>
+      <div id="pro-expires" style="margin-top:8px;font-size:11px;color:#64748b"></div>
+      <button class="license-btn deactivate" id="license-deactivate-btn"
+              style="margin-top:10px">
+        Remove license key
+      </button>
+    </div>
+
+  </div>
+
   <!-- ── Footer ── -->
   <div class="footer">
     <span class="footer-text">✅ Zero data leaves your device.</span>
     <a href="https://ai-cage-gamma.vercel.app/#privacy" target="_blank"
-       class="help-btn" title="Help & Support — ai-cage-gamma.vercel.app" aria-label="Help">❓</a>
+       class="help-btn" title="Help & Support" aria-label="Help">❓</a>
     <button class="export-btn" id="export-btn"
             title="Export audit log as CSV for your compliance team">
       📄 Export CSV
     </button>
   </div>
 
-  <!-- ── Free limit reached watermark ── -->
+  <!-- ── Free limit watermark ── -->
   <div id="watermark">
     🔶 <strong>Free limit reached</strong> — 100 cages used this month.<br>
     <a href="#" id="upgrade-link">🚀 Upgrade to Pro — unlimited cages · €5/month</a>

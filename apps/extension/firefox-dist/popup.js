@@ -1,10 +1,189 @@
 (function() {
   "use strict";
-  const UPGRADE_URL = "https://ai-cage-gamma.vercel.app/#pricing";
+  const EMBEDDED_KEY = "ai-cage-verification-v1-7f3a9b2e8c1d4a6f";
+  const FREE_FEATURES = {
+    maxPiiTypes: 15,
+    maxMonthlyCages: 100,
+    customPolicy: false,
+    auditExport: false,
+    shadowAi: true,
+    // Shadow AI detection is free — it's a safety feature
+    agentCage: false,
+    mcpMonitor: false,
+    sso: false,
+    siem: false,
+    centralisedPolicy: false
+  };
+  const PRO_FEATURES = {
+    maxPiiTypes: -1,
+    // unlimited
+    maxMonthlyCages: -1,
+    customPolicy: true,
+    auditExport: true,
+    shadowAi: true,
+    agentCage: true,
+    mcpMonitor: true,
+    sso: false,
+    siem: false,
+    centralisedPolicy: false
+  };
+  const ENTERPRISE_FEATURES = {
+    maxPiiTypes: -1,
+    maxMonthlyCages: -1,
+    customPolicy: true,
+    auditExport: true,
+    shadowAi: true,
+    agentCage: true,
+    mcpMonitor: true,
+    sso: true,
+    siem: true,
+    centralisedPolicy: true
+  };
+  function getTierFeatures(tier) {
+    switch (tier) {
+      case "FREE":
+        return { ...FREE_FEATURES };
+      case "PRO":
+        return { ...PRO_FEATURES };
+      case "ENTERPRISE":
+        return { ...ENTERPRISE_FEATURES };
+    }
+  }
+  function base64UrlDecode(str) {
+    let s = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    return atobSafe(s);
+  }
+  function atobSafe(str) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const lookup = /* @__PURE__ */ new Map();
+    for (let i = 0; i < chars.length; i++) {
+      lookup.set(chars[i] ?? "", i);
+    }
+    let result = "";
+    let buffer = 0;
+    let bits = 0;
+    for (const ch of str) {
+      if (ch === "=") break;
+      const val = lookup.get(ch);
+      if (val === void 0) continue;
+      buffer = buffer << 6 | val;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        result += String.fromCharCode(buffer >> bits & 255);
+      }
+    }
+    return result;
+  }
+  function djb2Hash(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) + hash + str.charCodeAt(i) | 0;
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
+  function computeSignature(payloadB64) {
+    return djb2Hash(payloadB64 + EMBEDDED_KEY);
+  }
+  function parseLicenseKey(key) {
+    if (!key || !key.includes(".")) return null;
+    const parts = key.split(".");
+    if (parts.length !== 2) return null;
+    const [payloadB64Raw, sig] = parts;
+    if (!payloadB64Raw || !sig) return null;
+    const payloadB64 = payloadB64Raw;
+    const expectedSig = computeSignature(payloadB64);
+    if (sig !== expectedSig) return null;
+    try {
+      const json = base64UrlDecode(payloadB64);
+      const payload = JSON.parse(json);
+      if (!payload.tier || !payload.expiresAt || !payload.issuedAt) return null;
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+  const LICENSE_KEY = "ai-cage:license-key";
+  async function checkLicense(storage, monthlyCageCount) {
+    const rawKey = await storage.getItem(LICENSE_KEY);
+    if (!rawKey) {
+      const features2 = getTierFeatures("FREE");
+      return {
+        status: "NONE",
+        tier: "FREE",
+        payload: null,
+        features: features2,
+        message: "Free tier active — 100 cages/month limit",
+        monthlyCageCount,
+        limitReached: monthlyCageCount >= features2.maxMonthlyCages
+      };
+    }
+    const payload = parseLicenseKey(rawKey);
+    if (!payload) {
+      const features2 = getTierFeatures("FREE");
+      return {
+        status: "TAMPERED",
+        tier: "FREE",
+        payload: null,
+        features: features2,
+        message: "⚠️ License key is invalid or tampered — using free tier",
+        monthlyCageCount,
+        limitReached: monthlyCageCount >= features2.maxMonthlyCages
+      };
+    }
+    const now = /* @__PURE__ */ new Date();
+    const expires = new Date(payload.expiresAt);
+    if (now > expires) {
+      const features2 = getTierFeatures("FREE");
+      return {
+        status: "EXPIRED",
+        tier: "FREE",
+        payload,
+        features: features2,
+        message: `License expired on ${payload.expiresAt.slice(0, 10)} — using free tier`,
+        monthlyCageCount,
+        limitReached: monthlyCageCount >= features2.maxMonthlyCages
+      };
+    }
+    const features = getTierFeatures(payload.tier);
+    const limitReached = features.maxMonthlyCages > 0 && monthlyCageCount >= features.maxMonthlyCages;
+    return {
+      status: "VALID",
+      tier: payload.tier,
+      payload,
+      features,
+      message: `${payload.tier} license valid until ${payload.expiresAt.slice(0, 10)} — ${payload.customer}`,
+      monthlyCageCount,
+      limitReached
+    };
+  }
+  async function activateLicense(key, storage) {
+    const payload = parseLicenseKey(key);
+    if (!payload) return false;
+    if (new Date(payload.expiresAt) < /* @__PURE__ */ new Date()) return false;
+    await storage.setItem(LICENSE_KEY, key);
+    return true;
+  }
+  async function deactivateLicense(storage) {
+    await storage.setItem(LICENSE_KEY, "");
+  }
+  const STRIPE_URL = "https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00";
   const RELEASES_URL = "https://github.com/smartsniper31/ai-cage/releases";
   const VERSION_URL = "https://ai-cage-gamma.vercel.app/version.json";
   const FREE_LIMIT = 100;
   const WARN_AT = 80;
+  const UPGRADE_URL = STRIPE_URL;
+  const chromeStorageAdapter = {
+    async getItem(key) {
+      const result = await chrome.storage.local.get(key);
+      const val = result[key];
+      return typeof val === "string" ? val : null;
+    },
+    async setItem(key, value) {
+      await chrome.storage.local.set({ [key]: value });
+    }
+  };
   function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = String(value);
@@ -281,8 +460,105 @@
     } catch {
     }
   }
+  async function renderAccountTab() {
+    var _a;
+    const resp = await chrome.runtime.sendMessage({ type: "GET_STATS", tabId: 0 }).catch(() => null);
+    const monthly = (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0;
+    const info = await checkLicense(chromeStorageAdapter, monthly);
+    const badgeEl = document.getElementById("plan-badge");
+    const detailEl = document.getElementById("plan-details");
+    const activationSection = document.getElementById("activation-section");
+    const proActiveSection = document.getElementById("pro-active-section");
+    document.getElementById("free-progress-wrap");
+    const watermark = document.getElementById("watermark");
+    const freeProgressWrap = document.getElementById("free-progress-wrap");
+    if (info.tier === "PRO" || info.tier === "ENTERPRISE") {
+      if (badgeEl) {
+        badgeEl.textContent = info.tier;
+        badgeEl.className = "plan-badge pro";
+      }
+      if (detailEl) {
+        detailEl.textContent = info.message;
+      }
+      if (activationSection) activationSection.style.display = "none";
+      if (proActiveSection) proActiveSection.style.display = "block";
+      const expiresEl = document.getElementById("pro-expires");
+      if (expiresEl && info.payload) {
+        const expDate = info.payload.expiresAt.slice(0, 10);
+        expiresEl.textContent = `License valid until ${expDate} — ${info.payload.customer}`;
+      }
+      if (freeProgressWrap) freeProgressWrap.style.display = "none";
+      if (watermark) watermark.style.display = "none";
+      (_a = document.getElementById("upgrade-banner")) == null ? void 0 : _a.classList.remove("show");
+      document.getElementById("agent-locked-notice") && (document.getElementById("agent-locked-notice").style.display = "none");
+    } else {
+      if (badgeEl) {
+        badgeEl.textContent = info.status === "EXPIRED" ? "EXPIRED" : "FREE";
+        badgeEl.className = info.status === "EXPIRED" ? "plan-badge exp" : "plan-badge free";
+      }
+      if (detailEl) {
+        detailEl.innerHTML = info.status === "EXPIRED" ? `⚠️ Your license expired — <strong>renew to keep Pro features</strong>.` : `Free tier: <strong>${monthly} / 100</strong> cages used this month.`;
+      }
+      if (activationSection) activationSection.style.display = "block";
+      if (proActiveSection) proActiveSection.style.display = "none";
+      if (freeProgressWrap) freeProgressWrap.style.display = "block";
+    }
+  }
+  function setLicenseMsg(text, type) {
+    const el = document.getElementById("license-msg");
+    if (!el) return;
+    el.textContent = text;
+    el.className = `license-msg show ${type}`;
+  }
+  function wireAccountTab() {
+    var _a, _b, _c;
+    (_a = document.getElementById("license-activate-btn")) == null ? void 0 : _a.addEventListener("click", async () => {
+      const input = document.getElementById("license-input");
+      const key = (input == null ? void 0 : input.value.trim()) ?? "";
+      if (!key) {
+        setLicenseMsg("Please paste your license key.", "warn");
+        input == null ? void 0 : input.focus();
+        return;
+      }
+      const btn = document.getElementById("license-activate-btn");
+      btn.disabled = true;
+      btn.textContent = "⏳ Validating…";
+      const ok = await activateLicense(key, chromeStorageAdapter);
+      if (ok) {
+        input.value = "";
+        input == null ? void 0 : input.classList.remove("error");
+        input == null ? void 0 : input.classList.add("success");
+        setLicenseMsg("✅ Pro license activated! Unlimited cages unlocked.", "ok");
+        btn.textContent = "✅ Activate Pro";
+        btn.disabled = false;
+        await renderAccountTab();
+        await renderOverview();
+      } else {
+        input == null ? void 0 : input.classList.add("error");
+        setLicenseMsg(
+          "❌ Invalid or expired key. Check your email or contact support@ai-cage.io",
+          "error"
+        );
+        btn.textContent = "✅ Activate Pro";
+        btn.disabled = false;
+      }
+    });
+    (_b = document.getElementById("license-deactivate-btn")) == null ? void 0 : _b.addEventListener("click", async () => {
+      const confirmed = confirm(
+        "Remove your Pro license key? You will revert to the Free tier (100 cages/month)."
+      );
+      if (!confirmed) return;
+      await deactivateLicense(chromeStorageAdapter);
+      setLicenseMsg("License removed. You are now on the Free tier.", "warn");
+      await renderAccountTab();
+      await renderOverview();
+    });
+    (_c = document.getElementById("buy-pro-btn")) == null ? void 0 : _c.addEventListener("click", () => {
+      void chrome.tabs.create({ url: STRIPE_URL });
+    });
+  }
   document.addEventListener("DOMContentLoaded", () => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     let installedVersion = "0.6.0";
     try {
       const manifest = chrome.runtime.getManifest();
@@ -316,7 +592,12 @@
       activateTab("agent");
       void renderAgentTab();
     });
-    (_f = document.getElementById("export-btn")) == null ? void 0 : _f.addEventListener("click", () => void exportCSV());
+    (_f = document.getElementById("tab-account")) == null ? void 0 : _f.addEventListener("click", () => {
+      activateTab("account");
+      void renderAccountTab();
+    });
+    wireAccountTab();
+    (_g = document.getElementById("export-btn")) == null ? void 0 : _g.addEventListener("click", () => void exportCSV());
     activateTab("overview");
     void renderOverview();
   });

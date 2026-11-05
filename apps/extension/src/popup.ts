@@ -6,19 +6,26 @@
  *   1. Overview  — PII caged stats + free-tier progress bar + upgrade flow
  *   2. Shadow AI — AI endpoints detected calling from this browser
  *   3. Agent     — Injection events (Pro feature lock shown for Free users)
+ *   4. Account   — Pro license activation / deactivation (FIX B)
  *
  * Upgrade flow:
  *   - Progress bar shows free tier usage (0 → 100 cages/month)
- *   - At  80 cages → amber warning + inline upgrade banner appears
- *   - At 100 cages → full watermark + all upgrade CTAs open pricing page
- *   - Agent tab → locked notice for Free users with upgrade CTA
+ *   - At  80 cages → amber warning + inline upgrade banner
+ *   - At 100 cages → full watermark + all upgrade CTAs open Stripe
+ *   - Agent tab → locked notice for Free users
+ *   - Account tab → paste license key → activate → watermark disappears
  */
 
-const UPGRADE_URL    = 'https://ai-cage-gamma.vercel.app/#pricing';
-const RELEASES_URL   = 'https://github.com/smartsniper31/ai-cage/releases';
-const VERSION_URL    = 'https://ai-cage-gamma.vercel.app/version.json';
-const FREE_LIMIT     = 100;
-const WARN_AT        = 80;
+import { checkLicense, activateLicense, deactivateLicense } from '@ai-cage/core';
+
+const STRIPE_URL   = 'https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00';
+const RELEASES_URL = 'https://github.com/smartsniper31/ai-cage/releases';
+const VERSION_URL  = 'https://ai-cage-gamma.vercel.app/version.json';
+const FREE_LIMIT   = 100;
+const WARN_AT      = 80;
+
+// Alias so all upgrade CTAs point to Stripe
+const UPGRADE_URL = STRIPE_URL;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +52,21 @@ interface ShadowLogResponse {
 interface ExportCSVResponse { csv: string; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Wraps chrome.storage.local as a StorageAdapter so the license engine
+ * (packages/core/src/license.ts) can read/write the Pro key.
+ * Zero network calls — 100% local storage.
+ */
+const chromeStorageAdapter = {
+  async getItem(key: string): Promise<string | null> {
+    const result = await chrome.storage.local.get(key);
+    const val = result[key];
+    return typeof val === 'string' ? val : null;
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    await chrome.storage.local.set({ [key]: value });
+  },
+};
 
 function setText(id: string, value: number | string): void {
   const el = document.getElementById(id);
@@ -426,6 +448,156 @@ async function checkForUpdates(installedVersion: string): Promise<void> {
   }
 }
 
+// ─── Account tab — Pro license activation (FIX B) ─────────────────────────────
+
+/**
+ * Renders the Account tab.
+ * Shows current plan + license key input.
+ * Calls checkLicense() from @ai-cage/core — 100% local, zero network.
+ */
+async function renderAccountTab(): Promise<void> {
+  // Get monthly count to pass to checkLicense
+  const resp = await chrome.runtime.sendMessage<
+    { type: string; tabId: number }, { monthlyPiiCaged?: number }
+  >({ type: 'GET_STATS', tabId: 0 }).catch(() => null);
+  const monthly = resp?.monthlyPiiCaged ?? 0;
+
+  const info = await checkLicense(chromeStorageAdapter, monthly);
+
+  // Update plan badge
+  const badgeEl = document.getElementById('plan-badge');
+  const detailEl = document.getElementById('plan-details');
+  const activationSection = document.getElementById('activation-section');
+  const proActiveSection  = document.getElementById('pro-active-section');
+  const progressWrap      = document.getElementById('free-progress-wrap');
+  const watermark         = document.getElementById('watermark');
+  const freeProgressWrap  = document.getElementById('free-progress-wrap');
+
+  if (info.tier === 'PRO' || info.tier === 'ENTERPRISE') {
+    // ── PRO active ──────────────────────────────────────────────────────────
+    if (badgeEl) {
+      badgeEl.textContent  = info.tier;
+      badgeEl.className    = 'plan-badge pro';
+    }
+    if (detailEl) {
+      detailEl.textContent = info.message;
+    }
+    // Show pro section, hide activation form
+    if (activationSection) activationSection.style.display = 'none';
+    if (proActiveSection)  proActiveSection.style.display  = 'block';
+
+    // Expiry info
+    const expiresEl = document.getElementById('pro-expires');
+    if (expiresEl && info.payload) {
+      const expDate = info.payload.expiresAt.slice(0, 10);
+      expiresEl.textContent = `License valid until ${expDate} — ${info.payload.customer}`;
+    }
+
+    // Hide free-tier UI on Overview
+    if (freeProgressWrap) freeProgressWrap.style.display = 'none';
+    if (watermark)        watermark.style.display         = 'none';
+
+    // Remove upgrade banners — Pro user doesn't need them
+    document.getElementById('upgrade-banner')?.classList.remove('show');
+    document.getElementById('agent-locked-notice') &&
+      (document.getElementById('agent-locked-notice')!.style.display = 'none');
+
+  } else {
+    // ── FREE / expired ───────────────────────────────────────────────────────
+    if (badgeEl) {
+      badgeEl.textContent = info.status === 'EXPIRED' ? 'EXPIRED' : 'FREE';
+      badgeEl.className   = info.status === 'EXPIRED' ? 'plan-badge exp' : 'plan-badge free';
+    }
+    if (detailEl) {
+      detailEl.innerHTML = info.status === 'EXPIRED'
+        ? `⚠️ Your license expired — <strong>renew to keep Pro features</strong>.`
+        : `Free tier: <strong>${monthly} / 100</strong> cages used this month.`;
+    }
+    if (activationSection) activationSection.style.display = 'block';
+    if (proActiveSection)  proActiveSection.style.display  = 'none';
+    if (freeProgressWrap)  freeProgressWrap.style.display  = 'block';
+  }
+}
+
+/**
+ * Shows a feedback message in the license msg area.
+ */
+function setLicenseMsg(text: string, type: 'ok' | 'error' | 'warn'): void {
+  const el = document.getElementById('license-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.className   = `license-msg show ${type}`;
+}
+
+/**
+ * Wires the Account tab buttons: Activate, Deactivate, Buy Pro.
+ * Called once from DOMContentLoaded.
+ */
+function wireAccountTab(): void {
+  // ── Activate button ────────────────────────────────────────────────────────
+  document.getElementById('license-activate-btn')
+    ?.addEventListener('click', async () => {
+      const input = document.getElementById('license-input') as HTMLInputElement | null;
+      const key   = input?.value.trim() ?? '';
+
+      if (!key) {
+        setLicenseMsg('Please paste your license key.', 'warn');
+        input?.focus();
+        return;
+      }
+
+      // Visual feedback while processing
+      const btn = document.getElementById('license-activate-btn') as HTMLButtonElement;
+      btn.disabled    = true;
+      btn.textContent = '⏳ Validating…';
+
+      const ok = await activateLicense(key, chromeStorageAdapter);
+
+      if (ok) {
+        input!.value = '';
+        input?.classList.remove('error');
+        input?.classList.add('success');
+        setLicenseMsg('✅ Pro license activated! Unlimited cages unlocked.', 'ok');
+        btn.textContent = '✅ Activate Pro';
+        btn.disabled    = false;
+        // Refresh the account tab to show Pro state
+        await renderAccountTab();
+        // Also refresh overview to hide watermark & progress bar
+        await renderOverview();
+      } else {
+        input?.classList.add('error');
+        setLicenseMsg(
+          '❌ Invalid or expired key. Check your email or contact support@ai-cage.io',
+          'error',
+        );
+        btn.textContent = '✅ Activate Pro';
+        btn.disabled    = false;
+      }
+    });
+
+  // ── Deactivate button ──────────────────────────────────────────────────────
+  document.getElementById('license-deactivate-btn')
+    ?.addEventListener('click', async () => {
+      const confirmed = confirm(
+        'Remove your Pro license key? You will revert to the Free tier (100 cages/month).',
+      );
+      if (!confirmed) return;
+
+      await deactivateLicense(chromeStorageAdapter);
+      setLicenseMsg('License removed. You are now on the Free tier.', 'warn');
+
+      // Refresh
+      await renderAccountTab();
+      await renderOverview();
+    });
+
+  // ── Buy Pro button ─────────────────────────────────────────────────────────
+  document.getElementById('buy-pro-btn')
+    ?.addEventListener('click', () => {
+      void chrome.tabs.create({ url: STRIPE_URL });
+    });
+}
+
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -474,6 +646,13 @@ document.addEventListener('DOMContentLoaded', () => {
     activateTab('agent');
     void renderAgentTab();
   });
+  document.getElementById('tab-account')?.addEventListener('click', () => {
+    activateTab('account');
+    void renderAccountTab();
+  });
+
+  // ── Wire Account tab buttons (activate / deactivate / buy) ──
+  wireAccountTab();
 
   // ── Export CSV ──
   document.getElementById('export-btn')
