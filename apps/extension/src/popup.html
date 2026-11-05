@@ -11,6 +11,8 @@
       --green-bg:   #f0fdf4;
       --red:        #dc2626;
       --red-bg:     #fef2f2;
+      --amber:      #d97706;
+      --amber-bg:   #fffbeb;
       --bg:         #f8fafc;
       --surface:    #ffffff;
       --text:       #0f172a;
@@ -35,9 +37,9 @@
       align-items: center;
       gap: 10px;
     }
-    .header-icon { font-size: 20px; }
-    .header-title { font-size: 15px; font-weight: 700; }
-    .header-sub   { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+    .header-icon    { font-size: 20px; }
+    .header-title   { font-size: 15px; font-weight: 700; }
+    .header-sub     { font-size: 10px; opacity: 0.8; margin-top: 1px; }
     .header-version { margin-left: auto; font-size: 10px; opacity: 0.65; }
 
     /* ── Status pill ── */
@@ -51,6 +53,7 @@
       font-size: 11px;
       font-weight: 600;
       text-align: center;
+      transition: background .2s, color .2s, border-color .2s;
     }
 
     /* ── Tabs ── */
@@ -98,8 +101,43 @@
       color: var(--green);
       line-height: 1;
     }
-    .stat-number.red { color: var(--red); }
+    .stat-number.red    { color: var(--red); }
+    .stat-number.amber  { color: var(--amber); }
     .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Progress bar (free tier) ── */
+    .free-progress-wrap {
+      margin-bottom: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .free-progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .free-progress-label { color: var(--muted); font-weight: 600; }
+    .free-progress-count { font-weight: 800; color: var(--green); }
+    .free-progress-count.warning { color: var(--amber); }
+    .free-progress-count.danger  { color: var(--red); }
+    .progress-bar-bg {
+      background: #e2e8f0;
+      border-radius: 999px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--green);
+      transition: width .4s ease, background .3s;
+    }
+    .progress-bar-fill.warning { background: var(--amber); }
+    .progress-bar-fill.danger  { background: var(--red); }
 
     /* ── Top sites ── */
     .section-label {
@@ -110,9 +148,7 @@
       letter-spacing: 0.06em;
       margin-bottom: 4px;
     }
-    #top-sites {
-      list-style: none;
-    }
+    #top-sites { list-style: none; }
     #top-sites li {
       display: flex;
       justify-content: space-between;
@@ -130,12 +166,49 @@
     .shadow-item {
       padding: 7px 0;
       border-bottom: 1px solid var(--border);
+      cursor: pointer;
     }
     .shadow-item:last-child { border-bottom: none; }
-    .shadow-site { font-weight: 700; font-size: 12px; color: var(--red); }
-    .shadow-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
-    .shadow-detail { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px 0; line-height: 1.6; }
+    .shadow-site   { font-weight: 700; font-size: 12px; color: var(--red); }
+    .shadow-meta   { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    .shadow-detail { font-size: 10px; color: var(--muted); margin-top: 2px;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shadow-detail.expanded { white-space: normal; overflow: visible; }
+    .empty {
+      font-size: 12px; color: var(--muted);
+      text-align: center; padding: 16px 0; line-height: 1.7;
+    }
+
+    /* ── Upgrade banner (inline CTA) ── */
+    .upgrade-banner {
+      background: linear-gradient(135deg, #15803d, #16a34a);
+      color: #fff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .upgrade-banner.show { display: block; }
+    .upgrade-banner-title {
+      font-size: 13px; font-weight: 800; margin-bottom: 3px;
+    }
+    .upgrade-banner-sub {
+      font-size: 11px; opacity: .88; margin-bottom: 10px; line-height: 1.4;
+    }
+    .upgrade-banner-btn {
+      display: inline-block;
+      background: #fff;
+      color: #15803d;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 16px;
+      border-radius: 7px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .15s;
+    }
+    .upgrade-banner-btn:hover { opacity: .9; }
 
     /* ── Footer ── */
     .footer {
@@ -159,10 +232,53 @@
       white-space: nowrap;
     }
     .export-btn:hover { opacity: 0.9; }
+    .help-btn {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #166534;
+      padding: 0 2px;
+      line-height: 1;
+      text-decoration: none;
+    }
+
+    /* ── Locked feature badge ── */
+    .locked-badge {
+      display: inline-block;
+      background: #e2e8f0;
+      color: #64748b;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-left: 6px;
+    }
+
+    /* ── Watermark (100 cages limit) ── */
+    #watermark {
+      display: none;
+      padding: 10px 14px;
+      background: var(--amber-bg);
+      color: #92400e;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      border-top: 1px solid #fde68a;
+      line-height: 1.5;
+    }
+    #watermark a {
+      color: #92400e;
+      text-decoration: underline;
+      font-weight: 800;
+    }
   </style>
 </head>
 <body>
 
+  <!-- ── Header ── -->
   <div class="header">
     <span class="header-icon" aria-hidden="true">🔒</span>
     <div>
@@ -172,16 +288,45 @@
     <span class="header-version" id="popup-version"></span>
   </div>
 
+  <!-- ── Status pill ── -->
   <div class="status-pill" id="status-text">Loading…</div>
 
+  <!-- ── Tabs ── -->
   <div class="tabs" role="tablist">
     <button class="tab-btn" id="tab-overview" role="tab" aria-selected="true">📊 Overview</button>
     <button class="tab-btn" id="tab-shadow"   role="tab" aria-selected="false">👁️ Shadow AI</button>
     <button class="tab-btn" id="tab-agent"    role="tab" aria-selected="false">🤖 Agent</button>
   </div>
 
-  <!-- Overview pane -->
+  <!-- ══════════════════════════════════════════════
+       OVERVIEW PANE
+  ══════════════════════════════════════════════ -->
   <div class="tab-pane" id="pane-overview">
+
+    <!-- Free tier progress bar -->
+    <div class="free-progress-wrap" id="free-progress-wrap">
+      <div class="free-progress-header">
+        <span class="free-progress-label">Free tier usage this month</span>
+        <span class="free-progress-count" id="free-progress-count">0 / 100</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Inline upgrade banner (shown at 80+ cages) -->
+    <div class="upgrade-banner" id="upgrade-banner">
+      <div class="upgrade-banner-title">⚡ Almost at your limit!</div>
+      <div class="upgrade-banner-sub">
+        You're running low on free cages this month.<br>
+        Upgrade to Pro for <strong>unlimited protection</strong> — €5/user/month.
+      </div>
+      <button class="upgrade-banner-btn" id="upgrade-banner-btn">
+        🚀 Upgrade to Pro →
+      </button>
+    </div>
+
+    <!-- Stats grid -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-number" id="monthly-caged">—</div>
@@ -193,36 +338,61 @@
       </div>
       <div class="stat-card">
         <div class="stat-number" id="session-count">—</div>
-        <div class="stat-label">Caged this session</div>
+        <div class="stat-label">This session</div>
       </div>
       <div class="stat-card">
         <div class="stat-number" id="tab-count">—</div>
-        <div class="stat-label">Caged this tab</div>
+        <div class="stat-label">This tab</div>
       </div>
     </div>
 
     <div class="section-label">Top AI Sites</div>
-    <ul id="top-sites"><li class="empty">Aucune activité enregistrée.<br><strong style="color:#15803d">Allez sur ChatGPT et tapez votre email → regardez la protection en action.</strong></li></ul>
+    <ul id="top-sites">
+      <li class="empty">
+        No activity yet.<br>
+        <strong style="color:#15803d">Go to ChatGPT and type your email — watch it get protected.</strong>
+      </li>
+    </ul>
   </div>
 
-  <!-- Shadow AI pane -->
+  <!-- ══════════════════════════════════════════════
+       SHADOW AI PANE
+  ══════════════════════════════════════════════ -->
   <div class="tab-pane" id="pane-shadow" style="display:none">
-    <p style="font-size:11px;color:#64748b;margin-bottom:8px;">
-      These SaaS tools made requests to AI APIs from your browser.
+    <p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6">
+      These tools made requests to AI APIs from your browser.<br>
       <strong>88% of AI traffic is invisible</strong> to most companies.
     </p>
     <ul id="shadow-list"><li class="empty">Loading…</li></ul>
   </div>
 
-  <!-- Agent pane -->
+  <!-- ══════════════════════════════════════════════
+       AGENT PANE
+  ══════════════════════════════════════════════ -->
   <div class="tab-pane" id="pane-agent" style="display:none">
+
+    <!-- Locked notice for Free tier -->
+    <div id="agent-locked-notice" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:4px">
+        🔒 Agent Cage — Pro Feature
+      </div>
+      <div style="font-size:12px;color:#92400e;line-height:1.5;margin-bottom:10px">
+        Detects prompt injection attacks and blocks rogue AI agents before they execute dangerous tool calls.
+      </div>
+      <button class="upgrade-banner-btn" id="agent-upgrade-btn"
+              style="background:#d97706;color:#fff;font-size:12px;font-weight:800;
+                     padding:7px 16px;border-radius:7px;border:none;cursor:pointer;">
+        🚀 Upgrade to unlock Agent Cage →
+      </button>
+    </div>
+
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-number red"   id="agent-blocked">—</div>
+        <div class="stat-number red" id="agent-blocked">—</div>
         <div class="stat-label">Injections blocked</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number" style="color:#d97706" id="agent-exfil">—</div>
+        <div class="stat-number amber" id="agent-exfil">—</div>
         <div class="stat-label">Exfil attempts</div>
       </div>
     </div>
@@ -236,16 +406,21 @@
     </div>
   </div>
 
+  <!-- ── Footer ── -->
   <div class="footer">
-    <span class="footer-text" aria-hidden="true">✅</span>
-    <span class="footer-text">Zero data leaves your device.</span>
-    <button class="export-btn" id="export-btn" title="Export audit log as CSV for your compliance auditor">
+    <span class="footer-text">✅ Zero data leaves your device.</span>
+    <a href="https://ai-cage-gamma.vercel.app/#privacy" target="_blank"
+       class="help-btn" title="Help & Support — ai-cage-gamma.vercel.app" aria-label="Help">❓</a>
+    <button class="export-btn" id="export-btn"
+            title="Export audit log as CSV for your compliance team">
       📄 Export CSV
     </button>
   </div>
 
-  <div id="watermark" style="display:none;padding:6px 12px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;text-align:center;border-top:1px solid #fde68a">
-    🔶 AI CAGE Free — limite 100 cages/mois. <a href="https://ai-cage-gamma.vercel.app/#pricing" id="upgrade-link" target="_blank" rel="noopener noreferrer" style="color:#92400e;text-decoration:underline;font-weight:800">🚀 Passer à Pro — 5€/mois</a>
+  <!-- ── Free limit reached watermark ── -->
+  <div id="watermark">
+    🔶 <strong>Free limit reached</strong> — 100 cages used this month.<br>
+    <a href="#" id="upgrade-link">🚀 Upgrade to Pro — unlimited cages · €5/month</a>
   </div>
 
   <script src="popup.js"></script>

@@ -218,7 +218,7 @@ function createStatusIndicator(): void {
   const el = document.createElement('div');
   el.id = 'cage-status';
   el.className = 'idle';
-  el.innerHTML = '<div class="dot"></div><span id="cage-status-text">🔒 AI CAGE actif</span>';
+  el.innerHTML = '<div class="dot"></div><span id="cage-status-text">🔒 AI CAGE active</span>';
   root.appendChild(el);
 }
 
@@ -242,9 +242,9 @@ function updateStatus(state: 'idle' | 'caged' | 'warning', text?: string): void 
   if (text) {
     textEl.textContent = text;
   } else {
-    if (state === 'idle')    textEl.textContent = '🔒 AI CAGE actif';
-    if (state === 'caged')   textEl.textContent = `🔒 ${sessionTotal} protégé${sessionTotal > 1 ? 's' : ''}`;
-    if (state === 'warning') textEl.textContent = '⚠️ Vérifiez le fichier';
+    if (state === 'idle')    textEl.textContent = '🔒 AI CAGE active';
+    if (state === 'caged')   textEl.textContent = `🔒 ${sessionTotal} protected`;
+    if (state === 'warning') textEl.textContent = '⚠️ Check before sending';
   }
 
   // After caged/warning → revert to idle after 3s
@@ -281,8 +281,8 @@ function showNetworkPanel(
         <div style="font-size:12px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.preview}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cager</button>
-        <button class="gs" data-idx="${idx}" data-act="pass">Ignorer</button>
+        <button class="bs" data-idx="${idx}" data-act="cage">🔒 Cage</button>
+        <button class="gs" data-idx="${idx}" data-act="pass">Skip</button>
       </div>
     </div>`).join('');
 
@@ -292,17 +292,17 @@ function showNetworkPanel(
     <div class="ch amber">
       <span style="font-size:16px">⚠️</span>
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13px">Données sensibles détectées !</div>
-        <div style="font-size:11px;opacity:.9">${items.length} élément${items.length > 1 ? 's' : ''} — choisissez une action</div>
+        <div style="font-weight:800;font-size:13px">Sensitive data detected!</div>
+        <div style="font-size:11px;opacity:.9">${items.length} item${items.length > 1 ? 's' : ''} — choose an action</div>
       </div>
       <button id="cage-close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:20px;padding:2px 6px">×</button>
     </div>
     <div class="cl">${itemsHtml}</div>
     <div class="ca">
-      <button class="bg" id="cage-all">🔒 Tout cager &amp; envoyer</button>
-      <button class="gg" id="pass-all">⚡ Envoyer sans protection</button>
+      <button class="bg" id="cage-all">🔒 Cage All &amp; Send</button>
+      <button class="gg" id="pass-all">⚡ Send Without Protection</button>
     </div>
-    <div class="cw">⚠️ "Envoyer sans protection" transmet vos vraies données à l'IA.</div>`;
+    <div class="cw">⚠️ "Send Without Protection" sends your real data to the AI.</div>`;
   root.appendChild(panel);
 
   let sent = false;
@@ -317,7 +317,7 @@ function showNetworkPanel(
       updateBadge();
       updateStatus('caged');  // FIX 2: reflect cage in status pill
       const types = [...new Set(cageItems.map(i => i.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2).join(', ');
-      showToast(`🔒 ${cageItems.length} élément${cageItems.length > 1 ? 's' : ''} protégé${cageItems.length > 1 ? 's' : ''} (${types})`);
+      showToast(`🔒 ${cageItems.length} item${cageItems.length > 1 ? 's' : ''} protected (${types})`);
       try {
         void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
       } catch { /* ignore */ }
@@ -505,7 +505,7 @@ function handlePrompt(el: HTMLElement): void {
   // P0-7: Show toast confirmation so Karim knows it worked
   const typeLabels = [...new Set(entities.map(e => e.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2);
   const more       = entities.length > 2 ? ` +${entities.length - 2}` : '';
-  showToast(`🔒 ${totalCaged} protégé${totalCaged > 1 ? 's' : ''} (${typeLabels.join(', ')}${more})`);
+  showToast(`🔒 ${totalCaged} protected (${typeLabels.join(', ')}${more})`);
 
   try {
     void chrome.runtime.sendMessage({
@@ -573,11 +573,10 @@ window.addEventListener('message', (event) => {
 
   // Response tokens restored locally
   if (d?.type === 'AI_CAGE_NETWORK_RESTORED') {
-    updateStatus('idle', '✅ Données restaurées');
-    showToast('✅ Données restaurées localement — l\'IA n\'a jamais vu l\'original');
+    updateStatus('idle', '✅ Data restored locally');
+    showToast('✅ Data restored — the AI never saw your real information');
   }
 
-  // Prompt injection detected by injected.ts
   if (d?.type === 'AI_CAGE_INJECTION_DETECTED') {
     try {
       void chrome.runtime.sendMessage({
@@ -587,14 +586,13 @@ window.addEventListener('message', (event) => {
         blocked: true,
       });
     } catch { /* ignore */ }
-    updateStatus('warning', '🚫 Injection bloquée');
-    showToast('🚫 Injection bloquée', 'warning');
+    updateStatus('warning', '🚫 Injection blocked');
+    showToast('🚫 Prompt injection attack blocked', 'warning');
   }
 
-  // P0-9: File upload warning from injected.ts
   if (d?.type === 'AI_CAGE_FILE_UPLOAD_WARNING') {
-    updateStatus('warning', '⚠️ Fichier — vérifiez avant d\'envoyer');
-    showToast('📄 Fichier détecté — vérifiez qu\'il ne contient pas de données sensibles avant d\'envoyer', 'warning', 5000);
+    updateStatus('warning', '⚠️ File detected — check before sending');
+    showToast('📄 File upload detected — verify it contains no sensitive data before sending', 'warning', 5000);
   }
 });
 

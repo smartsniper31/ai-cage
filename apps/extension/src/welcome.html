@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bienvenue sur AI CAGE</title>
+  <title>Welcome to AI CAGE</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -20,11 +20,13 @@
       background: #fff;
       border-radius: 20px;
       padding: 40px 44px;
-      max-width: 560px;
+      max-width: 580px;
       width: 100%;
-      box-shadow: 0 8px 40px rgba(0,0,0,.1);
+      box-shadow: 0 8px 40px rgba(0,0,0,.10);
       text-align: center;
     }
+
+    /* ── Header ── */
     .badge {
       display: inline-block;
       background: #dcfce7;
@@ -36,24 +38,20 @@
       margin-bottom: 20px;
       border: 1px solid #bbf7d0;
     }
-    h1 {
-      font-size: 26px;
-      font-weight: 800;
-      margin-bottom: 8px;
-      color: #0f172a;
-    }
+    h1 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
     .subtitle {
       font-size: 14px;
       color: #64748b;
       margin-bottom: 32px;
       line-height: 1.6;
     }
-    /* Steps */
+
+    /* ── Steps ── */
     .steps {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 14px;
+      margin-bottom: 28px;
       text-align: left;
     }
     .step {
@@ -67,8 +65,7 @@
     }
     .step-num {
       flex-shrink: 0;
-      width: 32px;
-      height: 32px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       background: #15803d;
       color: #fff;
@@ -78,17 +75,8 @@
       font-size: 14px;
       font-weight: 800;
     }
-    .step-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 2px;
-    }
-    .step-desc {
-      font-size: 12px;
-      color: #64748b;
-      line-height: 1.5;
-    }
+    .step-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .step-desc  { font-size: 12px; color: #64748b; line-height: 1.6; }
     .step-desc code {
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
@@ -98,13 +86,14 @@
       font-family: monospace;
       font-size: 11px;
     }
-    /* Demo strip */
+
+    /* ── Demo strip ── */
     .demo {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 16px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       text-align: left;
     }
     .demo-label {
@@ -113,7 +102,7 @@
       text-transform: uppercase;
       letter-spacing: .06em;
       color: #94a3b8;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .demo-row {
       display: flex;
@@ -125,28 +114,54 @@
       background: #fef2f2;
       border: 1px solid #fecaca;
       color: #991b1b;
-      padding: 6px 10px;
+      padding: 7px 10px;
       border-radius: 7px;
       font-family: monospace;
       flex: 1;
     }
-    .demo-arrow { color: #94a3b8; font-size: 16px; flex-shrink: 0; }
+    .demo-arrow { color: #94a3b8; font-size: 18px; flex-shrink: 0; }
     .demo-after {
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
       color: #15803d;
-      padding: 6px 10px;
+      padding: 7px 10px;
       border-radius: 7px;
       font-family: monospace;
       font-weight: 700;
       flex: 1;
     }
-    /* CTA */
+
+    /* ── Free plan highlight ── */
+    .free-plan {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .free-plan-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #15803d;
+      margin-bottom: 6px;
+    }
+    .free-plan ul {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .free-plan li { font-size: 12px; color: #374151; }
+    .free-plan .locked { color: #94a3b8; }
+
+    /* ── CTAs ── */
     .cta-group {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
       justify-content: center;
+      margin-bottom: 20px;
     }
     .btn-primary {
       background: #15803d;
@@ -159,6 +174,7 @@
       cursor: pointer;
       text-decoration: none;
       display: inline-block;
+      transition: background .15s;
     }
     .btn-primary:hover { background: #166534; }
     .btn-secondary {
@@ -172,14 +188,12 @@
       cursor: pointer;
       text-decoration: none;
       display: inline-block;
+      transition: background .15s;
     }
     .btn-secondary:hover { background: #e2e8f0; }
-    /* Footer */
-    .footer-note {
-      margin-top: 24px;
-      font-size: 11px;
-      color: #94a3b8;
-    }
+
+    /* ── Footer ── */
+    .footer-note { font-size: 11px; color: #94a3b8; line-height: 1.6; }
     .version-badge {
       display: inline-block;
       background: #f1f5f9;
@@ -195,64 +209,81 @@
   <div class="card">
 
     <!-- Header -->
-    <div class="badge">✅ Installation réussie</div>
-    <h1>🔒 Bienvenue sur AI CAGE</h1>
+    <div class="badge">✅ Successfully installed</div>
+    <h1>🔒 Welcome to AI CAGE</h1>
     <p class="subtitle">
-      Votre garde-fou contre les fuites de données vers les IA.<br>
-      100% local — aucune donnée ne quitte votre appareil.
+      Your personal firewall for AI. Every prompt you send to ChatGPT,
+      Claude, Gemini, Meta AI, or any other AI tool is scanned and
+      protected <strong>before it leaves your device</strong>.
     </p>
 
-    <!-- Steps -->
+    <!-- 3 steps -->
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
         <div>
-          <div class="step-title">Épinglez l'extension dans Chrome</div>
+          <div class="step-title">Pin the extension to your Chrome toolbar</div>
           <div class="step-desc">
-            Cliquez sur l'icône puzzle 🧩 en haut à droite → épinglez <strong>AI CAGE</strong>.
-            Vous verrez le cadenas 🔒 apparaître dans la barre.
+            Click the puzzle icon 🧩 in the top-right of Chrome
+            → find <strong>AI CAGE</strong> → click the pin icon.
+            The 🔒 lock will appear in your toolbar permanently.
           </div>
         </div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <div>
-          <div class="step-title">Allez sur ChatGPT, Claude ou DeepSeek</div>
+          <div class="step-title">Go to any AI — ChatGPT, Claude, Meta AI…</div>
           <div class="step-desc">
-            Ouvrez n'importe quelle IA. AI CAGE s'active automatiquement sur tous les sites IA.
+            AI CAGE activates automatically on every AI chat site.
+            You will see the <strong>🔒 AI CAGE active</strong> indicator
+            in the bottom-right corner of the page.
           </div>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div>
-          <div class="step-title">Tapez un message avec des données sensibles</div>
+          <div class="step-title">Type a message with sensitive data and press Enter</div>
           <div class="step-desc">
-            Essayez : <code>Mon email est test@company.tn</code><br>
-            AI CAGE remplace automatiquement par <code>[CAGED_EMAIL_1]</code> avant l'envoi.
-            Un toast vert confirme la protection. L'IA ne voit jamais votre vrai email.
+            Try: <code>My email is test@company.com and my IBAN is TN591000603518</code><br>
+            AI CAGE replaces it with <code>[CAGED_EMAIL_1]</code> and <code>[CAGED_IBAN_2]</code>
+            before sending. A green toast confirms the protection.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Live demo mockup -->
+    <!-- Demo -->
     <div class="demo">
-      <div class="demo-label">Ce que vous tapez → Ce que l'IA reçoit</div>
+      <div class="demo-label">What you type → What the AI receives</div>
       <div class="demo-row">
-        <div class="demo-before">Mon IBAN TN5910006035183598</div>
+        <div class="demo-before">Send invoice to ahmed@co.tn, IBAN TN5910…</div>
         <div class="demo-arrow">→</div>
-        <div class="demo-after">Mon IBAN [CAGED_IBAN_1]</div>
+        <div class="demo-after">Send invoice to [CAGED_EMAIL_1], IBAN [CAGED_IBAN_2]</div>
       </div>
+    </div>
+
+    <!-- Free plan summary -->
+    <div class="free-plan">
+      <div class="free-plan-title">🆓 Your Free Plan includes:</div>
+      <ul>
+        <li>✅ 15 PII types detected</li>
+        <li>✅ 100 protections / month</li>
+        <li>✅ Shadow AI detection</li>
+        <li>✅ Chrome + Firefox + Edge</li>
+        <li class="locked">🔒 Agent Cage — Pro only</li>
+        <li class="locked">🔒 Unlimited cages — Pro only</li>
+      </ul>
     </div>
 
     <!-- CTAs -->
     <div class="cta-group">
       <a href="https://chatgpt.com" target="_blank" class="btn-primary">
-        🚀 Tester sur ChatGPT maintenant
+        🚀 Test it on ChatGPT now →
       </a>
-      <a href="https://ai-cage-gamma.vercel.app" target="_blank" class="btn-secondary">
-        📖 Voir la documentation
+      <a href="https://ai-cage-gamma.vercel.app/#pricing" target="_blank" class="btn-secondary">
+        ⭐ Upgrade to Pro — €5/mo
       </a>
     </div>
 
@@ -261,12 +292,12 @@
       🇹🇳 Made in Tunisia &nbsp;·&nbsp;
       <span class="version-badge" id="v">v0.6.0</span>
       &nbsp;·&nbsp;
-      <a href="mailto:support@ai-cage.io" style="color:#15803d;text-decoration:none">support@ai-cage.io</a>
+      Questions? <a href="mailto:support@ai-cage.io" style="color:#15803d">support@ai-cage.io</a>
     </p>
+
   </div>
 
   <script>
-    // Inject real version from manifest
     try {
       var v = chrome.runtime.getManifest().version;
       var el = document.getElementById('v');
