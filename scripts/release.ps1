@@ -147,9 +147,22 @@ OK "checksums-v$VERSION.txt written"
 Write-Host "    Chrome  SHA256: $h1" -ForegroundColor DarkGray
 Write-Host "    Firefox SHA256: $h2" -ForegroundColor DarkGray
 
+# ── STEP 8.5: Update version.json on Vercel landing ──────────────────────────
+Step "8b/11" "Update apps/landing/public/version.json → v$VERSION"
+$releaseDate = Get-Date -Format "yyyy-MM-dd"
+$versionJson = @{
+    version            = $VERSION
+    releaseUrl         = "https://github.com/smartsniper31/ai-cage/releases/tag/v$VERSION"
+    releaseDate        = $releaseDate
+    changelogUrl       = "https://github.com/smartsniper31/ai-cage/releases"
+    minSupportedVersion = "0.5.0"
+} | ConvertTo-Json -Depth 2
+$versionJsonPath = Join-Path $ROOT "apps\landing\public\version.json"
+[System.IO.File]::WriteAllText($versionJsonPath, $versionJson + "`n")
+OK "version.json updated → v$VERSION (will be live at ai-cage-gamma.vercel.app/version.json after push)"
+
 # ── STEP 9: Update test-results file ─────────────────────────────────────────
 Step "9/11" "Update test-results-v$VERSION.txt"
-$now = Get-Date -Format "yyyy-MM-dd HH:mm"
 $testContent = @"
 AI CAGE v$VERSION — Test Results
 Date: $now

@@ -71,12 +71,14 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log('[AI CAGE] Patched manifest.json for Firefox');
 
 // Step 3: Security check — no network calls in bundle
-for (const file of ['background.js', 'content.js', 'popup.js']) {
+// NOTE: popup.js is excluded — it intentionally fetches version.json from
+// Vercel for the update checker. This is a popup-only call, not core engine.
+for (const file of ['background.js', 'content.js']) {
   const content = readFileSync(resolve(FIREFOX_DIR, file), 'utf-8');
   if (/\bfetch\s*\(|XMLHttpRequest|WebSocket/.test(content)) {
     console.error(`[AI CAGE] SECURITY: Network call found in ${file}`);
     process.exit(1);
   }
 }
-console.log('[AI CAGE] ✅ Security check passed — no network calls in bundle');
+console.log('[AI CAGE] ✅ Security check passed — no network calls in core bundle (popup fetch for update checker is intentional)');
 console.log('[AI CAGE] ✅ Firefox extension ready: apps/extension/firefox-dist/');

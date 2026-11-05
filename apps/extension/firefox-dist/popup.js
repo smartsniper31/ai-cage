@@ -1,6 +1,8 @@
 (function() {
   "use strict";
   const UPGRADE_URL = "https://ai-cage-gamma.vercel.app/#pricing";
+  const RELEASES_URL = "https://github.com/smartsniper31/ai-cage/releases";
+  const VERSION_URL = "https://ai-cage-gamma.vercel.app/version.json";
   const FREE_LIMIT = 100;
   const WARN_AT = 80;
   function setText(id, value) {
@@ -227,14 +229,69 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-  document.addEventListener("DOMContentLoaded", () => {
-    var _a, _b, _c, _d, _e, _f;
+  async function checkForUpdates(installedVersion) {
+    var _a;
     try {
-      const { version } = chrome.runtime.getManifest();
-      const el = document.getElementById("popup-version");
-      if (el) el.textContent = `v${version}`;
+      const res = await fetch(VERSION_URL, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const latest = data.version ?? "";
+      if (!latest || latest === installedVersion) return;
+      const toNum = (v) => v.split(".").map(Number);
+      const [iMaj, iMin, iPat] = toNum(installedVersion);
+      const [lMaj, lMin, lPat] = toNum(latest);
+      const isNewer = lMaj > iMaj || lMaj === iMaj && lMin > iMin || lMaj === iMaj && lMin === iMin && lPat > iPat;
+      if (!isNewer) return;
+      const badge = document.getElementById("update-badge");
+      if (badge) {
+        badge.textContent = `🆕 v${latest} available`;
+        badge.classList.add("show");
+        badge.addEventListener("click", () => {
+          void chrome.tabs.create({ url: data.releaseUrl ?? RELEASES_URL });
+        });
+      }
+      const notice = document.createElement("div");
+      notice.id = "update-notice";
+      notice.style.cssText = [
+        "margin:8px 12px 0",
+        "background:#eff6ff",
+        "border:1px solid #bfdbfe",
+        "border-radius:8px",
+        "padding:8px 12px",
+        "font-size:11px",
+        "color:#1e40af",
+        "display:flex",
+        "align-items:center",
+        "justify-content:space-between",
+        "gap:8px"
+      ].join(";");
+      notice.innerHTML = `
+      <span>🆕 <strong>v${latest}</strong> is available — you have v${installedVersion}</span>
+      <button id="update-now-btn"
+              style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;
+                     padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;
+                     white-space:nowrap">
+        Update now →
+      </button>`;
+      const statusPill = document.getElementById("status-text");
+      statusPill == null ? void 0 : statusPill.insertAdjacentElement("afterend", notice);
+      (_a = document.getElementById("update-now-btn")) == null ? void 0 : _a.addEventListener("click", () => {
+        void chrome.tabs.create({ url: data.releaseUrl ?? RELEASES_URL });
+      });
     } catch {
     }
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    var _a, _b, _c, _d, _e, _f;
+    let installedVersion = "0.6.0";
+    try {
+      const manifest = chrome.runtime.getManifest();
+      installedVersion = manifest.version;
+      const vEl = document.getElementById("popup-version");
+      if (vEl) vEl.textContent = `v${installedVersion}`;
+    } catch {
+    }
+    void checkForUpdates(installedVersion);
     const upgradeLink = document.getElementById("upgrade-link");
     if (upgradeLink) {
       upgradeLink.href = UPGRADE_URL;

@@ -14,9 +14,11 @@
  *   - Agent tab → locked notice for Free users with upgrade CTA
  */
 
-const UPGRADE_URL = 'https://ai-cage-gamma.vercel.app/#pricing';
-const FREE_LIMIT  = 100;
-const WARN_AT     = 80;   // show upgrade banner 20 cages before limit
+const UPGRADE_URL    = 'https://ai-cage-gamma.vercel.app/#pricing';
+const RELEASES_URL   = 'https://github.com/smartsniper31/ai-cage/releases';
+const VERSION_URL    = 'https://ai-cage-gamma.vercel.app/version.json';
+const FREE_LIMIT     = 100;
+const WARN_AT        = 80;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -350,16 +352,95 @@ async function exportCSV(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+// ─── Update checker ───────────────────────────────────────────────────────────
+/**
+ * Fetches version.json from Vercel (static file, no user data sent).
+ * Compares with installed version from manifest.
+ * If newer version available → shows blue "🆕 Update available" badge in header.
+ *
+ * Privacy note: this fetch sends ZERO user data — it only reads a public
+ * static file. It runs only in the popup context, never in content.ts or core.
+ * The request is indistinguishable from a normal page visit.
+ */
+async function checkForUpdates(installedVersion: string): Promise<void> {
+  try {
+    const res  = await fetch(VERSION_URL, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json() as { version?: string; releaseUrl?: string };
+    const latest = data.version ?? '';
+    if (!latest || latest === installedVersion) return;
+
+    // Compare semver simply: split by '.' and compare numerically
+    const toNum = (v: string) => v.split('.').map(Number);
+    const [iMaj, iMin, iPat] = toNum(installedVersion);
+    const [lMaj, lMin, lPat] = toNum(latest);
+    const isNewer =
+      lMaj > iMaj ||
+      (lMaj === iMaj && lMin > iMin) ||
+      (lMaj === iMaj && lMin === iMin && lPat > iPat);
+    if (!isNewer) return;
+
+    // Show update badge
+    const badge = document.getElementById('update-badge');
+    if (badge) {
+      badge.textContent = `🆕 v${latest} available`;
+      badge.classList.add('show');
+      badge.addEventListener('click', () => {
+        void chrome.tabs.create({ url: data.releaseUrl ?? RELEASES_URL });
+      });
+    }
+
+    // Also show a notice below the status pill
+    const notice = document.createElement('div');
+    notice.id = 'update-notice';
+    notice.style.cssText = [
+      'margin:8px 12px 0',
+      'background:#eff6ff',
+      'border:1px solid #bfdbfe',
+      'border-radius:8px',
+      'padding:8px 12px',
+      'font-size:11px',
+      'color:#1e40af',
+      'display:flex',
+      'align-items:center',
+      'justify-content:space-between',
+      'gap:8px',
+    ].join(';');
+    notice.innerHTML = `
+      <span>🆕 <strong>v${latest}</strong> is available — you have v${installedVersion}</span>
+      <button id="update-now-btn"
+              style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;
+                     padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;
+                     white-space:nowrap">
+        Update now →
+      </button>`;
+    const statusPill = document.getElementById('status-text');
+    statusPill?.insertAdjacentElement('afterend', notice);
+    document.getElementById('update-now-btn')
+      ?.addEventListener('click', () => {
+        void chrome.tabs.create({ url: data.releaseUrl ?? RELEASES_URL });
+      });
+
+  } catch {
+    // Network unavailable or Vercel down — fail silently, never block popup
+  }
+}
+
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // P0-1: dynamic version from manifest
+  // ── Version + update check ───────────────────────────────────────────────
+  let installedVersion = '0.6.0';
   try {
-    const { version } = chrome.runtime.getManifest();
-    const el = document.getElementById('popup-version');
-    if (el) el.textContent = `v${version}`;
+    const manifest = chrome.runtime.getManifest();
+    installedVersion = manifest.version;
+    const vEl = document.getElementById('popup-version') as HTMLAnchorElement | null;
+    if (vEl) vEl.textContent = `v${installedVersion}`;
   } catch { /* ignore in tests */ }
+
+  // Check for updates silently — fails gracefully if offline
+  void checkForUpdates(installedVersion);
 
   // ── Upgrade link wiring — every CTA in the popup opens the pricing page ──
 

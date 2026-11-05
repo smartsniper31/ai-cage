@@ -40,7 +40,38 @@
     .header-icon    { font-size: 20px; }
     .header-title   { font-size: 15px; font-weight: 700; }
     .header-sub     { font-size: 10px; opacity: 0.8; margin-top: 1px; }
-    .header-version { margin-left: auto; font-size: 10px; opacity: 0.65; }
+    .header-version {
+      margin-left: auto;
+      font-size: 10px;
+      opacity: 0.65;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      transition: opacity .15s;
+    }
+    .header-version:hover { opacity: 1; }
+
+    /* ── Update available badge ── */
+    .update-badge {
+      display: none;
+      margin-left: 6px;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+      cursor: pointer;
+      border: none;
+      letter-spacing: .03em;
+      white-space: nowrap;
+      animation: badge-pulse 2s ease infinite;
+    }
+    .update-badge.show { display: inline-block; }
+    @keyframes badge-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(14,165,233,.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(14,165,233,0); }
+    }
 
     /* ── Status pill ── */
     .status-pill {
@@ -285,7 +316,19 @@
       <div class="header-title">AI CAGE</div>
       <div class="header-sub">Enterprise AI Data Protection</div>
     </div>
-    <span class="header-version" id="popup-version"></span>
+    <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+      <a id="popup-version"
+         href="https://github.com/smartsniper31/ai-cage/releases"
+         target="_blank"
+         rel="noopener noreferrer"
+         class="header-version"
+         title="View all releases on GitHub"></a>
+      <button id="update-badge"
+              class="update-badge"
+              title="A new version is available — click to update">
+        🆕 Update available
+      </button>
+    </div>
   </div>
 
   <!-- ── Status pill ── -->
