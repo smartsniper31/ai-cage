@@ -17,6 +17,12 @@ export default defineConfig({
           resolve(__dirname, 'dist/install.html'),
         );
         console.log('[landing] ✅ install.html copied to dist/');
+
+        copyFileSync(
+          resolve(__dirname, 'success.html'),
+          resolve(__dirname, 'dist/success.html'),
+        );
+        console.log('[landing] ✅ success.html copied to dist/');
       },
     },
   ],

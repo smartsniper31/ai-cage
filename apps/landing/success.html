@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to AI CAGE Pro — Payment Successful</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f0fdf4;
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px 44px;
+      max-width: 580px;
+      width: 100%;
+      box-shadow: 0 8px 40px rgba(0,0,0,.10);
+      text-align: center;
+    }
+    .success-icon {
+      width: 64px; height: 64px;
+      background: #dcfce7;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 20px;
+    }
+    h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; color: #15803d; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 32px; line-height: 1.6; }
+
+    /* ── Steps ── */
+    .steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; text-align: left; }
+    .step {
+      display: flex; align-items: flex-start; gap: 14px;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .step-num {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+      background: #15803d; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800;
+    }
+    .step-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .step-desc  { font-size: 12px; color: #64748b; line-height: 1.6; }
+    .step-desc code {
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      color: #15803d; padding: 1px 6px; border-radius: 4px;
+      font-family: monospace; font-size: 11px;
+    }
+
+    /* ── Key display ── */
+    .key-box {
+      background: #f0fdf4; border: 1.5px solid #15803d;
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 24px; text-align: left;
+    }
+    .key-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                 letter-spacing: .06em; color: #15803d; margin-bottom: 6px; }
+    .key-value {
+      font-family: monospace; font-size: 13px; color: #0f172a;
+      word-break: break-all; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: 8px 10px; margin-bottom: 8px;
+    }
+    .copy-key-btn {
+      background: #15803d; color: #fff; border: none;
+      border-radius: 6px; padding: 6px 14px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .copy-key-btn:hover { background: #166534; }
+
+    /* ── Email instructions ── */
+    .email-box {
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 24px; text-align: left;
+      font-size: 12px; color: #1e40af; line-height: 1.6;
+    }
+
+    /* ── CTAs ── */
+    .cta-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      background: #15803d; color: #fff; border: none;
+      border-radius: 10px; padding: 12px 24px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      text-decoration: none; display: inline-block;
+    }
+    .btn-primary:hover { background: #166534; }
+    .btn-secondary {
+      background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+      border-radius: 10px; padding: 12px 24px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: inline-block;
+    }
+
+    /* ── Footer ── */
+    .footer-note { margin-top: 24px; font-size: 11px; color: #94a3b8; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="success-icon">✅</div>
+    <h1>Payment successful — Welcome to Pro!</h1>
+    <p class="subtitle">
+      Your AI CAGE Pro subscription is now active.<br>
+      Follow the 3 steps below to activate unlimited cages on your device.
+    </p>
+
+    <!-- Key display (populated from URL param or Stripe metadata) -->
+    <div class="key-box" id="key-section" style="display:none">
+      <div class="key-label">🔑 Your Pro License Key</div>
+      <div class="key-value" id="key-display">—</div>
+      <button class="copy-key-btn" onclick="copyKey()">📋 Copy key</button>
+    </div>
+
+    <!-- Email instructions (shown when no key in URL — manual activation flow) -->
+    <div class="email-box" id="email-instructions">
+      📧 <strong>Check your email</strong> — your license key has been sent to the address you used at checkout.<br>
+      If you don't see it within 5 minutes, check your spam folder or contact us at
+      <a href="mailto:aicage.support@gmail.com" style="color:#1d4ed8;font-weight:700">aicage.support@gmail.com</a>
+    </div>
+
+    <!-- 3 activation steps -->
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Open your browser extension</div>
+          <div class="step-desc">
+            Click the 🔒 AI CAGE icon in your Chrome toolbar.<br>
+            If you haven't installed it yet → <a href="install.html" style="color:#15803d;font-weight:600">Install AI CAGE Free</a>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Go to the Account tab</div>
+          <div class="step-desc">
+            Click the <code>⚙️ Account</code> tab inside the popup.<br>
+            You will see a field: <strong>"Paste your license key here…"</strong>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Paste your key and click Activate</div>
+          <div class="step-desc">
+            Paste the key from your email → click <code>✅ Activate Pro</code>.<br>
+            The watermark disappears and you see <strong>"✅ Pro Plan Active"</strong>.<br>
+            Unlimited cages unlocked immediately — no restart needed.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTAs -->
+    <div class="cta-group">
+      <a href="https://chatgpt.com" target="_blank" class="btn-primary">
+        🚀 Start using Pro now →
+      </a>
+      <a href="index.html" class="btn-secondary">
+        ← Back to home
+      </a>
+    </div>
+
+    <p class="footer-note">
+      Questions? <a href="mailto:aicage.support@gmail.com" style="color:#15803d">aicage.support@gmail.com</a>
+      &nbsp;·&nbsp; We respond within 24h.
+    </p>
+
+  </div>
+
+  <script>
+    // If Stripe redirects with ?key=xxx in the URL, display it directly
+    var params = new URLSearchParams(window.location.search);
+    var key    = params.get('key');
+    if (key) {
+      document.getElementById('key-section').style.display = 'block';
+      document.getElementById('key-display').textContent   = key;
+      document.getElementById('email-instructions').style.display = 'none';
+    }
+
+    function copyKey() {
+      var k = document.getElementById('key-display').textContent;
+      navigator.clipboard.writeText(k).then(function() {
+        var btn = document.querySelector('.copy-key-btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(function() { btn.textContent = '📋 Copy key'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
