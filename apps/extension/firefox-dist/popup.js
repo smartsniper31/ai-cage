@@ -366,7 +366,9 @@
     setText("agent-exfil", exfilAttempts);
     const lockedEl = document.getElementById("agent-locked-notice");
     if (lockedEl) {
-      lockedEl.style.display = agentEvents.length === 0 ? "block" : "none";
+      const licInfo = await checkLicense(chromeStorageAdapter, 0);
+      const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
+      lockedEl.style.display = !isPro && agentEvents.length === 0 ? "block" : "none";
     }
     const listEl = document.getElementById("agent-events");
     if (!listEl) return;

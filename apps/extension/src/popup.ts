@@ -320,10 +320,13 @@ async function renderAgentTab(): Promise<void> {
   setText('agent-blocked', blockedInjections);
   setText('agent-exfil',   exfilAttempts);
 
-  // Show locked notice if no events AND Free tier (heuristic: no agent events ever)
+  // Show locked notice only if Free tier (no Pro license active)
   const lockedEl = document.getElementById('agent-locked-notice');
   if (lockedEl) {
-    lockedEl.style.display = agentEvents.length === 0 ? 'block' : 'none';
+    // Check license status before showing locked notice
+    const licInfo = await checkLicense(chromeStorageAdapter, 0);
+    const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
+    lockedEl.style.display = (!isPro && agentEvents.length === 0) ? 'block' : 'none';
   }
 
   const listEl = document.getElementById('agent-events');
