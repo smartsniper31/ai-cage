@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI CAGE — Pro Key Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f0fdf4;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.10);
+    }
+    .header {
+      background: #15803d;
+      color: #fff;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header h1 { font-size: 18px; font-weight: 800; }
+    .header p  { font-size: 12px; opacity: .85; margin-top: 2px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #374151;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: #15803d; }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: #15803d;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn:hover { background: #166534; }
+
+    /* Key output */
+    .key-box {
+      display: none;
+      margin-top: 20px;
+      background: #f0fdf4;
+      border: 2px solid #15803d;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .key-box.show { display: block; }
+    .key-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #15803d;
+      margin-bottom: 8px;
+    }
+    .key-value {
+      font-family: monospace;
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px;
+      word-break: break-all;
+      color: #0f172a;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .key-value:hover { background: #f8fafc; }
+
+    .copy-btn {
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    .copy-btn:hover { background: #0284c7; }
+
+    .email-btn {
+      background: #15803d;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .email-btn:hover { background: #166534; }
+
+    .info {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .expires {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    /* Email template */
+    .email-template {
+      display: none;
+      margin-top: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .email-template.show { display: block; }
+    .email-template-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .email-body {
+      font-family: monospace;
+      font-size: 11px;
+      color: #374151;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    .copy-email-btn {
+      background: #374151;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 20px 0;
+    }
+    .note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #1e40af;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <span style="font-size:28px">🔑</span>
+    <div>
+      <h1>AI CAGE — Pro Key Generator</h1>
+      <p>Generate a Pro license key for a customer in 10 seconds</p>
+    </div>
+  </div>
+
+  <div class="note">
+    📧 <strong>When to use:</strong> After receiving a Stripe payment notification in your Gmail.
+    Fill in the customer's email and name, click Generate, then copy the email template and send.
+  </div>
+
+  <label>Customer Email *</label>
+  <input type="email" id="customer-email" placeholder="customer@example.com" />
+
+  <label>Customer Name / Company</label>
+  <input type="text" id="customer-name" placeholder="Karim Ben Ali / Agence Bizerte" />
+
+  <label>Plan</label>
+  <select id="plan">
+    <option value="PRO">Pro — €5/month</option>
+    <option value="ENTERPRISE">Enterprise — €15/month</option>
+  </select>
+
+  <label>License Duration</label>
+  <select id="duration">
+    <option value="365">1 year (recommended)</option>
+    <option value="31">1 month</option>
+    <option value="90">3 months</option>
+    <option value="730">2 years</option>
+  </select>
+
+  <button class="btn" onclick="generateKey()">🔑 Generate Pro License Key</button>
+
+  <!-- Key output -->
+  <div class="key-box" id="key-box">
+    <div class="key-label">✅ License Key — click to select all</div>
+    <div class="key-value" id="key-output" onclick="selectAll(this)">—</div>
+    <div class="expires" id="expires-label"></div>
+    <div style="margin-top:10px">
+      <button class="copy-btn" onclick="copyKey()">📋 Copy Key</button>
+      <button class="email-btn" onclick="showEmailTemplate()">✉️ Show Email Template</button>
+    </div>
+    <p class="info">
+      Send this key to the customer. They paste it in AI CAGE popup → Account tab → Activate Pro.
+    </p>
+  </div>
+
+  <!-- Email template -->
+  <div class="email-template" id="email-template">
+    <hr class="divider" />
+    <div class="email-template-label">📧 Email to send — copy and paste into Gmail</div>
+    <div class="email-body" id="email-body"></div>
+    <button class="copy-email-btn" onclick="copyEmailTemplate()">📋 Copy full email</button>
+  </div>
+
+</div>
+
+<script>
+// ─── Same algorithm as packages/core/src/license.ts ─────────────────────────
+const EMBEDDED_KEY = 'ai-cage-verification-v1-7f3a9b2e8c1d4a6f';
+
+function djb2Hash(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function base64UrlEncode(str) {
+  // Browser-compatible base64
+  const b64 = btoa(unescape(encodeURIComponent(str)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function generateLicenseKey(payload) {
+  const json      = JSON.stringify(payload);
+  const b64       = base64UrlEncode(json);
+  const sig       = djb2Hash(b64 + EMBEDDED_KEY);
+  return b64 + '.' + sig;
+}
+
+// ─── Main function ────────────────────────────────────────────────────────────
+function generateKey() {
+  const email    = document.getElementById('customer-email').value.trim();
+  const name     = document.getElementById('customer-name').value.trim() || email;
+  const plan     = document.getElementById('plan').value;
+  const days     = parseInt(document.getElementById('duration').value);
+
+  if (!email || !email.includes('@')) {
+    alert('Please enter a valid customer email.');
+    document.getElementById('customer-email').focus();
+    return;
+  }
+
+  const now    = new Date();
+  const expiry = new Date(now);
+  expiry.setDate(expiry.getDate() + days);
+
+  const payload = {
+    tier:      plan,
+    deviceId:  'stripe-' + email.replace('@','_at_').replace(/\./g,'_'),
+    issuedAt:  now.toISOString(),
+    expiresAt: expiry.toISOString(),
+    features:  plan === 'ENTERPRISE'
+      ? ['agentCage','auditExport','customPolicy','mcpMonitor','sso','siem']
+      : ['agentCage','auditExport','customPolicy','mcpMonitor'],
+    customer:  name,
+    seats:     1,
+  };
+
+  const key = generateLicenseKey(payload);
+
+  // Show key
+  document.getElementById('key-output').textContent  = key;
+  document.getElementById('expires-label').textContent =
+    `Valid until: ${expiry.toISOString().slice(0,10)} · Plan: ${plan} · Customer: ${name}`;
+  document.getElementById('key-box').classList.add('show');
+
+  // Store for email template
+  window._currentKey    = key;
+  window._customerEmail = email;
+  window._customerName  = name;
+  window._expiresAt     = expiry.toISOString().slice(0,10);
+  window._plan          = plan;
+
+  // Hide email template (will show on button click)
+  document.getElementById('email-template').classList.remove('show');
+
+  // Scroll to key
+  document.getElementById('key-box').scrollIntoView({ behavior: 'smooth' });
+}
+
+function selectAll(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function copyKey() {
+  const key = document.getElementById('key-output').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy Key', 2000);
+  });
+}
+
+function showEmailTemplate() {
+  const emailBody = `To: ${window._customerEmail}
+Subject: Your AI CAGE Pro License Key 🔒
+
+Hi ${window._customerName},
+
+Thank you for subscribing to AI CAGE Pro!
+Here is your license key:
+
+${window._currentKey}
+
+Valid until: ${window._expiresAt} · Plan: ${window._plan}
+
+HOW TO ACTIVATE (30 seconds):
+
+1. Click the 🔒 AI CAGE icon in your Chrome toolbar
+2. Go to the ⚙️ Account tab
+3. Paste your key → click ✅ Activate Pro
+   → You will see "✅ Pro Plan Active" — unlimited cages unlocked!
+
+Not installed yet?
+→ https://ai-cage-gamma.vercel.app/install.html
+
+Questions? Reply to this email.
+We respond within 24h.
+
+🇹🇳 Made in Tunisia · AI CAGE Pro · Zero data leaves your device`;
+
+  document.getElementById('email-body').textContent = emailBody;
+  document.getElementById('email-template').classList.add('show');
+
+  // Also open Gmail with pre-filled email
+  const subject = encodeURIComponent('Your AI CAGE Pro License Key 🔒');
+  const body    = encodeURIComponent(emailBody.split('\n').slice(2).join('\n'));
+  window._gmailLink = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(window._customerEmail)}&su=${subject}&body=${body}`;
+}
+
+function copyEmailTemplate() {
+  const text = document.getElementById('email-body').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    // Also open Gmail
+    if (window._gmailLink) window.open(window._gmailLink, '_blank');
+    const btn = document.querySelector('.copy-email-btn');
+    btn.textContent = '✅ Copied + Gmail opened!';
+    setTimeout(() => btn.textContent = '📋 Copy full email', 3000);
+  });
+}
+
+// Focus email on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('customer-email').focus();
+});
+</script>
+</body>
+</html>
