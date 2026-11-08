@@ -228,8 +228,36 @@ function wireAccountPanel(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Panel 1 — Cage PII
+// Inline notification helper (replaces alert() — more professional)
 // ---------------------------------------------------------------------------
+function showNotification(message: string, type: 'ok' | 'warn' | 'error' = 'ok', durationMs = 3000): void {
+  const existing = document.getElementById('desktop-notification');
+  existing?.remove();
+
+  const bg    = type === 'ok' ? '#15803d' : type === 'warn' ? '#d97706' : '#dc2626';
+  const notif = document.createElement('div');
+  notif.id    = 'desktop-notification';
+  notif.style.cssText = [
+    'position:fixed', 'bottom:20px', 'right:20px', 'z-index:9999',
+    `background:${bg}`, 'color:#fff', 'border-radius:10px',
+    'padding:10px 18px', 'font-size:13px', 'font-weight:700',
+    'font-family:system-ui,sans-serif', 'box-shadow:0 4px 16px rgba(0,0,0,.25)',
+    'pointer-events:none', 'max-width:320px', 'line-height:1.4',
+    'animation:notif-in .18s ease',
+  ].join(';');
+  notif.textContent = message;
+
+  // Add keyframe if not already present
+  if (!document.getElementById('notif-style')) {
+    const s = document.createElement('style');
+    s.id = 'notif-style';
+    s.textContent = '@keyframes notif-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}';
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(notif);
+  setTimeout(() => notif.remove(), durationMs);
+}
 cageBtn.addEventListener('click', () => {
   const text = inputEl.value.trim();
   if (!text) return;
@@ -343,7 +371,7 @@ modalBlock.addEventListener('click',       () => closeModal(false));
 modalBlockReport.addEventListener('click', async () => {
   closeModal(false);
   await logEvent({ type: 'POLICY_VIOLATION', site: 'desktop', counts: {}, totalCount: 1, detail: modalDetail.textContent ?? '' }, store);
-  alert('🚫 Blocked and reported to audit log.');
+  showNotification('🚫 Blocked and reported to audit log.', 'error', 3000);
 });
 modalCancel.addEventListener('click',      () => closeModal(false));
 
@@ -391,7 +419,7 @@ simInject.addEventListener('click', async () => {
 // Scan agent output
 simScanOutput.addEventListener('click', () => {
   const text = outputEl.value || inputEl.value;
-  if (!text) { alert('Paste some text in the Cage PII panel first.'); return; }
+  if (!text) { showNotification('⚠️ Paste some text in the Cage PII panel first.', 'warn'); return; }
   const result = cageAgentOutput(text, { allowedDomains: [], blockInjections: true });
   if (result.injections.length > 0) {
     blockedCount++;
@@ -430,7 +458,7 @@ async function renderAuditLog(): Promise<void> {
 }
 exportCsvBtn.addEventListener('click', async () => {
   const csv = await exportAuditLogCSV(store);
-  if (!csv) { alert('Audit log is empty.'); return; }
+  if (!csv) { showNotification('⚠️ Audit log is empty — protect some data first.', 'warn'); return; }
   const blob = new Blob([csv], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -494,4 +522,23 @@ activatePanel('cage');
 void renderAgentPolicy();
 wireAccountPanel();
 void applyLicenseGating();
-console.warn(`[AI CAGE] Desktop v${VERSION} loaded. Cage 3: Agent Rogue active.`);
+
+// Dynamic version in title + footer (reads from Tauri or VERSION constant)
+(async () => {
+  let v = VERSION;
+  try {
+    // Try Tauri IPC first (real version from Cargo.toml)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tauri = (window as any).__TAURI__;
+    if (tauri?.invoke) {
+      v = await tauri.invoke('get_app_version') as string;
+    }
+  } catch { /* fallback to VERSION constant */ }
+  // Update title
+  document.title = `AI CAGE v${v} — Enterprise AI Data Protection`;
+  // Update footer version span
+  const footerV = document.getElementById('footer-version');
+  if (footerV) footerV.textContent = `v${v}`;
+})();
+
+console.warn(`[AI CAGE] Desktop v${VERSION} loaded. 5 panels active.`);
