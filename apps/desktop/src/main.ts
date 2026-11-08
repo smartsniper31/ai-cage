@@ -1,8 +1,8 @@
 /**
  * @file main.ts
- * AI CAGE Desktop — v0.3.0 (Phase 3: Agent Rogue)
+ * AI CAGE Desktop — v0.6.0
  *
- * 4 panels: Cage PII | Agent Cage | Audit Log | Shadow AI
+ * 5 panels: Cage PII | Agent Cage | Audit Log | Shadow AI | Account
  */
 
 import {
@@ -12,11 +12,17 @@ import {
   ALL_AI_ENDPOINTS,
   getDefaultPolicy, loadPolicy, savePolicy,
   cageAgentOutput, cageToolCall,
+  checkLicense, activateLicense, deactivateLicense,
+  VERSION,
 } from '@ai-cage/core';
 import type { CagedEntity, AuditEntry, AgentPolicy } from '@ai-cage/core';
 import { scanForInjection } from '@ai-cage/presidio-lite';
 
 const store = localStorageAdapter;
+
+// ── Stripe / support constants ────────────────────────────────────────────────
+const STRIPE_URL   = 'https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00';
+const SUPPORT_EMAIL = 'aicage.support@gmail.com';
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -73,11 +79,153 @@ const panels  = document.querySelectorAll<HTMLElement>('.panel');
 function activatePanel(id: string): void {
   navBtns.forEach((b) => b.classList.toggle('active', b.dataset['panel'] === id));
   panels.forEach((p) => { p.style.display = p.id === `panel-${id}` ? 'flex' : 'none'; });
-  if (id === 'audit')  void renderAuditLog();
-  if (id === 'shadow') renderShadowList();
-  if (id === 'agent')  void renderAgentPolicy();
+  if (id === 'audit')   void renderAuditLog();
+  if (id === 'shadow')  renderShadowList();
+  if (id === 'agent')   void renderAgentPolicy();
+  if (id === 'account') void renderAccountPanel();
 }
 navBtns.forEach((btn) => btn.addEventListener('click', () => activatePanel(btn.dataset['panel'] ?? 'cage')));
+
+// Expose activatePanel to inline onclick handlers (header upgrade button)
+(window as unknown as Record<string, unknown>)['activatePanel'] = activatePanel;
+
+// ---------------------------------------------------------------------------
+// License gating — apply Free/Pro UI state
+// ---------------------------------------------------------------------------
+async function applyLicenseGating(): Promise<void> {
+  const info = await checkLicense(store, 0);
+  const isPro = info.tier === 'PRO' || info.tier === 'ENTERPRISE';
+
+  // Header badge
+  const badge = document.getElementById('header-badge');
+  if (badge) badge.textContent = `v${VERSION} · ${isPro ? info.tier : 'Free'}`;
+
+  // Header upgrade button — visible only on Free
+  const upgradeBtn = document.getElementById('header-upgrade-btn') as HTMLButtonElement | null;
+  if (upgradeBtn) {
+    upgradeBtn.style.display = isPro ? 'none' : 'inline-block';
+    upgradeBtn.addEventListener('click', () => activatePanel('account'));
+  }
+
+  // Agent Cage — locked for Free
+  const agentLocked  = document.getElementById('agent-locked-notice');
+  const agentContent = document.getElementById('agent-pro-content');
+  if (agentLocked)  agentLocked.style.display  = isPro ? 'none' : 'block';
+  if (agentContent) agentContent.style.display = isPro ? 'flex' : 'none';
+
+  // Export CSV — locked for Free
+  const exportBtn     = document.getElementById('export-csv-btn') as HTMLButtonElement | null;
+  const exportLocked  = document.getElementById('export-locked-notice');
+  if (exportBtn)    exportBtn.disabled = !isPro;
+  if (exportLocked) exportLocked.style.display = isPro ? 'none' : 'block';
+
+  // Agent upgrade button
+  document.getElementById('agent-upgrade-btn')
+    ?.addEventListener('click', () => activatePanel('account'));
+  document.getElementById('export-upgrade-btn')
+    ?.addEventListener('click', () => activatePanel('account'));
+}
+
+// ---------------------------------------------------------------------------
+// Account panel
+// ---------------------------------------------------------------------------
+async function renderAccountPanel(): Promise<void> {
+  const info = await checkLicense(store, 0);
+  const isPro = info.tier === 'PRO' || info.tier === 'ENTERPRISE';
+
+  const badgeEl     = document.getElementById('plan-badge');
+  const detailEl    = document.getElementById('plan-details');
+  const activationEl = document.getElementById('activation-section');
+  const proActiveEl  = document.getElementById('pro-active-section');
+
+  if (badgeEl) {
+    badgeEl.textContent = isPro ? info.tier : (info.status === 'EXPIRED' ? 'EXPIRED' : 'FREE');
+    badgeEl.className   = `plan-badge ${isPro ? 'pro' : (info.status === 'EXPIRED' ? 'exp' : 'free')}`;
+  }
+
+  if (isPro) {
+    if (detailEl)    detailEl.textContent  = info.message;
+    if (activationEl) activationEl.style.display = 'none';
+    if (proActiveEl)  proActiveEl.style.display  = 'block';
+
+    const expiresEl = document.getElementById('pro-expires');
+    if (expiresEl && info.payload) {
+      expiresEl.textContent = `License valid until ${info.payload.expiresAt.slice(0, 10)} · ${info.payload.customer}`;
+    }
+  } else {
+    if (detailEl) {
+      detailEl.innerHTML = info.status === 'EXPIRED'
+        ? `⚠️ Your license expired — <strong>renew to keep Pro features</strong>.`
+        : `Free tier active. Upgrade to Pro for CSV export and Agent Cage.`;
+    }
+    if (activationEl) activationEl.style.display = 'block';
+    if (proActiveEl)  proActiveEl.style.display  = 'none';
+  }
+}
+
+function setLicenseMsg(text: string, type: 'ok' | 'error' | 'warn'): void {
+  const el = document.getElementById('license-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.className   = `license-msg show ${type}`;
+}
+
+function wireAccountPanel(): void {
+  // Activate button
+  document.getElementById('license-activate-btn')
+    ?.addEventListener('click', async () => {
+      const input = document.getElementById('license-input') as HTMLInputElement | null;
+      const key   = input?.value.trim() ?? '';
+      if (!key) { setLicenseMsg('Please paste your license key.', 'warn'); return; }
+
+      const btn = document.getElementById('license-activate-btn') as HTMLButtonElement;
+      btn.disabled    = true;
+      btn.textContent = '⏳ Validating…';
+
+      const ok = await activateLicense(key, store);
+      if (ok) {
+        input!.value = '';
+        input?.classList.add('success');
+        setLicenseMsg('✅ Pro license activated! CSV export and Agent Cage unlocked.', 'ok');
+        btn.textContent = '✅ Activate Pro';
+        btn.disabled    = false;
+        await renderAccountPanel();
+        await applyLicenseGating();
+      } else {
+        input?.classList.add('error');
+        setLicenseMsg(`❌ Invalid or expired key. Contact ${SUPPORT_EMAIL}`, 'error');
+        btn.textContent = '✅ Activate Pro';
+        btn.disabled    = false;
+      }
+    });
+
+  // Deactivate button
+  document.getElementById('license-deactivate-btn')
+    ?.addEventListener('click', async () => {
+      if (!confirm('Remove your Pro license key? You will revert to the Free tier.')) return;
+      await deactivateLicense(store);
+      setLicenseMsg('License removed. You are now on the Free tier.', 'warn');
+      await renderAccountPanel();
+      await applyLicenseGating();
+    });
+
+  // Buy Pro button
+  document.getElementById('buy-pro-btn')
+    ?.addEventListener('click', () => {
+      // Open in default browser via Tauri shell or window.open
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tauri = (window as any).__TAURI__;
+        if (tauri?.shell?.open) {
+          void tauri.shell.open(STRIPE_URL);
+        } else {
+          window.open(STRIPE_URL, '_blank');
+        }
+      } catch {
+        window.open(STRIPE_URL, '_blank');
+      }
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Panel 1 — Cage PII
@@ -344,4 +492,6 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 activatePanel('cage');
 void renderAgentPolicy();
-console.warn('[AI CAGE] Desktop v0.6.0 loaded. Cage 3: Agent Rogue active.');
+wireAccountPanel();
+void applyLicenseGating();
+console.warn(`[AI CAGE] Desktop v${VERSION} loaded. Cage 3: Agent Rogue active.`);
