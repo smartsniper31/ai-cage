@@ -1,7 +1,7 @@
 // Prevents a console window from appearing on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! AI CAGE Desktop — Tauri backend.
+//! AI CAGE Desktop — Tauri backend v0.6.0
 //!
 //! # Architecture
 //! ```
@@ -12,16 +12,14 @@
 //! via `@ai-cage/core` running inside the WebView — fully offline.
 //!
 //! The Rust side provides:
-//!   - `get_app_version`  — returns the current version string
-//!   - `open_privacy_doc` — opens PRIVACY_GUARANTEE.md in the default viewer
-//!   - Future: native file scanning, clipboard watching, system tray agent
+//!   - `get_app_version`  — returns the current version string from Cargo.toml
+//!   - `get_platform`     — returns the OS name (windows/macos/linux)
+//!   - `verify_offline_mode` — confirms no network calls from Rust side
 //!
 //! # Security
 //! - No network calls are made from the Rust side.
 //! - `tauri::api::http` is NOT enabled in Cargo.toml.
 //! - All Tauri capabilities are explicitly listed in tauri.conf.json.
-
-use tauri::Manager as _;
 
 // ---------------------------------------------------------------------------
 // Tauri commands — callable from TypeScript via invoke()
@@ -31,7 +29,6 @@ use tauri::Manager as _;
 ///
 /// # Example (TypeScript)
 /// ```ts
-/// import { invoke } from '@tauri-apps/api/tauri';
 /// const version = await invoke<string>('get_app_version');
 /// ```
 #[tauri::command]
@@ -39,7 +36,7 @@ fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-/// Returns the current platform target triple.
+/// Returns the current OS name.
 /// Useful for audit logs and support diagnostics.
 #[tauri::command]
 fn get_platform() -> String {
@@ -47,15 +44,11 @@ fn get_platform() -> String {
 }
 
 /// Confirms that no outbound network connections are active.
-/// Always returns true in this build — the Rust side is purely local.
-///
-/// This command exists so the frontend can display a verified
-/// "offline-only" badge backed by the Rust process, not just a JS claim.
+/// Always returns true — the Rust side is purely local.
+/// The architecture guarantee is enforced at compile time
+/// (tauri::api::http is not compiled in).
 #[tauri::command]
 fn verify_offline_mode() -> bool {
-    // In a future version this could check for active sockets.
-    // For V1, the architecture guarantee is enforced at compile time
-    // (tauri::api::http is not compiled in).
     true
 }
 
@@ -70,11 +63,14 @@ fn main() {
             get_platform,
             verify_offline_mode,
         ])
-        .setup(|app| {
+        .setup(|_app| {
             // In development, open DevTools for debugging.
+            // tauri::Manager is imported inside the cfg block to avoid
+            // unused import warnings in release builds.
             #[cfg(debug_assertions)]
             {
-                let window = app.get_window("main").unwrap();
+                use tauri::Manager;
+                let window = _app.get_window("main").unwrap();
                 window.open_devtools();
             }
             Ok(())

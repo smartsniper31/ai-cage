@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI CAGE — Enterprise AI Data Protection v0.6.0</title>
+  <title>AI CAGE — Enterprise AI Data Protection</title>
   <style>
     :root {
       --green:      #16a34a;
@@ -368,9 +368,7 @@
   <div class="panel" id="panel-audit">
     <div id="audit-summary"></div>
     <div class="audit-actions">
-      <!-- Export CSV — Pro only -->
       <button class="btn-primary" id="export-csv-btn">📄 Export CSV for Auditor</button>
-      <span id="export-pro-badge" style="display:none;font-size:10px;font-weight:700;background:#e2e8f0;color:#64748b;padding:2px 8px;border-radius:4px;align-self:center">PRO</span>
       <button class="btn-danger"  id="clear-log-btn">🗑 Clear Log</button>
     </div>
     <!-- Pro-locked notice for Export CSV -->
@@ -471,7 +469,7 @@
   <footer>
     <span aria-hidden="true">✅</span>
     All detection and audit logging runs locally. No data sent to any server.
-    &nbsp;·&nbsp; AI CAGE v0.6.0 &nbsp;·&nbsp; MIT License
+    &nbsp;·&nbsp; AI CAGE <span id="footer-version">v0.6.0</span> &nbsp;·&nbsp; MIT License
   </footer>
 
 </div>
