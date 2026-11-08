@@ -21,7 +21,7 @@
 //! - `tauri::api::http` is NOT enabled in Cargo.toml.
 //! - All Tauri capabilities are explicitly listed in tauri.conf.json.
 
-use tauri::Manager;
+use tauri::Manager as _;
 
 // ---------------------------------------------------------------------------
 // Tauri commands — callable from TypeScript via invoke()
