@@ -229,7 +229,7 @@ output = {
 
     <div style="border-top:1px solid #e2e8f0;margin-top:20px;padding-top:16px;
                 font-size:11px;color:#94a3b8;text-align:center">
-      🇹🇳 Made in Tunisia · AI CAGE Pro · 100% local · Zero data leaves your device<br>
+      🔒 Made in Privacy · AI CAGE Pro · 100% local · Zero data leaves your device<br>
       <a href="https://ai-cage-gamma.vercel.app" style="color:#94a3b8">ai-cage-gamma.vercel.app</a>
     </div>
 

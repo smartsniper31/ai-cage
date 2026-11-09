@@ -36,7 +36,7 @@
       ],
       "shortDescription": "Enterprise AI Data Protection — 100% Local",
       "longDescription":  "AI CAGE protects your sensitive data before it reaches ChatGPT, Claude, Gemini or any AI tool. PII detection, Agent Cage, Shadow AI monitoring. 100% offline — zero data leaves your device.",
-      "copyright":        "Copyright © 2026 Frikha, Tunisia. All rights reserved.",
+      "copyright":        "Copyright © 2026 AI CAGE. All rights reserved.",
       "category":         "Utility",
       "windows": {
         "digestAlgorithm": "sha256",
