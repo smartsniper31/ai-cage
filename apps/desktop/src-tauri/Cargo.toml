@@ -1,10 +1,10 @@
 [package]
 name = "ai-cage-desktop"
-version = "0.1.0"
+version = "0.6.0"
 description = "AI CAGE Desktop — Enterprise AI Data Protection"
 authors = ["AI CAGE Contributors"]
 license = "MIT"
-repository = "https://github.com/your-org/ai-cage"
+repository = "https://github.com/smartsniper31/ai-cage"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
