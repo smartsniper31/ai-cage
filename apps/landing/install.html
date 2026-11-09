@@ -341,13 +341,45 @@
           🪟 Windows Installer (.msi)
         </a>
       </div>
+
+      <!-- Chrome download blocking guide -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:12px;color:#1e40af">
+        <strong>🌐 If Chrome says "This file is dangerous" or blocks the download:</strong><br>
+        1. Click the <strong>arrow ˅</strong> next to the filename in the download bar<br>
+        2. Click <strong>"Keep"</strong> or <strong>"Keep anyway"</strong><br>
+        3. The file will save to your Downloads folder ✅
+      </div>
+
       <div class="nav-btns"><button class="btn-next" onclick="nextStep('desk',1,3)">Downloaded ✓ Next →</button></div>
     </div>
 
     <div class="step" id="desk-step-2">
       <div class="step-header"><div class="step-num">2</div><div class="step-title">Run the installer</div></div>
       <p class="step-body">Find the downloaded file (usually in your <strong>Downloads</strong> folder). <strong>Double-click</strong> it to run the installer.</p>
-      <div class="warn-box"><span>⚠️</span><span><strong>Windows security alert?</strong> Click <em>"More info"</em> then <em>"Run anyway"</em>. This is normal for open-source apps not yet on the Microsoft Store.</span></div>
+
+      <!-- Windows SmartScreen warning — step by step guide -->
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 14px;margin:10px 0">
+        <div style="font-weight:800;font-size:13px;color:#856404;margin-bottom:8px">
+          ⚠️ Windows may show a security warning — here's exactly what to do:
+        </div>
+        <div style="font-size:12px;color:#856404;line-height:1.8">
+          <strong>If you see "Windows protected your PC":</strong><br>
+          1. Click <strong>"More info"</strong> (small link under the warning)<br>
+          2. Click <strong>"Run anyway"</strong> button that appears<br>
+          3. The installer will open normally ✅
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:#856404;line-height:1.8">
+          <strong>If Chrome blocked the download:</strong><br>
+          1. Look at the bottom of Chrome for the download bar<br>
+          2. Click the <strong>arrow ˅</strong> next to the filename<br>
+          3. Click <strong>"Keep"</strong> or <strong>"Keep anyway"</strong><br>
+          4. The file will appear in your Downloads folder ✅
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#856404;background:rgba(0,0,0,.05);border-radius:6px;padding:8px">
+          💡 <strong>Why does this happen?</strong> AI CAGE is open-source and does not yet have a paid Microsoft code-signing certificate. The app is 100% safe — you can verify the source code at <a href="https://github.com/smartsniper31/ai-cage" style="color:#856404;font-weight:700">github.com/smartsniper31/ai-cage</a>
+        </div>
+      </div>
+
       <p class="step-body">Follow the installer — click <strong>Next</strong> → <strong>Install</strong> → <strong>Finish</strong>. The app opens automatically.</p>
       <div class="nav-btns">
         <button class="btn-back" onclick="prevStep('desk',2)">← Back</button>
@@ -389,6 +421,40 @@
     </details>
     <details><summary>Something went wrong — who can I contact?</summary>
       <div class="ans">Email <a href="mailto:aicage.support@gmail.com" style="color:#16a34a;font-weight:700">aicage.support@gmail.com</a> — we respond within 24 hours. No question is too simple.</div>
+    </details>
+    <details><summary>🛡️ Windows says "Windows protected your PC" — what do I do?</summary>
+      <div class="ans">
+        This is normal for open-source apps without a paid Microsoft certificate. AI CAGE is 100% safe.<br><br>
+        <strong>Steps to install anyway:</strong><br>
+        1. Click <strong>"More info"</strong> (small link below the warning message)<br>
+        2. Click the <strong>"Run anyway"</strong> button that appears<br>
+        3. The installer will open normally ✅<br><br>
+        You can verify the full source code at <a href="https://github.com/smartsniper31/ai-cage" style="color:#16a34a;font-weight:700" target="_blank">github.com/smartsniper31/ai-cage</a>
+      </div>
+    </details>
+    <details><summary>🌐 Chrome blocked the download — how do I get the file?</summary>
+      <div class="ans">
+        Chrome sometimes blocks unsigned executables. Here's how to allow it:<br><br>
+        <strong>Option A — Download bar:</strong><br>
+        1. Look at the bottom of Chrome for the download notification<br>
+        2. Click the <strong>arrow ˅</strong> next to the filename<br>
+        3. Click <strong>"Keep"</strong> or <strong>"Keep anyway"</strong> ✅<br><br>
+        <strong>Option B — Downloads page:</strong><br>
+        1. Press <strong>Ctrl+J</strong> to open Chrome Downloads<br>
+        2. Find the AI CAGE file → click <strong>"Keep dangerous file"</strong><br>
+        3. Confirm → file is saved ✅<br><br>
+        <strong>Option C — Use the .msi installer instead:</strong><br>
+        The <strong>.msi</strong> file is sometimes blocked less aggressively than .exe. Try downloading that version from the same page.
+      </div>
+    </details>
+    <details><summary>🔷 Microsoft Edge blocked the download — what do I do?</summary>
+      <div class="ans">
+        Edge has SmartScreen enabled by default. Steps to allow:<br><br>
+        1. Click the <strong>3 dots ···</strong> next to the blocked download notification<br>
+        2. Click <strong>"Keep"</strong><br>
+        3. A dialog appears — click <strong>"Show more"</strong> → <strong>"Keep anyway"</strong> ✅<br><br>
+        Or: disable SmartScreen temporarily in Edge Settings → Privacy → Microsoft Defender SmartScreen → Off, then re-enable after install.
+      </div>
     </details>
   </div>
 
