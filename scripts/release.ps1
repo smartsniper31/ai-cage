@@ -99,6 +99,26 @@ $contentSize = [math]::Round((Get-Item (Join-Path $EXT_DIST "content.js")).Lengt
 $bgSize      = [math]::Round((Get-Item (Join-Path $EXT_DIST "background.js")).Length / 1KB, 1)
 OK "content.js ${contentSize}kB  background.js ${bgSize}kB"
 
+# ── STEP 2b: Build desktop Vite (MUST run directly from apps/desktop/) ────────
+# CRITICAL: Do NOT use 'pnpm --filter' for desktop — it may change cwd to repo
+# root which causes Vite to pick up wrong index.html and produce old version.
+# Always run node_modules/.bin/vite build from within apps/desktop/ directly.
+Step "2b/11" "Build desktop Vite — directly from apps/desktop/"
+$DESKTOP_DIR = Join-Path $ROOT "apps\desktop"
+Set-Location $DESKTOP_DIR
+node_modules/.bin/vite build
+if ($LASTEXITCODE -ne 0) { FAIL "desktop Vite build failed" }
+$desktopHtml = Join-Path $DESKTOP_DIR "dist\index.html"
+if (!(Test-Path $desktopHtml)) { FAIL "desktop dist/index.html missing after build" }
+# Safety check — no old version strings in output
+$htmlContent = [IO.File]::ReadAllText($desktopHtml)
+if ($htmlContent -match "v0\.3\.0|v0\.4\.5|v0\.5\.0") {
+    FAIL "OLD VERSION string found in desktop dist/index.html — check apps/desktop/index.html"
+}
+$deskSize = [math]::Round((Get-Item $desktopHtml).Length / 1KB, 1)
+OK "desktop dist/index.html ${deskSize}kB — version check passed"
+Set-Location $ROOT
+
 # ── STEP 3: Build Firefox dist ───────────────────────────────────────────────
 Step "3/11" "Build Firefox dist (build-firefox.mjs)"
 Set-Location $EXT_DIR
