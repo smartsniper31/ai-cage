@@ -154,6 +154,29 @@
     ],
     defaultScore: 0.58
   };
+  const postalAddressDetector = {
+    name: "Postal Address",
+    type: "POSTAL_ADDRESS",
+    patterns: [
+      // ── Labelled (high confidence) ─────────────────────────────────────────
+      // "Adresse : 12 Rue Habib Bourguiba, Monastir 5000"
+      /\b(?:Adresse|Domicile|R[eé]sidence|Address|Home\s+Address|Mailing\s+Address)\s*[:=\-]\s*([^\n]{5,80})/gi,
+      // ── French street types ────────────────────────────────────────────────
+      // "12 Rue Habib Bourguiba" / "Avenue de la Paix" / "Boulevard 7 Novembre"
+      /\b\d{1,4}\s+(?:Rue|Avenue|Av\.|Boulevard|Blvd\.?|Impasse|Allée|Place|Route|Cité|Quartier|Résidence|Lotissement|Zone)\s+[A-ZÀ-Ÿa-zà-ÿ][A-ZÀ-Ÿa-zà-ÿ\s\d]{3,50}/gi,
+      // ── English street types ───────────────────────────────────────────────
+      // "12 Main Street, London" / "5B Baker Street"
+      /\b\d{1,4}[A-Z]?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|Place|Pl\.?|Square|Sq\.?|Way|Close|Crescent|Terrace)\b/gi,
+      // ── Postal code patterns (FR/TN/UK/DE) ────────────────────────────────
+      // Tunisia: 4 digits — "Monastir 5000", "Tunis 1000"
+      /\b(?:Tunis|Sfax|Sousse|Monastir|Bizerte|Nabeul|Kairouan|Gafsa|Ariana|Manouba|Ben\s+Arous|La\s+Marsa|Hammamet|Djerba|Gabès)\s+\d{4}\b/gi,
+      // France: 5-digit postal code with city
+      /\b\d{5}\s+[A-ZÀ-Ÿ][a-zA-Zà-ÿ\s\-]{2,30}\b/g,
+      // UK: postcode format
+      /\b[A-Z]{1,2}\d{1,2}[A-Z]?\s+\d[A-Z]{2}\b/g
+    ],
+    defaultScore: 0.72
+  };
   const transcriptMarkerDetector = {
     name: "Meeting Transcript Marker",
     type: "MEETING_TRANSCRIPT_MARKER",
@@ -209,6 +232,8 @@
     // 0.78
     phoneDetector,
     // 0.75
+    postalAddressDetector,
+    // 0.72 — NEW: street addresses
     meetingParticipantDetector,
     // 0.68 — Cage 5
     carteSejourDetector,
@@ -290,7 +315,8 @@
     PASSPORT: "PASSPORT",
     GENERIC_SECRET: "SECRET",
     MEETING_TRANSCRIPT_MARKER: "TRANSCRIPT",
-    MEETING_PARTICIPANT: "PARTICIPANT"
+    MEETING_PARTICIPANT: "PARTICIPANT",
+    POSTAL_ADDRESS: "ADDRESS"
   };
   function cageText(text, options = {}) {
     const { minScore = 0.6, labelledPlaceholders = true } = options;

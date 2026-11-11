@@ -1,23 +1,25 @@
-# AI CAGE — Phase 5.8 Final Report
+# AI CAGE — Phase 5.8 Final Report (Updated)
 **Version :** v0.6.0  
-**Date :** 2026-11-04  
-**Auteur :** Kiro, Release Engineer  
-**Statut :** ✅ SHIPPED — Prêt à vendre à Karim
+**Date updated :** 2026-11-11  
+**Status :** ✅ PRODUCTION READY — Ready to sell
 
 ---
 
 ## 1. Build Sizes
 
-| Fichier | Taille | Gzip |
-|---------|--------|------|
+| File | Size | Gzip |
+|------|------|------|
 | `apps/extension/dist/background.js` | 21.29 kB | 5.53 kB |
-| `apps/extension/dist/content.js` | 25.55 kB | 8.39 kB |
-| `apps/extension/dist/injected.js` | 9.94 kB | 3.21 kB |
-| `apps/extension/dist/popup.js` | 8.54 kB | 2.71 kB |
-| `apps/extension/dist/welcome.html` | ~8 kB | — |
-| `apps/landing/dist/index.html` | 32.80 kB | 8.02 kB |
-| `dist/ai-cage-extension-v0.6.0-chrome.zip` | 28 kB | — |
-| `dist/ai-cage-extension-v0.6.0-firefox.zip` | 28 kB | — |
+| `apps/extension/dist/content.js` | 31.14 kB | 9.58 kB |
+| `apps/extension/dist/injected.js` | 12.87 kB | 3.89 kB |
+| `apps/extension/dist/popup.js` | ~24 kB | — |
+| `apps/desktop/dist/index.html` | 25.33 kB | 6.50 kB |
+| `apps/desktop/dist/assets/index.js` | 45.32 kB | 16.72 kB |
+| `apps/landing/dist/index.html` | ~35 kB | ~8 kB |
+| `dist/ai-cage-extension-v0.6.0-chrome.zip` | 37 KB | — |
+| `dist/ai-cage-extension-v0.6.0-firefox.zip` | 37 KB | — |
+| `dist/ai-cage-desktop-v0.6.0-windows-setup.exe` | 1.05 MB | — |
+| `dist/ai-cage-desktop-v0.6.0-windows.msi` | 1.54 MB | — |
 
 ---
 
@@ -25,167 +27,148 @@
 
 ```
 PRESIDIO-LITE : 74/74 ✅
-  ✓ tests/injection.test.ts  (35)
-  ✓ tests/scan.test.ts       (39)
-
-CORE : 128/128 ✅
-  ✓ tests/license.test.ts        (19)
-  ✓ tests/cage.test.ts           (21)
-  ✓ tests/mcpMonitor.test.ts     (20)
-  ✓ tests/auditLog.test.ts       (16)
-  ✓ tests/cageTranscript.test.ts (17)
-  ✓ tests/agentCage.test.ts      (19)
-  ✓ tests/shadowAi.test.ts       (16)
-
-TOTAL : 202/202 ✅
+CORE          : 128/128 ✅
+TOTAL         : 202/202 ✅
+Security contract: no network calls in core ✅
 ```
-
-Résultats complets → `test-results-v0.6.0.txt`
 
 ---
 
 ## 3. Git
 
-| Élément | Valeur |
-|---------|--------|
-| Branche | `master` |
-| Commit v0.6.0 | `ebf8ce0` |
-| Commit docs | `1832931` |
+| Item | Value |
+|------|-------|
+| Latest commit | `3a20ba8` |
+| Branch | `master` |
 | Tag | `v0.6.0` |
-| Remote | `https://github.com/smartsniper31/ai-cage.git` |
-| Push status | ✅ `origin/master` à jour |
+| Remote | `origin/master` up to date |
 
 ---
 
-## 4. GitHub Release
+## 4. GitHub Release v0.6.0 — 6 assets
 
-**URL :** https://github.com/smartsniper31/ai-cage/releases/tag/v0.6.0
-
-**Assets uploadés :**
-- `ai-cage-extension-v0.6.0-chrome.zip` (28 kB)
-- `ai-cage-extension-v0.6.0-firefox.zip` (28 kB)
-- `checksums-v0.6.0.txt` (SHA256)
-- `test-results-v0.6.0.txt`
-
----
-
-## 5. Zips + Checksums
-
-```
-dist/
-├── ai-cage-extension-v0.6.0-chrome.zip   28 KB
-├── ai-cage-extension-v0.6.0-firefox.zip  28 KB
-└── checksums-v0.6.0.txt
-
-SHA256:
-4230500dd...  ai-cage-extension-v0.6.0-chrome.zip
-acb9f45f6...  ai-cage-extension-v0.6.0-firefox.zip
-```
+| Asset | Size | Built |
+|-------|------|-------|
+| `ai-cage-desktop-v0.6.0-windows-setup.exe` | 1.05 MB | 10/11/2026 |
+| `ai-cage-desktop-v0.6.0-windows.msi` | 1.54 MB | 10/11/2026 |
+| `ai-cage-extension-v0.6.0-chrome.zip` | 37 KB | 11/11/2026 |
+| `ai-cage-extension-v0.6.0-firefox.zip` | 37 KB | 11/11/2026 |
+| `checksums-v0.6.0.txt` | SHA256 | 11/11/2026 |
+| `test-results-v0.6.0.txt` | — | — |
 
 ---
 
-## 6. Vercel
+## 5. Vercel
 
-| Paramètre | Valeur |
-|-----------|--------|
-| URL production | https://ai-cage-gamma.vercel.app/ |
+| Item | Value |
+|------|-------|
+| URL | https://ai-cage-gamma.vercel.app/ |
+| Auto-deploy | ✅ on every git push origin master |
 | Root Directory | `apps/landing` |
 | Build Command | `npm run build` |
-| Output Directory | `dist` |
-| Framework | Vite |
-| Auto-deploy | ✅ déclenché par `git push origin master` |
-
-Guide complet → `docs/VERCEL_DEPLOY.md`
+| Output | `dist/` |
 
 ---
 
-## 7. Quality Gate Final — 12/12 ✅
+## 6. Features — Free vs Pro
 
-| # | Critère | Statut |
-|---|---------|--------|
-| QG-1 | Version `v0.6.0` partout (dynamique) | ✅ |
-| QG-2 | `Upgrade to Pro` → landing pricing | ✅ |
-| QG-3 | `Start Pro Trial` → modale fluide | ✅ |
-| QG-4 | Onboarding `welcome.html` auto-open | ✅ |
-| QG-5 | 1 seule UI (Ghost Mode, no bubble) | ✅ |
-| QG-6 | Toast vert après cage (<100ms) | ✅ |
-| QG-7 | `bottom:80px` visible Windows | ✅ |
-| QG-8 | Status message cohérent (4 états) | ✅ |
-| QG-9 | Warning orange PDF/FormData (5s) | ✅ |
-| QG-10 | Build 0 erreur | ✅ |
-| QG-11 | 202/202 tests pass | ✅ |
-| QG-12 | Cage 4/5 fausse pub supprimée | ✅ |
+### Extension (Chrome / Edge / Firefox)
 
----
+| Feature | Free | Pro |
+|---------|------|-----|
+| PII cage (16 types) | ✅ 100/month | ✅ Unlimited |
+| Shadow AI detection | ✅ | ✅ |
+| Status indicator pill | ✅ | ✅ |
+| Toast notifications | ✅ | ✅ |
+| Update checker | ✅ | ✅ |
+| Agent Cage | ❌ | ✅ |
+| Audit CSV export | ❌ | ✅ |
+| Account tab + license | ✅ activate | ✅ |
 
-## 8. Fichiers créés / modifiés — récapitulatif release
+### Desktop (Windows)
 
-### Nouveaux fichiers
-| Fichier | Description |
-|---------|-------------|
-| `packages/core/src/version.ts` | Source de vérité version `0.6.0` |
-| `apps/extension/src/welcome.html` | Page onboarding FR 3 étapes |
-| `apps/extension/firefox-dist/welcome.html` | Copie Firefox |
-| `docs/UX_AUDIT.md` | Audit UX complet 7 sections |
-| `docs/UX_FIXES.md` | 9 P0 + 7 P1 + 4 P2 avec code |
-| `docs/PHASE5_8_REPORT.md` | Rapport fixes P0 |
-| `docs/PHASE5_8_FINAL_REPORT.md` | Ce fichier |
-| `docs/VERCEL_DEPLOY.md` | Guide déploiement Vercel |
-| `docs/REAL_TEST_CHECKLIST_v0.6.0.md` | Checklist tests fondateur |
-| `scripts/zip.sh` | Script génération zips |
-| `RELEASE_NOTES_v0.6.0.md` | Notes de release GitHub |
-| `test-results-v0.6.0.txt` | Résultats tests v0.6.0 |
-| `dist/ai-cage-extension-v0.6.0-chrome.zip` | Extension Chrome |
-| `dist/ai-cage-extension-v0.6.0-firefox.zip` | Extension Firefox |
-| `dist/checksums-v0.6.0.txt` | Checksums SHA256 |
-
-### Fichiers modifiés
-| Fichier | Changement principal |
-|---------|---------------------|
-| `apps/extension/src/manifest.json` | `0.4.5` → `0.6.0`, `welcome.html` ajouté |
-| `apps/extension/src/content.ts` | Réécriture Ghost Mode + toast |
-| `apps/extension/src/background.ts` | `onInstalled` listener |
-| `apps/extension/src/injected.ts` | FormData/Blob warning P0-9 |
-| `apps/extension/src/popup.html` | Version dynamique, upgrade link |
-| `apps/extension/src/popup.ts` | Status 4 états, version inject |
-| `apps/extension/vite.config.ts` | `welcome.html` copié dans dist |
-| `apps/extension/build-firefox.mjs` | Version Firefox `0.6.0` |
-| `apps/landing/index.html` | Modal Pro Trial, Cage 4/5, v0.6.0 |
-| `apps/landing/package.json` | `0.4.5` → `0.6.0` |
-| `apps/landing/vercel.json` | Config Vite build + dist output |
-| `apps/desktop/src/index.html` | `0.3.0` → `0.6.0` |
-| `apps/desktop/src/main.ts` | console.warn `0.6.0` |
-| `packages/core/src/index.ts` | Export `VERSION` |
-| `package.json` | `0.4.5` → `0.6.0` |
-| `.husky/pre-commit` | Fix false positive `localStorage` |
+| Feature | Free | Pro |
+|---------|------|-----|
+| Cage PII (manual) | ✅ | ✅ |
+| Restore AI response | ✅ | ✅ |
+| Audit Log (read) | ✅ | ✅ |
+| Shadow AI catalogue | ✅ | ✅ |
+| Account tab + license | ✅ activate | ✅ |
+| Agent Cage | ❌ | ✅ |
+| Export CSV | ❌ | ✅ |
 
 ---
 
-## 9. Checklist fondateur
+## 7. PII Detectors — 16 types
 
-Tests manuels requis → `docs/REAL_TEST_CHECKLIST_v0.6.0.md`
-
-```
-TEST 1 — Landing v0.6.0 affichée          [ ] TODO
-TEST 2 — Modal Pro Trial (pas Gmail)       [ ] TODO
-TEST 3 — 1 seul popup (no bubble)         [ ] TODO
-TEST 4 — Toast vert après cage            [ ] TODO
-TEST 5 — DevTools payload = [CAGED]       [ ] TODO
-TEST 6 — Warning orange PDF upload        [ ] TODO
-BONUS  — Onboarding welcome auto-open     [ ] TODO
-```
+| Type | Score | Coverage |
+|------|-------|----------|
+| PRIVATE_KEY | 1.00 | PEM keys |
+| EMAIL_ADDRESS | 0.95 | RFC 5321 |
+| CREDIT_CARD | 0.90 | Visa/MC/Amex |
+| IBAN | 0.90 | ISO 13616 |
+| API_KEY | 0.88 | GitHub/AWS/Stripe |
+| GENERIC_SECRET | 0.82 | password=, key= |
+| IP_ADDRESS | 0.85 | IPv4 |
+| RIB_TN | 0.80 | Tunisian RIB |
+| PASSPORT_TN | 0.78 | Tunisian passport |
+| PHONE_NUMBER | 0.75 | +216, +33, +1 |
+| **POSTAL_ADDRESS** | **0.72** | **NEW: FR/EN/TN streets** |
+| CARTE_SEJOUR | 0.72 | FR/TN permit |
+| PASSPORT | 0.70 | Generic |
+| CIN_TN | 0.65 | Tunisian ID |
+| PERSON_NAME | 0.58 | Arabic/Latin names |
+| MF_TN | 0.92 | Matricule Fiscal |
 
 ---
 
-## 10. Prochaines étapes v0.7.0
+## 8. QA Fixes Applied (v0.6.0 final)
 
-| Priorité | Feature | Effort |
+| Fix | Status | File |
+|-----|--------|------|
+| P1 — Address detector | ✅ | `detectors.ts` |
+| P2 — Restore empty message | ✅ | `main.ts` |
+| P3 — Shadow AI disclaimer | ✅ | `desktop/index.html` |
+| P4 — Branded icon | ✅ | `src-tauri/icons/` |
+| Root cause desktop version | ✅ | `desktop/index.html` (single file) |
+| Cargo.toml version | ✅ | `Cargo.toml` v0.6.0 |
+| vite.config.ts explicit root | ✅ | `vite.config.ts` |
+| release.ps1 safety check | ✅ | `scripts/release.ps1` |
+
+---
+
+## 9. Mobile Strategy
+
+| Platform | Status |
+|----------|--------|
+| Desktop browser (Chrome/Edge/Firefox) | ✅ LIVE |
+| Desktop app (Windows) | ✅ LIVE |
+| Mobile browser | ⚠️ Landing shows "Mobile coming soon" banner |
+| Mobile app (iOS/Android) | 🔜 v0.7.0 roadmap |
+
+---
+
+## 10. Payment Flow
+
+| Step | Status |
+|------|--------|
+| Stripe Payment Link | ✅ Test mode active |
+| success.html post-payment | ✅ 3-step activation guide |
+| `tools/generate-key.html` | ✅ Manual key generator |
+| Email via `aicage.support@gmail.com` | ✅ Working |
+| Zapier auto-license | ⚠️ Configured, email field fix needed |
+| Go Live (Stripe production) | 🔜 When ready for real clients |
+
+---
+
+## 11. Next Steps — v0.7.0 Roadmap
+
+| Priority | Feature | Effort |
 |----------|---------|--------|
-| P1 | i18n FR (`_locales/fr/messages.json`) | 4h |
-| P1 | Stripe Payment Link (remplace fallback mailto) | 2h |
-| P1 | `chrome.storage.session` — session counts persistent | 2h |
-| P1 | Shadow AI items cliquables (expand détail) | 1h |
-| P1 | MutationObserver throttle (CPU streaming) | 1h |
-| P2 | Dark mode panel (`prefers-color-scheme`) | 2h |
-| P2 | Activation licence dans popup | 8h |
-| P2 | Stats par site dans popup | 3h |
+| P1 | Chrome Web Store submission | 1 day |
+| P1 | Stripe Live mode + real Payment Link | 30 min |
+| P1 | Zapier: fix customer_email field mapping | 30 min |
+| P2 | i18n FR/AR for extension popup | 4h |
+| P2 | Mobile app (React Native) | v0.7.0 |
+| P2 | Cage 4: Code Leak (VS Code extension) | v0.7.0 |
+| P3 | ed25519 license signing (replace djb2) | v0.8.0 |
