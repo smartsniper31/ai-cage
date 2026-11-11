@@ -27,7 +27,8 @@ export type EntityType =
   | 'PASSPORT'
   | 'GENERIC_SECRET'
   | 'MEETING_TRANSCRIPT_MARKER'  // Cage 5: transcript headers, speaker labels, timestamps
-  | 'MEETING_PARTICIPANT';       // Cage 5: "John said:", "Speaker 1:", participant lines
+  | 'MEETING_PARTICIPANT'        // Cage 5: "John said:", "Speaker 1:", participant lines
+  | 'POSTAL_ADDRESS';            // Street address: "12 Rue Habib Bourguiba, Monastir 5000"
 
 /**
  * A single PII match found in a text.
