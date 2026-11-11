@@ -1,51 +1,18 @@
-AI CAGE v0.6.0 — Test Results (final)
-Date: 2026-11-05
-==============================
+AI CAGE v0.6.0 - Test Results
+Date: 2026-11-12 00:23:27
+================================
 
-PRESIDIO-LITE (74/74)
-  ✓ tests/injection.test.ts  (35)
-  ✓ tests/scan.test.ts       (39)
-  Test Files: 2 passed (2)
-  Tests: 74 passed (74)
-
-CORE (128/128)
-  ✓ tests/license.test.ts        (19)
-  ✓ tests/cage.test.ts           (21)
-  ✓ tests/mcpMonitor.test.ts     (20)
-  ✓ tests/auditLog.test.ts       (16)
-  ✓ tests/cageTranscript.test.ts (17)
-  ✓ tests/agentCage.test.ts      (19)
-  ✓ tests/shadowAi.test.ts       (16)
-  Test Files: 7 passed (7)
-  Tests: 128 passed (128)
-
-TOTAL: 202/202 PASS ✅
+TOTAL: 202/202 PASS
 
 BUILD SIZES (extension dist/):
-  background.js  21.29 kB  (gzip: 5.53 kB)
-  content.js     31.14 kB  (gzip: 9.58 kB)   ← +5.5kB: status indicator + 30 selectors
-  injected.js    12.87 kB  (gzip: 3.89 kB)   ← +2.9kB: 45 AI patterns
-  popup.js        ~9   kB
-  welcome.html   ~8   kB   ← EN rewrite
-
-LANDING BUILD:
-  dist/index.html  34.43 kB  (gzip: 8.14 kB)
+  background.js   20.8 kB
+  content.js      34.4 kB
+  landing         39.4 kB
 
 ZIPS (dist/):
-  ai-cage-extension-v0.6.0-chrome.zip    31.8 KB
-  ai-cage-extension-v0.6.0-firefox.zip   31.8 KB
+  chrome.zip   36.7 KB
+  firefox.zip  36.8 KB
 
 SHA256:
-  469051052d8d2525732ef3fed94753495b1a155c40a27a6562610daad09585c2  chrome
-  7306fbd3ff1df5bcba2a396bc650032346e0f657f24a756eff04f81caafd0849  firefox
-
-CHANGES SINCE INITIAL v0.6.0 RELEASE:
-  - EN language full sweep (popup, welcome, content, landing)
-  - Free tier progress bar + 80-cage upgrade banner
-  - Universal AI patterns (45 endpoints: Meta AI, Bing, Grok, Mistral…)
-  - 30+ DOM selectors for prompt detection
-  - Status indicator pill (non-interactive)
-  - firefox-dist/welcome.html rebuilt to EN
-  - 7-cages landing subtitle fixed
-
-QUALITY GATE: 12/12 ✅
+  3f1cc95c4858603d6d04c274930c7292caccf3f96987cb2bc1a33349122a6f97  chrome
+  9fccd6263b2ae4fbee4cd2ff5bea74aa82ee89c11bb0a02d5ab5ef5baaae517c  firefox

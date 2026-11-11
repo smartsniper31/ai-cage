@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # AI CAGE — Complete Release Pipeline
 # scripts/release.ps1
 #
@@ -183,8 +183,9 @@ OK "version.json updated → v$VERSION (will be live at ai-cage-gamma.vercel.app
 
 # ── STEP 9: Update test-results file ─────────────────────────────────────────
 Step "9/11" "Update test-results-v$VERSION.txt"
+$now = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $testContent = @"
-AI CAGE v$VERSION — Test Results
+AI CAGE v$VERSION - Test Results
 Date: $now
 ================================
 
@@ -209,8 +210,12 @@ OK "test-results-v$VERSION.txt updated"
 # ── STEP 10: Git add + commit + push ─────────────────────────────────────────
 Step "10/11" "Git commit + push origin master"
 
+# Temporarily relax error preference for git commands (git writes warnings to stderr)
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+
 # Stage all modified tracked files + new docs/src files
-# Note: dist/ is in .gitignore (correct — binaries don't go in git)
+# Note: dist/ is in .gitignore (correct - binaries don't go in git)
 # Zips go to GitHub Release only (Step 11)
 git add --all 2>&1 | Out-Null
 
@@ -218,21 +223,25 @@ git add --all 2>&1 | Out-Null
 $status = git status --porcelain
 if ($status) {
     if ($Message -eq "") {
-        $Message = "chore: release v$VERSION — rebuild zips + assets updated"
+        $Message = "chore: release v$VERSION - rebuild zips + assets updated"
     }
     git commit -m $Message
     if ($LASTEXITCODE -ne 0) { FAIL "git commit failed (pre-commit hook may have blocked it)" }
     OK "Committed: $Message"
 } else {
-    Write-Host "    ℹ️  Nothing new to commit — working tree clean" -ForegroundColor DarkGray
+    Write-Host "    Nothing new to commit - working tree clean" -ForegroundColor DarkGray
 }
 
 git push origin master
 if ($LASTEXITCODE -ne 0) { FAIL "git push failed" }
-OK "Pushed to origin/master — Vercel auto-deploy triggered"
+OK "Pushed to origin/master - Vercel auto-deploy triggered"
+
+$ErrorActionPreference = $prevEAP
 
 # ── STEP 11: GitHub Release — delete old assets, upload fresh zips ───────────
 Step "11/11" "Update GitHub Release v$VERSION assets"
+
+$ErrorActionPreference = "Continue"
 
 # Get current asset names
 $assets = gh release view v$VERSION --json assets --jq ".assets[].name" 2>&1
