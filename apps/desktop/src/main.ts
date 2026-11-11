@@ -280,7 +280,10 @@ cageBtn.addEventListener('click', () => {
 });
 uncageBtn.addEventListener('click', () => {
   const ai = outputEl.value;
-  if (!ai || !lastEntities.length) return;
+  if (!ai || !lastEntities.length) {
+    showNotification('⚠️ No session to restore — cage some text first, then paste the AI response here.', 'warn', 4000);
+    return;
+  }
   outputEl.value = uncageText(ai, lastEntities);
   countEl.textContent = '0';
   listEl.innerHTML = '<li>Restored.</li>';

@@ -266,6 +266,45 @@ const personNameDetector: Detector = {
   defaultScore: 0.58,
 };
 
+/**
+ * Postal address detector — street addresses in French, English, Arabic-Latin.
+ *
+ * Covers patterns like:
+ *   - "12 Rue Habib Bourguiba, Monastir 5000"
+ *   - "Avenue de la Liberté, Tunis"
+ *   - "12 Main Street, London SW1A 1AA"
+ *   - preceded by labels: "Adresse:", "Address:", "Domicile:"
+ *
+ * Design note: score 0.72 — addresses are inherently ambiguous.
+ * We require a street-type keyword OR a postal code to avoid false positives.
+ */
+const postalAddressDetector: Detector = {
+  name: 'Postal Address',
+  type: 'POSTAL_ADDRESS',
+  patterns: [
+    // ── Labelled (high confidence) ─────────────────────────────────────────
+    // "Adresse : 12 Rue Habib Bourguiba, Monastir 5000"
+    /\b(?:Adresse|Domicile|R[eé]sidence|Address|Home\s+Address|Mailing\s+Address)\s*[:=\-]\s*([^\n]{5,80})/gi,
+
+    // ── French street types ────────────────────────────────────────────────
+    // "12 Rue Habib Bourguiba" / "Avenue de la Paix" / "Boulevard 7 Novembre"
+    /\b\d{1,4}\s+(?:Rue|Avenue|Av\.|Boulevard|Blvd\.?|Impasse|Allée|Place|Route|Cité|Quartier|Résidence|Lotissement|Zone)\s+[A-ZÀ-Ÿa-zà-ÿ][A-ZÀ-Ÿa-zà-ÿ\s\d]{3,50}/gi,
+
+    // ── English street types ───────────────────────────────────────────────
+    // "12 Main Street, London" / "5B Baker Street"
+    /\b\d{1,4}[A-Z]?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|Place|Pl\.?|Square|Sq\.?|Way|Close|Crescent|Terrace)\b/gi,
+
+    // ── Postal code patterns (FR/TN/UK/DE) ────────────────────────────────
+    // Tunisia: 4 digits — "Monastir 5000", "Tunis 1000"
+    /\b(?:Tunis|Sfax|Sousse|Monastir|Bizerte|Nabeul|Kairouan|Gafsa|Ariana|Manouba|Ben\s+Arous|La\s+Marsa|Hammamet|Djerba|Gabès)\s+\d{4}\b/gi,
+    // France: 5-digit postal code with city
+    /\b\d{5}\s+[A-ZÀ-Ÿ][a-zA-Zà-ÿ\s\-]{2,30}\b/g,
+    // UK: postcode format
+    /\b[A-Z]{1,2}\d{1,2}[A-Z]?\s+\d[A-Z]{2}\b/g,
+  ],
+  defaultScore: 0.72,
+};
+
 // ---------------------------------------------------------------------------
 // Phase 4 — Cage 5: Voice/Video transcript detectors
 // ---------------------------------------------------------------------------
@@ -322,21 +361,22 @@ const meetingParticipantDetector: Detector = {
  * The deduplication in scan.ts will prefer the first match in case of overlap.
  */
 export const ALL_DETECTORS: readonly Detector[] = [
-  privateKeyDetector,    // 1.00
-  mfTnDetector,          // 0.92
-  emailDetector,         // 0.95
-  creditCardDetector,    // 0.90
-  ibanDetector,          // 0.90
-  apiKeyDetector,        // 0.88
-  genericSecretDetector, // 0.82
+  privateKeyDetector,       // 1.00
+  mfTnDetector,             // 0.92
+  emailDetector,            // 0.95
+  creditCardDetector,       // 0.90
+  ibanDetector,             // 0.90
+  apiKeyDetector,           // 0.88
+  genericSecretDetector,    // 0.82
   transcriptMarkerDetector, // 0.82 — Cage 5
-  ipDetector,            // 0.85
-  ribTnDetector,         // 0.80
-  passportTnDetector,    // 0.78
-  phoneDetector,         // 0.75
+  ipDetector,               // 0.85
+  ribTnDetector,            // 0.80
+  passportTnDetector,       // 0.78
+  phoneDetector,            // 0.75
+  postalAddressDetector,    // 0.72 — NEW: street addresses
   meetingParticipantDetector, // 0.68 — Cage 5
-  carteSejourDetector,   // 0.72
-  passportDetector,      // 0.70
-  cinTnDetector,         // 0.65
-  personNameDetector,    // 0.58
+  carteSejourDetector,      // 0.72
+  passportDetector,         // 0.70
+  cinTnDetector,            // 0.65
+  personNameDetector,       // 0.58
 ];
