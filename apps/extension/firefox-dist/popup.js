@@ -253,22 +253,36 @@
     var _a;
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const tabId = (tab == null ? void 0 : tab.id) ?? 0;
-    const resp = await chrome.runtime.sendMessage({ type: "GET_STATS", tabId });
+    const [resp, licInfo] = await Promise.all([
+      chrome.runtime.sendMessage(
+        { type: "GET_STATS", tabId }
+      ),
+      checkLicense(chromeStorageAdapter, 0)
+    ]);
     const monthly = (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0;
     const session = (resp == null ? void 0 : resp.sessionCageCount) ?? 0;
     const shadow = (resp == null ? void 0 : resp.sessionShadowCount) ?? 0;
     const tabCnt = (resp == null ? void 0 : resp.tabCount) ?? 0;
+    const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
     setText("monthly-caged", monthly);
     setText("monthly-shadow", (resp == null ? void 0 : resp.monthlyShadowAi) ?? 0);
     setText("session-count", session);
     setText("tab-count", tabCnt);
-    renderProgress(monthly);
+    const progressWrap = document.getElementById("free-progress-wrap");
+    const upgradeBanner = document.getElementById("upgrade-banner");
+    if (isPro) {
+      if (progressWrap) progressWrap.style.display = "none";
+      if (upgradeBanner) upgradeBanner.classList.remove("show");
+    } else {
+      if (progressWrap) progressWrap.style.display = "block";
+      renderProgress(monthly);
+    }
     const statusEl = document.getElementById("status-text");
     if (statusEl) {
       statusEl.style.background = "";
       statusEl.style.color = "";
       statusEl.style.borderColor = "";
-      if (monthly >= FREE_LIMIT) {
+      if (!isPro && monthly >= FREE_LIMIT) {
         statusEl.textContent = "🔶 Monthly limit reached — upgrade for unlimited cages";
         statusEl.style.background = "#fef3c7";
         statusEl.style.color = "#92400e";
@@ -278,15 +292,15 @@
         statusEl.style.background = "#fef2f2";
         statusEl.style.color = "#991b1b";
         statusEl.style.borderColor = "#fecaca";
-      } else if (monthly >= WARN_AT) {
+      } else if (!isPro && monthly >= WARN_AT) {
         statusEl.textContent = `⚡ ${FREE_LIMIT - monthly} free cage${FREE_LIMIT - monthly === 1 ? "" : "s"} left this month — upgrade soon`;
         statusEl.style.background = "#fffbeb";
         statusEl.style.color = "#92400e";
         statusEl.style.borderColor = "#fde68a";
       } else if (session > 0) {
-        statusEl.textContent = `🔒 Active — ${session} item${session > 1 ? "s" : ""} protected this session`;
+        statusEl.textContent = `🔒 ${isPro ? "Pro — " : ""}${session} item${session > 1 ? "s" : ""} protected this session`;
       } else if (monthly > 0) {
-        statusEl.textContent = `✅ Active — ${monthly} item${monthly > 1 ? "s" : ""} protected this month`;
+        statusEl.textContent = `✅ ${isPro ? "Pro — " : ""}${monthly} item${monthly > 1 ? "s" : ""} protected this month`;
       } else {
         statusEl.textContent = "🛡️ Monitoring — type a prompt on an AI site to test";
       }
