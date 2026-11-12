@@ -155,15 +155,20 @@ async function renderOverview(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const tabId = tab?.id ?? 0;
 
-  const resp = await chrome.runtime.sendMessage<
-    { type: string; tabId: number },
-    StatsResponse
-  >({ type: 'GET_STATS', tabId });
+  // Check license first — both calls run in parallel for speed
+  const [resp, licInfo] = await Promise.all([
+    chrome.runtime.sendMessage<{ type: string; tabId: number }, StatsResponse>(
+      { type: 'GET_STATS', tabId },
+    ),
+    checkLicense(chromeStorageAdapter, 0),
+  ]);
 
   const monthly = resp?.monthlyPiiCaged   ?? 0;
   const session = resp?.sessionCageCount  ?? 0;
   const shadow  = resp?.sessionShadowCount ?? 0;
   const tabCnt  = resp?.tabCount          ?? 0;
+
+  const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
 
   // Stats
   setText('monthly-caged',  monthly);
@@ -171,8 +176,18 @@ async function renderOverview(): Promise<void> {
   setText('session-count',  session);
   setText('tab-count',      tabCnt);
 
-  // Progress bar + upgrade flow
-  renderProgress(monthly);
+  // Progress bar: only show for Free tier users
+  const progressWrap = document.getElementById('free-progress-wrap');
+  const upgradeBanner = document.getElementById('upgrade-banner');
+  if (isPro) {
+    // PRO — hide the entire free-tier quota section
+    if (progressWrap)  progressWrap.style.display  = 'none';
+    if (upgradeBanner) upgradeBanner.classList.remove('show');
+  } else {
+    // FREE — show bar and fill it
+    if (progressWrap) progressWrap.style.display = 'block';
+    renderProgress(monthly);
+  }
 
   // Status pill
   const statusEl = document.getElementById('status-text');
@@ -182,30 +197,30 @@ async function renderOverview(): Promise<void> {
     statusEl.style.color        = '';
     statusEl.style.borderColor  = '';
 
-    if (monthly >= FREE_LIMIT) {
-      // Limit hit — urgent upgrade
+    if (!isPro && monthly >= FREE_LIMIT) {
+      // Free tier limit hit — urgent upgrade
       statusEl.textContent  = '🔶 Monthly limit reached — upgrade for unlimited cages';
       statusEl.style.background  = '#fef3c7';
       statusEl.style.color       = '#92400e';
       statusEl.style.borderColor = '#fde68a';
     } else if (shadow > 0) {
-      // Shadow AI detected — red alert
+      // Shadow AI detected — red alert (shown for all tiers)
       statusEl.textContent  = `⚠️ Shadow AI detected — ${shadow} suspicious call${shadow > 1 ? 's' : ''}`;
       statusEl.style.background  = '#fef2f2';
       statusEl.style.color       = '#991b1b';
       statusEl.style.borderColor = '#fecaca';
-    } else if (monthly >= WARN_AT) {
-      // Warning zone
+    } else if (!isPro && monthly >= WARN_AT) {
+      // Free tier warning zone
       statusEl.textContent  = `⚡ ${FREE_LIMIT - monthly} free cage${FREE_LIMIT - monthly === 1 ? '' : 's'} left this month — upgrade soon`;
       statusEl.style.background  = '#fffbeb';
       statusEl.style.color       = '#92400e';
       statusEl.style.borderColor = '#fde68a';
     } else if (session > 0) {
       // Active this session
-      statusEl.textContent  = `🔒 Active — ${session} item${session > 1 ? 's' : ''} protected this session`;
+      statusEl.textContent  = `🔒 ${isPro ? 'Pro — ' : ''}${session} item${session > 1 ? 's' : ''} protected this session`;
     } else if (monthly > 0) {
       // Previously used this month
-      statusEl.textContent  = `✅ Active — ${monthly} item${monthly > 1 ? 's' : ''} protected this month`;
+      statusEl.textContent  = `✅ ${isPro ? 'Pro — ' : ''}${monthly} item${monthly > 1 ? 's' : ''} protected this month`;
     } else {
       // Brand new / nothing yet
       statusEl.textContent = '🛡️ Monitoring — type a prompt on an AI site to test';
