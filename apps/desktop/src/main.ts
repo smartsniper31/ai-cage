@@ -7,7 +7,7 @@
 
 import {
   cageText, uncageText,
-  logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV, clearAuditLog,
+  logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV, generatePlainReport, clearAuditLog,
   localStorageAdapter,
   ALL_AI_ENDPOINTS,
   getDefaultPolicy, loadPolicy, savePolicy,
@@ -50,6 +50,7 @@ const customToolInput = document.getElementById('sim-tool-custom') as HTMLInputE
 
 const auditTableBody  = document.getElementById('audit-tbody')    as HTMLTableSectionElement;
 const exportCsvBtn    = document.getElementById('export-csv-btn') as HTMLButtonElement;
+const exportReportBtn = document.getElementById('export-report-btn') as HTMLButtonElement | null;
 const clearLogBtn     = document.getElementById('clear-log-btn')  as HTMLButtonElement;
 const auditSummaryEl  = document.getElementById('audit-summary')  as HTMLDivElement;
 const shadowListEl    = document.getElementById('shadow-list')    as HTMLUListElement;
@@ -468,6 +469,47 @@ exportCsvBtn.addEventListener('click', async () => {
   a.href = url; a.download = `ai-cage-audit-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
+});
+
+// ── Plain-language report ──────────────────────────────────────────────────
+exportReportBtn?.addEventListener('click', async () => {
+  if (exportReportBtn) {
+    exportReportBtn.disabled = true;
+    exportReportBtn.textContent = '⏳ Generating…';
+  }
+  try {
+    const licInfo = await checkLicense(store, 0);
+    const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
+    const customerName = licInfo.payload?.customer ?? 'there';
+    const result = await generatePlainReport(store, { isPro, customerName });
+
+    if (!result.text || result.totalProtected === 0 && result.totalShadowAi === 0) {
+      showNotification('⚠️ Nothing to report yet — use AI CAGE to protect some data first.', 'warn', 4000);
+      return;
+    }
+
+    const blob = new Blob([result.text], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `ai-cage-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification(
+      isPro ? '✅ Full Pro report downloaded.' : '✅ Report downloaded — upgrade to Pro for full details.',
+      'ok', 3500,
+    );
+  } catch {
+    showNotification('❌ Could not generate report. Please try again.', 'error', 3000);
+  } finally {
+    if (exportReportBtn) {
+      exportReportBtn.disabled = false;
+      exportReportBtn.textContent = '📋 Plain Report';
+    }
+  }
 });
 clearLogBtn.addEventListener('click', async () => {
   if (!confirm('⚠️ Delete all audit log entries? This is recorded in the tamper-evidence history.')) return;
