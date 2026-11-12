@@ -42,6 +42,30 @@ let sessionShadowCount = 0;
 const tabCageCounts    = new Map<number, number>();
 
 // ---------------------------------------------------------------------------
+// C2 — Deduplication cache: prevents double-counting the same cage event
+// that arrives twice (once from content.ts DOM intercept, once from
+// injected.ts network intercept) within a 2-second window.
+// Key: `${site}:${totalCount}` — Value: timestamp of last log
+// ---------------------------------------------------------------------------
+const cageDedupeCache = new Map<string, number>();
+const CAGE_DEDUPE_WINDOW_MS = 2000;
+
+function isDuplicateCageEvent(site: string, totalCount: number): boolean {
+  const key = `${site}:${totalCount}`;
+  const now = Date.now();
+  const last = cageDedupeCache.get(key);
+  if (last !== undefined && now - last < CAGE_DEDUPE_WINDOW_MS) {
+    return true; // duplicate — skip
+  }
+  cageDedupeCache.set(key, now);
+  // Evict entries older than the window to avoid memory growth
+  for (const [k, t] of cageDedupeCache) {
+    if (now - t > CAGE_DEDUPE_WINDOW_MS * 10) cageDedupeCache.delete(k);
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Message protocol (background ↔ content ↔ popup)
 // ---------------------------------------------------------------------------
 
@@ -90,9 +114,22 @@ async function handleCageReport(
   tabId: number,
 ): Promise<void> {
   const count = msg.entities.length;
+
+  // C2 — Skip if this is a duplicate event (same site + count within 2s)
+  // Prevents double-logging when both DOM intercept and network intercept
+  // fire for the same user action.
+  if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
+    console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
+    // Still update the badge counter so the icon stays accurate,
+    // but do NOT write another audit entry.
+    sessionCageCount += count;
+    tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
+    await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
+    return;
+  }
+
   sessionCageCount += count;
   tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
-
   await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
 
   // Build counts-by-type map (no original values)
@@ -119,6 +156,25 @@ async function handleCageReport(
 // Cage 2: Shadow AI detection — now inline in registerShadowAiObserver
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// C3 — Shadow AI cooldown: same hostname logged at most once per 5 minutes.
+// ChatGPT and other AI sites make dozens of background polling requests per
+// session. Without this guard, the audit log fills with hundreds of identical
+// SHADOW_AI_DETECTED entries that confuse users and bloat the CSV.
+// ---------------------------------------------------------------------------
+const shadowCooldownCache = new Map<string, number>();
+const SHADOW_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+function isShadowCoolingDown(hostname: string): boolean {
+  const now  = Date.now();
+  const last = shadowCooldownCache.get(hostname);
+  if (last !== undefined && now - last < SHADOW_COOLDOWN_MS) {
+    return true; // already logged recently — skip
+  }
+  shadowCooldownCache.set(hostname, now);
+  return false;
+}
+
 /**
  * Register the webRequest listener for Shadow AI detection.
  * MV3 FIX: Use onBeforeRequest (works in MV3).
@@ -144,6 +200,12 @@ function registerShadowAiObserver(): void {
 
         const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
         const hostname = hostnameMatch?.[1] ?? url;
+
+        // C3 — Skip if this hostname was already logged within the last 5 min
+        if (isShadowCoolingDown(hostname)) {
+          return;
+        }
+
         const initiator = details.initiator ?? 'unknown';
 
         void logEvent(
@@ -295,22 +357,26 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // ---------------------------------------------------------------------------
 
 // P0-6: Open welcome page on first install
+// C4: Only log EXTENSION_STARTED on genuine install — not on every SW restart.
+// MV3 service workers restart every ~30s of inactivity. Logging on every
+// restart produced 20+ identical entries per session and cluttered the CSV.
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === chrome.runtime.OnInstalledReason.INSTALL) {
     void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+    // Log only on real first install
+    void logEvent(
+      {
+        type: 'EXTENSION_STARTED',
+        site: 'background',
+        counts: {},
+        totalCount: 0,
+        detail: 'First install',
+      },
+      chromeStorageAdapter,
+    );
   }
 });
 
 registerShadowAiObserver();
-
-void logEvent(
-  {
-    type: 'EXTENSION_STARTED',
-    site: 'background',
-    counts: {},
-    totalCount: 0,
-  },
-  chromeStorageAdapter,
-);
 
 console.warn('[AI CAGE] Background service worker v0.6.0 — Cage 1+2+3 active.');
