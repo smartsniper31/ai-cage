@@ -392,6 +392,51 @@ async function exportCSV(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+// ─── Plain-language report ──────────────────────────────────────────────────────
+
+async function exportPlainReport(): Promise<void> {
+  const btn = document.getElementById('report-btn') as HTMLButtonElement | null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+
+  try {
+    const resp = await chrome.runtime.sendMessage<
+      { type: string },
+      { report: string; isPro: boolean }
+    >({ type: 'GET_PLAIN_REPORT' });
+
+    if (!resp?.report) {
+      alert('Nothing to report yet — use AI CAGE to protect some data first, then try again.');
+      return;
+    }
+
+    const blob = new Blob([resp.report], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `ai-cage-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Visual confirmation
+    if (btn) {
+      btn.textContent = '✅ Report downloaded';
+      setTimeout(() => {
+        if (btn) {
+          btn.textContent = resp.isPro ? '📋 Full Report' : '📋 Report';
+          btn.disabled = false;
+        }
+      }, 2000);
+    }
+  } catch {
+    alert('Could not generate report. Please try again.');
+  } finally {
+    if (btn && btn.disabled) {
+      btn.disabled = false;
+      btn.textContent = '📋 Report';
+    }
+  }
+}
+
 // ─── Update checker ───────────────────────────────────────────────────────────
 /**
  * Fetches version.json from Vercel (static file, no user data sent).
@@ -675,6 +720,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Export CSV ──
   document.getElementById('export-btn')
     ?.addEventListener('click', () => void exportCSV());
+
+  // ── Plain-language report ──
+  document.getElementById('report-btn')
+    ?.addEventListener('click', () => void exportPlainReport());
 
   // ── Default tab ──
   activateTab('overview');

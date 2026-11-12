@@ -236,6 +236,14 @@
       font-weight: 700; cursor: pointer; white-space: nowrap;
     }
     .export-btn:hover { opacity: 0.9; }
+    .report-btn {
+      background: #0f172a; color: #fff; border: none;
+      border-radius: 5px; padding: 4px 10px; font-size: 10px;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .report-btn:hover  { opacity: 0.82; }
+    .report-btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .help-btn {
       background: none; border: none; font-size: 16px; cursor: pointer;
       color: #166534; padding: 0 2px; line-height: 1; text-decoration: none;
@@ -452,6 +460,10 @@
     <span class="footer-text">✅ Zero data leaves your device.</span>
     <a href="https://ai-cage-gamma.vercel.app/#privacy" target="_blank"
        class="help-btn" title="Help & Support" aria-label="Help">❓</a>
+    <button class="report-btn" id="report-btn"
+            title="Download a plain-language protection report — no technical jargon">
+      📋 Report
+    </button>
     <button class="export-btn" id="export-btn"
             title="Export audit log as CSV for your compliance team">
       📄 Export CSV

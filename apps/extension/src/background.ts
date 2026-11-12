@@ -15,7 +15,7 @@
  *   - Version unified to 0.6.0
  */
 
-import { summariseCaged, matchAiEndpoint, logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV } from '@ai-cage/core';
+import { summariseCaged, matchAiEndpoint, logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV, generatePlainReport, checkLicense } from '@ai-cage/core';
 import type { CagedEntity, AuditEntry } from '@ai-cage/core';
 
 // ---------------------------------------------------------------------------
@@ -69,12 +69,17 @@ interface ExportAuditCSVMessage {
   type: 'EXPORT_AUDIT_CSV';
 }
 
+interface GetPlainReportMessage {
+  type: 'GET_PLAIN_REPORT';
+}
+
 type IncomingMessage =
   | CageReportMessage
   | GetStatsMessage
   | GetShadowLogMessage
   | GetAuditLogMessage
-  | ExportAuditCSVMessage;
+  | ExportAuditCSVMessage
+  | GetPlainReportMessage;
 
 // ---------------------------------------------------------------------------
 // Cage 1: Handle PII cage reports from content.ts
@@ -257,6 +262,20 @@ chrome.runtime.onMessage.addListener(
     if (msg.type === 'EXPORT_AUDIT_CSV') {
       void exportAuditLogCSV(chromeStorageAdapter).then((csv: string) => {
         sendResponse({ csv });
+      });
+      return true;
+    }
+
+    if (msg.type === 'GET_PLAIN_REPORT') {
+      // Check license to know if full Pro report is unlocked
+      void checkLicense(chromeStorageAdapter, 0).then(async (licInfo) => {
+        const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
+        const customerName = licInfo.payload?.customer ?? 'there';
+        const result = await generatePlainReport(
+          chromeStorageAdapter,
+          { isPro, customerName },
+        );
+        sendResponse({ report: result.text, isPro });
       });
       return true;
     }

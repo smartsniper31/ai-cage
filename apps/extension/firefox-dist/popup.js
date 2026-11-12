@@ -424,6 +424,43 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+  async function exportPlainReport() {
+    const btn = document.getElementById("report-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "⏳ Generating…";
+    }
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "GET_PLAIN_REPORT" });
+      if (!(resp == null ? void 0 : resp.report)) {
+        alert("Nothing to report yet — use AI CAGE to protect some data first, then try again.");
+        return;
+      }
+      const blob = new Blob([resp.report], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ai-cage-report-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (btn) {
+        btn.textContent = "✅ Report downloaded";
+        setTimeout(() => {
+          if (btn) {
+            btn.textContent = resp.isPro ? "📋 Full Report" : "📋 Report";
+            btn.disabled = false;
+          }
+        }, 2e3);
+      }
+    } catch {
+      alert("Could not generate report. Please try again.");
+    } finally {
+      if (btn && btn.disabled) {
+        btn.disabled = false;
+        btn.textContent = "📋 Report";
+      }
+    }
+  }
   async function checkForUpdates(installedVersion) {
     var _a;
     try {
@@ -574,7 +611,7 @@
     });
   }
   document.addEventListener("DOMContentLoaded", () => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     let installedVersion = "0.6.0";
     try {
       const manifest = chrome.runtime.getManifest();
@@ -614,6 +651,7 @@
     });
     wireAccountTab();
     (_g = document.getElementById("export-btn")) == null ? void 0 : _g.addEventListener("click", () => void exportCSV());
+    (_h = document.getElementById("report-btn")) == null ? void 0 : _h.addEventListener("click", () => void exportPlainReport());
     activateTab("overview");
     void renderOverview();
   });
