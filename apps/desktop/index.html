@@ -109,6 +109,9 @@
     .btn-secondary { background: #e2e8f0; color: var(--text); }
     .btn-copy      { background: var(--blue); color: #fff; }
     .btn-danger    { background: var(--red); color: #fff; }
+    .btn-report    { background: #0f172a; color: #fff; }
+    .btn-report:hover { opacity: 0.82; }
+    .btn-report:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-amber     { background: var(--amber); color: #fff; }
     .cage-stat     { margin-left: auto; font-size: 12px; color: var(--muted); }
     .cage-stat strong { color: var(--green); font-size: 22px; font-weight: 800; }
@@ -354,6 +357,7 @@
   <div class="panel" id="panel-audit">
     <div id="audit-summary"></div>
     <div class="audit-actions">
+      <button class="btn-report" id="export-report-btn" title="Download a plain-language protection report — no technical jargon">📋 Plain Report</button>
       <button class="btn-primary" id="export-csv-btn">📄 Export CSV for Auditor</button>
       <button class="btn-danger"  id="clear-log-btn">🗑 Clear Log</button>
     </div>
