@@ -23,10 +23,86 @@
 
 import { scanText } from '@ai-cage/presidio-lite';
 import type { EntityType } from '@ai-cage/presidio-lite';
-import type { CageResult, CagedEntity, CageOptions } from './types.js';
+import type { CageResult, CagedEntity, CageOptions, InferenceRisk } from './types.js';
 
 // Re-export so consumers can import everything from @ai-cage/core.
-export type { CageResult, CagedEntity, CageOptions };
+export type { CageResult, CagedEntity, CageOptions, InferenceRisk };
+
+// ---------------------------------------------------------------------------
+// Session salt — ephemeral token rotation (Linkage Attack prevention)
+// Rotates every session so [CAGED_EMAIL_A7X9_1] in session 1 becomes
+// [CAGED_EMAIL_K3P2_1] in session 2. The AI cannot correlate prompts
+// across sessions. Generated once per module load, never persisted.
+// ---------------------------------------------------------------------------
+function generateSessionSalt(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/I/1 ambiguity
+  let s = '';
+  for (let i = 0; i < 4; i++) {
+    s += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return s;
+}
+
+/** Salt generated once per session. Never stored, never transmitted. */
+export const SESSION_SALT: string = generateSessionSalt();
+
+// ---------------------------------------------------------------------------
+// Quasi-identifier patterns — Inference Risk detection
+// ---------------------------------------------------------------------------
+const QUASI_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
+  // Age — "34 ans", "aged 45", "45 years old"
+  { label: 'age',          pattern: /\b\d{1,3}\s*(?:ans?|years?\s*old|year[-\s]old|yo\b)/i },
+  // Company size — "8 employees", "15 salariés", "équipe de 6"
+  { label: 'team_size',    pattern: /\b\d{1,4}\s*(?:employ[eé]es?|salari[eé]s?|staff|workers?|personnes?|collaborateurs?|membres?)\b/i },
+  // Monetary amount — "12 500 DT", "€ 8000", "$4,200", "15 000 €"
+  { label: 'amount',       pattern: /(?:€|\$|£|DT|TND|EUR|USD)\s*[\d\s,.]+|[\d\s,.]+\s*(?:€|\$|£|DT|TND|EUR|USD)/i },
+  // Specific date — "le 3 novembre", "signed on Nov 3", "03/11/2026"
+  { label: 'specific_date', pattern: /\b(?:le\s+)?\d{1,2}[/\-.]\d{1,2}(?:[/\-.]\d{2,4})?|\b\d{1,2}\s+(?:jan(?:vier)?|f[eé]v(?:rier)?|mar(?:s|ch)?|avr(?:il)?|apr(?:il)?|mai|may|juin|jun(?:e)?|juil(?:let)?|jul(?:y)?|ao[uû]t|aug(?:ust)?|sep(?:t(?:embre|ember)?)?|oct(?:obre|ober)?|nov(?:embre|ember)?|d[eé]c(?:embre|ember)?)\b/i },
+  // Named city / location — "in Bizerte", "à Sousse", "near Tunis"
+  { label: 'city',         pattern: /\b(?:à|at|in|near|de)\s+[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?\b/ },
+  // Professional role
+  { label: 'role',         pattern: /\b(?:patron|gérant|CEO|director|manager|associate|partner|avocat|médecin|comptable|notaire|architecte|consultant)\b/i },
+  // Contract / deal reference
+  { label: 'deal_ref',     pattern: /\b(?:contrat|dossier|deal|affaire|cas|case|matter|n[°o]\.?\s*\d+)\b/i },
+  // Industry / sector
+  { label: 'sector',       pattern: /\b(?:agence|cabinet|étude|firm|studio|startup|société|entreprise|sarl|suarl|sa\b|llc|inc\b)\b/i },
+];
+
+/** Minimum number of quasi-identifiers to trigger an Inference Risk warning. */
+const INFERENCE_THRESHOLD = 3;
+
+/**
+ * Counts distinct quasi-identifiers in a text.
+ * Returns an InferenceRisk descriptor.
+ * Does NOT modify the text — read-only analysis.
+ */
+export function detectQuasiIdentifiers(text: string): InferenceRisk {
+  const clues: string[] = [];
+
+  for (const { label, pattern } of QUASI_PATTERNS) {
+    // Reset stateful regex
+    pattern.lastIndex = 0;
+    if (pattern.test(text)) {
+      clues.push(label);
+    }
+  }
+
+  const score = clues.length;
+  const risky = score >= INFERENCE_THRESHOLD;
+
+  let message = '';
+  if (risky) {
+    message =
+      `Inference Risk: ${score} clues combined can identify you even without your name. ` +
+      `(${clues.map(c => c.replace('_', ' ')).join(', ')})`;
+  } else if (score > 0) {
+    message =
+      `${score} context clue${score > 1 ? 's' : ''} detected. ` +
+      `Add ${INFERENCE_THRESHOLD - score} more and you become identifiable without your name.`;
+  }
+
+  return { score, risky, clues, message };
+}
 
 /**
  * Maps EntityType values to short, human-readable label strings used
@@ -76,16 +152,23 @@ const TYPE_LABEL: Record<EntityType, string> = {
  * ```
  */
 export function cageText(text: string, options: CageOptions = {}): CageResult {
-  const { minScore = 0.6, labelledPlaceholders = true } = options;
+  const { minScore = 0.6, labelledPlaceholders = true, sessionSalt } = options;
+
+  // Use provided salt or fall back to the module-level session salt.
+  // This ensures tokens rotate every session automatically.
+  const salt = sessionSalt ?? SESSION_SALT;
 
   // 1. Detect all PII — purely local, offline.
   const matches = scanText(text, { minScore });
 
+  // 2. Run inference risk analysis (read-only, before any replacement)
+  const inferenceRisk = detectQuasiIdentifiers(text);
+
   if (matches.length === 0) {
-    return { cagedText: text, entities: [], totalCaged: 0 };
+    return { cagedText: text, entities: [], totalCaged: 0, inferenceRisk };
   }
 
-  // 2. Build entities and replacement map.
+  // 3. Build entities and replacement map.
   const entities: CagedEntity[] = [];
   let counter = 1;
 
@@ -97,7 +180,9 @@ export function cageText(text: string, options: CageOptions = {}): CageResult {
 
   for (const match of sortedDesc) {
     const label = labelledPlaceholders ? `_${TYPE_LABEL[match.type]}` : '';
-    const placeholder = `[CAGED${label}_${counter}]`;
+    // SESSION_SALT rotates every session → prevents cross-session linkage attacks.
+    // e.g. [CAGED_EMAIL_A7X9_1] in session 1, [CAGED_EMAIL_K3P2_1] in session 2.
+    const placeholder = `[CAGED${label}_${salt}_${counter}]`;
     counter++;
 
     entities.unshift({
@@ -114,6 +199,7 @@ export function cageText(text: string, options: CageOptions = {}): CageResult {
     cagedText: result,
     entities,
     totalCaged: entities.length,
+    inferenceRisk,
   };
 }
 

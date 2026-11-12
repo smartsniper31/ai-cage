@@ -75,14 +75,16 @@ describe('cageText — basic PII replacement', () => {
 describe('cageText — placeholder format', () => {
   it('generates labelled placeholders by default', () => {
     const { cagedText } = cageText('alice@example.com');
-    expect(cagedText).toMatch(/\[CAGED_EMAIL_\d+\]/);
+    // Format: [CAGED_EMAIL_<SALT>_<N>] — salt is 4 alphanumeric chars
+    expect(cagedText).toMatch(/\[CAGED_EMAIL_[A-Z0-9]{4}_\d+\]/);
   });
 
   it('generates unlabelled placeholders when labelledPlaceholders=false', () => {
     const { cagedText } = cageText('alice@example.com', {
       labelledPlaceholders: false,
     });
-    expect(cagedText).toMatch(/\[CAGED_\d+\]/);
+    // Format: [CAGED_<SALT>_<N>]
+    expect(cagedText).toMatch(/\[CAGED_[A-Z0-9]{4}_\d+\]/);
     expect(cagedText).not.toMatch(/EMAIL/);
   });
 
@@ -115,8 +117,9 @@ describe('uncageText — round-trip', () => {
 
   it('restores when the AI response adds text around placeholders', () => {
     const { entities } = cageText('alice@example.com');
-    // Simulate the AI wrapping the placeholder in a sentence
-    const aiResponse = 'I have processed [CAGED_EMAIL_1] and it looks valid.';
+    // Use the actual generated placeholder (includes session salt)
+    const placeholder = entities[0]?.placeholder ?? '';
+    const aiResponse = `I have processed ${placeholder} and it looks valid.`;
     const restored = uncageText(aiResponse, entities);
     expect(restored).toContain('alice@example.com');
   });

@@ -16,7 +16,7 @@
  */
 
 import { summariseCaged, matchAiEndpoint, logEvent, getAuditLog, getAuditSummary, exportAuditLogCSV, generatePlainReport, checkLicense } from '@ai-cage/core';
-import type { CagedEntity, AuditEntry } from '@ai-cage/core';
+import type { CagedEntity, AuditEntry, InferenceRisk } from '@ai-cage/core';
 
 // ---------------------------------------------------------------------------
 // Chrome storage adapter — wraps chrome.storage.local as a StorageAdapter
@@ -40,6 +40,10 @@ const chromeStorageAdapter = {
 let sessionCageCount   = 0;
 let sessionShadowCount = 0;
 const tabCageCounts    = new Map<number, number>();
+
+// Last inference risk detected — updated on every CAGE_REPORT, returned in GET_STATS
+// so the popup Overview can display it without an extra round-trip.
+let lastInferenceRisk: InferenceRisk | null = null;
 
 // ---------------------------------------------------------------------------
 // C2 — Deduplication cache: prevents double-counting the same cage event
@@ -74,6 +78,7 @@ interface CageReportMessage {
   tabId: number;
   site: string;
   entities: CagedEntity[];
+  inferenceRisk?: InferenceRisk;
 }
 
 interface GetStatsMessage {
@@ -115,13 +120,14 @@ async function handleCageReport(
 ): Promise<void> {
   const count = msg.entities.length;
 
+  // Store inference risk from this report (may be risky even if count === 0)
+  if (msg.inferenceRisk) {
+    lastInferenceRisk = msg.inferenceRisk;
+  }
+
   // C2 — Skip if this is a duplicate event (same site + count within 2s)
-  // Prevents double-logging when both DOM intercept and network intercept
-  // fire for the same user action.
   if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
     console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
-    // Still update the badge counter so the icon stays accurate,
-    // but do NOT write another audit entry.
     sessionCageCount += count;
     tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
     await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
@@ -132,19 +138,13 @@ async function handleCageReport(
   tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
   await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
 
-  // Build counts-by-type map (no original values)
   const counts: Record<string, number> = {};
   for (const e of msg.entities) {
     counts[e.type] = (counts[e.type] ?? 0) + 1;
   }
 
   await logEvent(
-    {
-      type: 'PII_CAGED',
-      site: msg.site,
-      counts,
-      totalCount: count,
-    },
+    { type: 'PII_CAGED', site: msg.site, counts, totalCount: count },
     chromeStorageAdapter,
   );
 
@@ -295,10 +295,11 @@ chrome.runtime.onMessage.addListener(
         sendResponse({
           sessionCageCount,
           sessionShadowCount,
-          tabCount:        tabCageCounts.get(tabId) ?? 0,
-          monthlyPiiCaged: summary.totalCaged,
-          monthlyShadowAi: summary.totalShadowAi,
-          topSites:        summary.topSites,
+          tabCount:          tabCageCounts.get(tabId) ?? 0,
+          monthlyPiiCaged:   summary.totalCaged,
+          monthlyShadowAi:   summary.totalShadowAi,
+          topSites:          summary.topSites,
+          inferenceRisk:     lastInferenceRisk,
         });
       });
       return true;
