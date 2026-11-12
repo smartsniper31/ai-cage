@@ -149,6 +149,18 @@ const COUNTER_KEY   = 'ai-cage:audit-id-counter';
  * }, adapter);
  * ```
  */
+/**
+ * Strips any caging tokens like [CAGED_TRANSCRIPT_1] or [EMAIL_1] from a
+ * detail string so that system-generated log messages are always readable.
+ * These tokens appear when a detail string accidentally passes through the
+ * cage engine. We remove them here as the last line of defence.
+ */
+function sanitiseDetail(detail: string | undefined): string | undefined {
+  if (!detail) return detail;
+  // Remove [CAGED_TRANSCRIPT_N], [EMAIL_N], [PERSON_N], [PHONE_N], etc.
+  return detail.replace(/\[[A-Z_]+_\d+\]/g, '[PROTECTED]');
+}
+
 export async function logEvent(
   event: Omit<AuditEntry, 'id' | 'timestamp'>,
   storage: StorageAdapter,
@@ -164,10 +176,16 @@ export async function logEvent(
 
   const id = rawCounter ? parseInt(rawCounter, 10) + 1 : 1;
 
+  // C1: sanitise detail — strip any [CAGED_TRANSCRIPT_N] tokens that may
+  // have leaked into system-generated strings, keeping the log readable.
+  const sanitised = sanitiseDetail(event.detail);
+
   const entry: AuditEntry = {
     id,
     timestamp: new Date().toISOString(),
     ...event,
+    // Only set detail when it has a value (exactOptionalPropertyTypes compat)
+    ...(sanitised !== undefined ? { detail: sanitised } : {}),
   };
 
   log.entries.push(entry);

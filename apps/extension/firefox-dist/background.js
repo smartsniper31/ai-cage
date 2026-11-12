@@ -558,6 +558,10 @@
   }
   const LOG_KEY = "ai-cage:audit-log";
   const COUNTER_KEY = "ai-cage:audit-id-counter";
+  function sanitiseDetail(detail) {
+    if (!detail) return detail;
+    return detail.replace(/\[[A-Z_]+_\d+\]/g, "[PROTECTED]");
+  }
   async function logEvent(event, storage) {
     const [rawLog, rawCounter] = await Promise.all([
       storage.getItem(LOG_KEY),
@@ -565,10 +569,13 @@
     ]);
     const log = rawLog ? JSON.parse(rawLog) : { entries: [], version: 1 };
     const id = rawCounter ? parseInt(rawCounter, 10) + 1 : 1;
+    const sanitised = sanitiseDetail(event.detail);
     const entry = {
       id,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      ...event
+      ...event,
+      // Only set detail when it has a value (exactOptionalPropertyTypes compat)
+      ...sanitised !== void 0 ? { detail: sanitised } : {}
     };
     log.entries.push(entry);
     await Promise.all([
@@ -1164,8 +1171,30 @@
   let sessionCageCount = 0;
   let sessionShadowCount = 0;
   const tabCageCounts = /* @__PURE__ */ new Map();
+  const cageDedupeCache = /* @__PURE__ */ new Map();
+  const CAGE_DEDUPE_WINDOW_MS = 2e3;
+  function isDuplicateCageEvent(site, totalCount) {
+    const key = `${site}:${totalCount}`;
+    const now = Date.now();
+    const last = cageDedupeCache.get(key);
+    if (last !== void 0 && now - last < CAGE_DEDUPE_WINDOW_MS) {
+      return true;
+    }
+    cageDedupeCache.set(key, now);
+    for (const [k, t] of cageDedupeCache) {
+      if (now - t > CAGE_DEDUPE_WINDOW_MS * 10) cageDedupeCache.delete(k);
+    }
+    return false;
+  }
   async function handleCageReport(msg, tabId) {
     const count = msg.entities.length;
+    if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
+      console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
+      sessionCageCount += count;
+      tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
+      await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
+      return;
+    }
     sessionCageCount += count;
     tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
     await updateBadge(tabId, tabCageCounts.get(tabId) ?? 0);
@@ -1185,6 +1214,17 @@
     const summary = summariseCaged(msg.entities);
     console.warn(`[AI CAGE] 🔒 Caged ${count} item(s) on ${msg.site}:`, summary);
   }
+  const shadowCooldownCache = /* @__PURE__ */ new Map();
+  const SHADOW_COOLDOWN_MS = 5 * 60 * 1e3;
+  function isShadowCoolingDown(hostname) {
+    const now = Date.now();
+    const last = shadowCooldownCache.get(hostname);
+    if (last !== void 0 && now - last < SHADOW_COOLDOWN_MS) {
+      return true;
+    }
+    shadowCooldownCache.set(hostname, now);
+    return false;
+  }
   function registerShadowAiObserver() {
     if (!chrome.webRequest) {
       console.warn("[AI CAGE] webRequest API not available — Shadow AI detection disabled.");
@@ -1202,6 +1242,9 @@
           for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
           const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
           const hostname = (hostnameMatch == null ? void 0 : hostnameMatch[1]) ?? url;
+          if (isShadowCoolingDown(hostname)) {
+            return;
+          }
           const initiator = details.initiator ?? "unknown";
           void logEvent(
             {
@@ -1322,17 +1365,18 @@
   chrome.runtime.onInstalled.addListener(({ reason }) => {
     if (reason === chrome.runtime.OnInstalledReason.INSTALL) {
       void chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+      void logEvent(
+        {
+          type: "EXTENSION_STARTED",
+          site: "background",
+          counts: {},
+          totalCount: 0,
+          detail: "First install"
+        },
+        chromeStorageAdapter
+      );
     }
   });
   registerShadowAiObserver();
-  void logEvent(
-    {
-      type: "EXTENSION_STARTED",
-      site: "background",
-      counts: {},
-      totalCount: 0
-    },
-    chromeStorageAdapter
-  );
   console.warn("[AI CAGE] Background service worker v0.6.0 — Cage 1+2+3 active.");
 })();
