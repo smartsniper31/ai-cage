@@ -124,6 +124,30 @@
     .progress-bar-fill.warning { background: var(--amber); }
     .progress-bar-fill.danger  { background: var(--red); }
 
+    /* ── Inference Risk banner ── */
+    .inference-risk-banner {
+      display: none;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 11px;
+      line-height: 1.5;
+      font-weight: 600;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+    .inference-risk-banner.warn-only {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+    .inference-risk-title {
+      font-weight: 800;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
     /* ── Section label ── */
     .section-label {
       font-size: 10px; font-weight: 700; color: var(--muted);
@@ -340,6 +364,12 @@
         <strong style="color:#15803d">Go to ChatGPT and type your email — watch it get protected.</strong>
       </li>
     </ul>
+
+    <!-- Inference Risk banner — hidden by default, shown by renderOverview() -->
+    <div class="inference-risk-banner" id="inference-risk-banner">
+      <div class="inference-risk-title">⚠️ Inference Risk Detected</div>
+      <div class="inference-risk-msg"></div>
+    </div>
   </div>
 
   <!-- ══ SHADOW AI ══ -->

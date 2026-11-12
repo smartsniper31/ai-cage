@@ -1171,6 +1171,7 @@
   let sessionCageCount = 0;
   let sessionShadowCount = 0;
   const tabCageCounts = /* @__PURE__ */ new Map();
+  let lastInferenceRisk = null;
   const cageDedupeCache = /* @__PURE__ */ new Map();
   const CAGE_DEDUPE_WINDOW_MS = 2e3;
   function isDuplicateCageEvent(site, totalCount) {
@@ -1188,6 +1189,9 @@
   }
   async function handleCageReport(msg, tabId) {
     const count = msg.entities.length;
+    if (msg.inferenceRisk) {
+      lastInferenceRisk = msg.inferenceRisk;
+    }
     if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
       console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
       sessionCageCount += count;
@@ -1203,12 +1207,7 @@
       counts[e.type] = (counts[e.type] ?? 0) + 1;
     }
     await logEvent(
-      {
-        type: "PII_CAGED",
-        site: msg.site,
-        counts,
-        totalCount: count
-      },
+      { type: "PII_CAGED", site: msg.site, counts, totalCount: count },
       chromeStorageAdapter
     );
     const summary = summariseCaged(msg.entities);
@@ -1320,7 +1319,8 @@
             tabCount: tabCageCounts.get(tabId) ?? 0,
             monthlyPiiCaged: summary.totalCaged,
             monthlyShadowAi: summary.totalShadowAi,
-            topSites: summary.topSites
+            topSites: summary.topSites,
+            inferenceRisk: lastInferenceRisk
           });
         });
         return true;

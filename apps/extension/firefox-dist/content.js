@@ -296,6 +296,52 @@
     }
     return result.sort((a, b) => a.start - b.start);
   }
+  function generateSessionSalt() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 4; i++) {
+      s += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return s;
+  }
+  const SESSION_SALT = generateSessionSalt();
+  const QUASI_PATTERNS = [
+    // Age — "34 ans", "aged 45", "45 years old"
+    { label: "age", pattern: /\b\d{1,3}\s*(?:ans?|years?\s*old|year[-\s]old|yo\b)/i },
+    // Company size — "8 employees", "15 salariés", "équipe de 6"
+    { label: "team_size", pattern: /\b\d{1,4}\s*(?:employ[eé]es?|salari[eé]s?|staff|workers?|personnes?|collaborateurs?|membres?)\b/i },
+    // Monetary amount — "12 500 DT", "€ 8000", "$4,200", "15 000 €"
+    { label: "amount", pattern: /(?:€|\$|£|DT|TND|EUR|USD)\s*[\d\s,.]+|[\d\s,.]+\s*(?:€|\$|£|DT|TND|EUR|USD)/i },
+    // Specific date — "le 3 novembre", "signed on Nov 3", "03/11/2026"
+    { label: "specific_date", pattern: /\b(?:le\s+)?\d{1,2}[/\-.]\d{1,2}(?:[/\-.]\d{2,4})?|\b\d{1,2}\s+(?:jan(?:vier)?|f[eé]v(?:rier)?|mar(?:s|ch)?|avr(?:il)?|apr(?:il)?|mai|may|juin|jun(?:e)?|juil(?:let)?|jul(?:y)?|ao[uû]t|aug(?:ust)?|sep(?:t(?:embre|ember)?)?|oct(?:obre|ober)?|nov(?:embre|ember)?|d[eé]c(?:embre|ember)?)\b/i },
+    // Named city / location — "in Bizerte", "à Sousse", "near Tunis"
+    { label: "city", pattern: /\b(?:à|at|in|near|de)\s+[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?\b/ },
+    // Professional role
+    { label: "role", pattern: /\b(?:patron|gérant|CEO|director|manager|associate|partner|avocat|médecin|comptable|notaire|architecte|consultant)\b/i },
+    // Contract / deal reference
+    { label: "deal_ref", pattern: /\b(?:contrat|dossier|deal|affaire|cas|case|matter|n[°o]\.?\s*\d+)\b/i },
+    // Industry / sector
+    { label: "sector", pattern: /\b(?:agence|cabinet|étude|firm|studio|startup|société|entreprise|sarl|suarl|sa\b|llc|inc\b)\b/i }
+  ];
+  const INFERENCE_THRESHOLD = 3;
+  function detectQuasiIdentifiers(text) {
+    const clues = [];
+    for (const { label, pattern } of QUASI_PATTERNS) {
+      pattern.lastIndex = 0;
+      if (pattern.test(text)) {
+        clues.push(label);
+      }
+    }
+    const score = clues.length;
+    const risky = score >= INFERENCE_THRESHOLD;
+    let message = "";
+    if (risky) {
+      message = `Inference Risk: ${score} clues combined can identify you even without your name. (${clues.map((c) => c.replace("_", " ")).join(", ")})`;
+    } else if (score > 0) {
+      message = `${score} context clue${score > 1 ? "s" : ""} detected. Add ${INFERENCE_THRESHOLD - score} more and you become identifiable without your name.`;
+    }
+    return { score, risky, clues, message };
+  }
   const TYPE_LABEL = {
     PERSON_NAME: "NAME",
     EMAIL_ADDRESS: "EMAIL",
@@ -319,10 +365,12 @@
     POSTAL_ADDRESS: "ADDRESS"
   };
   function cageText(text, options = {}) {
-    const { minScore = 0.6, labelledPlaceholders = true } = options;
+    const { minScore = 0.6, labelledPlaceholders = true, sessionSalt } = options;
+    const salt = sessionSalt ?? SESSION_SALT;
     const matches = scanText(text, { minScore });
+    const inferenceRisk = detectQuasiIdentifiers(text);
     if (matches.length === 0) {
-      return { cagedText: text, entities: [], totalCaged: 0 };
+      return { cagedText: text, entities: [], totalCaged: 0, inferenceRisk };
     }
     const entities = [];
     let counter = 1;
@@ -330,7 +378,7 @@
     let result = text;
     for (const match of sortedDesc) {
       const label = labelledPlaceholders ? `_${TYPE_LABEL[match.type]}` : "";
-      const placeholder = `[CAGED${label}_${counter}]`;
+      const placeholder = `[CAGED${label}_${salt}_${counter}]`;
       counter++;
       entities.unshift({
         placeholder,
@@ -343,7 +391,8 @@
     return {
       cagedText: result,
       entities,
-      totalCaged: entities.length
+      totalCaged: entities.length,
+      inferenceRisk
     };
   }
   const SHADOW_HOST_ID = "ai-cage-host-v6";
@@ -735,23 +784,29 @@
   function handlePrompt(el) {
     const raw = readText(el);
     if (!raw || raw.length < 3) return;
-    const { cagedText, entities, totalCaged } = cageText(raw);
-    if (totalCaged === 0) return;
-    pendingEntities = [...pendingEntities, ...entities];
-    writeText(el, cagedText);
-    shareEntitiesWithPage(entities);
-    sessionTotal += totalCaged;
-    updateBadge();
-    updateStatus("caged");
-    const typeLabels = [...new Set(entities.map((e) => e.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2);
-    const more = entities.length > 2 ? ` +${entities.length - 2}` : "";
-    showToast(`🔒 ${totalCaged} protected (${typeLabels.join(", ")}${more})`);
+    const { cagedText, entities, totalCaged, inferenceRisk } = cageText(raw);
+    if (totalCaged === 0 && !inferenceRisk.risky) return;
+    if (totalCaged > 0) {
+      pendingEntities = [...pendingEntities, ...entities];
+      writeText(el, cagedText);
+      shareEntitiesWithPage(entities);
+      sessionTotal += totalCaged;
+      updateBadge();
+      updateStatus("caged");
+      const typeLabels = [...new Set(entities.map((e) => e.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2);
+      const more = entities.length > 2 ? ` +${entities.length - 2}` : "";
+      showToast(`🔒 ${totalCaged} protected (${typeLabels.join(", ")}${more})`);
+    }
+    if (inferenceRisk.risky) {
+      showToast(`⚠️ ${inferenceRisk.message}`, "warning", 5e3);
+    }
     try {
       void chrome.runtime.sendMessage({
         type: "CAGE_REPORT",
         tabId: 0,
         site: window.location.hostname,
-        entities
+        entities,
+        inferenceRisk
       });
     } catch {
     }

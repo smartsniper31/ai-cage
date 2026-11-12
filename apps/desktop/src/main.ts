@@ -13,6 +13,7 @@ import {
   getDefaultPolicy, loadPolicy, savePolicy,
   cageAgentOutput, cageToolCall,
   checkLicense, activateLicense, deactivateLicense,
+  detectQuasiIdentifiers,
   VERSION,
 } from '@ai-cage/core';
 import type { CagedEntity, AuditEntry, AgentPolicy } from '@ai-cage/core';
@@ -262,7 +263,7 @@ function showNotification(message: string, type: 'ok' | 'warn' | 'error' = 'ok',
 cageBtn.addEventListener('click', () => {
   const text = inputEl.value.trim();
   if (!text) return;
-  const { cagedText, entities, totalCaged } = cageText(text);
+  const { cagedText, entities, totalCaged, inferenceRisk } = cageText(text);
   outputEl.value = cagedText;
   lastEntities   = entities;
   countEl.textContent = String(totalCaged);
@@ -273,6 +274,21 @@ cageBtn.addEventListener('click', () => {
     listEl.appendChild(li);
   }
   copyBtn.disabled = uncageBtn.disabled = false;
+
+  // Inference Risk warning — shown even when no direct PII found
+  if (inferenceRisk.risky) {
+    const li = document.createElement('li');
+    li.style.cssText = 'color:#991b1b;font-weight:700;margin-top:6px;list-style:none';
+    li.textContent = `⚠️ ${inferenceRisk.message}`;
+    listEl.appendChild(li);
+    showNotification(`⚠️ Inference Risk: ${inferenceRisk.score} clues detected`, 'warn', 6000);
+  } else if (inferenceRisk.score > 0) {
+    const li = document.createElement('li');
+    li.style.cssText = 'color:#92400e;font-size:11px;margin-top:4px;list-style:none';
+    li.textContent = `ℹ️ ${inferenceRisk.message}`;
+    listEl.appendChild(li);
+  }
+
   if (totalCaged > 0) {
     const counts: Record<string, number> = {};
     for (const e of entities) counts[e.type] = (counts[e.type] ?? 0) + 1;

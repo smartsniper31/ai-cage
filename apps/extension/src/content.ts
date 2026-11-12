@@ -25,7 +25,7 @@
  *   - Network decision panel (Cage All / Send Unprotected) still active
  */
 
-import { cageText } from '@ai-cage/core';
+import { cageText, detectQuasiIdentifiers } from '@ai-cage/core';
 import type { CagedEntity } from '@ai-cage/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -492,20 +492,26 @@ function handlePrompt(el: HTMLElement): void {
   const raw = readText(el);
   if (!raw || raw.length < 3) return;
 
-  const { cagedText, entities, totalCaged } = cageText(raw);
-  if (totalCaged === 0) return;
+  const { cagedText, entities, totalCaged, inferenceRisk } = cageText(raw);
+  if (totalCaged === 0 && !inferenceRisk.risky) return;
 
-  pendingEntities = [...pendingEntities, ...entities];
-  writeText(el, cagedText);
-  shareEntitiesWithPage(entities);
-  sessionTotal += totalCaged;
-  updateBadge();
-  updateStatus('caged');  // FIX 2: update status pill
+  if (totalCaged > 0) {
+    pendingEntities = [...pendingEntities, ...entities];
+    writeText(el, cagedText);
+    shareEntitiesWithPage(entities);
+    sessionTotal += totalCaged;
+    updateBadge();
+    updateStatus('caged');
 
-  // P0-7: Show toast confirmation so Karim knows it worked
-  const typeLabels = [...new Set(entities.map(e => e.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2);
-  const more       = entities.length > 2 ? ` +${entities.length - 2}` : '';
-  showToast(`🔒 ${totalCaged} protected (${typeLabels.join(', ')}${more})`);
+    const typeLabels = [...new Set(entities.map(e => e.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2);
+    const more       = entities.length > 2 ? ` +${entities.length - 2}` : '';
+    showToast(`🔒 ${totalCaged} protected (${typeLabels.join(', ')}${more})`);
+  }
+
+  // Show inference risk warning even if no direct PII was found
+  if (inferenceRisk.risky) {
+    showToast(`⚠️ ${inferenceRisk.message}`, 'warning', 5000);
+  }
 
   try {
     void chrome.runtime.sendMessage({
@@ -513,6 +519,7 @@ function handlePrompt(el: HTMLElement): void {
       tabId: 0,
       site: window.location.hostname,
       entities,
+      inferenceRisk,
     });
   } catch { /* ignore */ }
 }

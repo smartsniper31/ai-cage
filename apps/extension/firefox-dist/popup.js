@@ -323,6 +323,23 @@
         </li>`;
       }
     }
+    const riskEl = document.getElementById("inference-risk-banner");
+    const risk = resp == null ? void 0 : resp.inferenceRisk;
+    if (riskEl) {
+      if (risk && risk.risky) {
+        riskEl.style.display = "block";
+        const msgEl = riskEl.querySelector(".inference-risk-msg");
+        if (msgEl) msgEl.textContent = risk.message;
+      } else if (risk && risk.score > 0) {
+        riskEl.style.display = "block";
+        riskEl.classList.add("warn-only");
+        const msgEl = riskEl.querySelector(".inference-risk-msg");
+        if (msgEl) msgEl.textContent = risk.message;
+      } else {
+        riskEl.style.display = "none";
+        riskEl.classList.remove("warn-only");
+      }
+    }
   }
   async function renderShadowAi() {
     const resp = await chrome.runtime.sendMessage(

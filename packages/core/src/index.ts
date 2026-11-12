@@ -9,8 +9,8 @@
 export { VERSION } from './version.js';
 
 // ── Caging engine (Phase 1) ──────────────────────────────────────────────
-export { cageText, uncageText, summariseCaged } from './cage.js';
-export type { CageResult, CagedEntity, CageOptions } from './types.js';
+export { cageText, uncageText, summariseCaged, SESSION_SALT, detectQuasiIdentifiers } from './cage.js';
+export type { CageResult, CagedEntity, CageOptions, InferenceRisk } from './types.js';
 
 // ── Shadow AI catalogue (Phase 2) ────────────────────────────────────────
 export {

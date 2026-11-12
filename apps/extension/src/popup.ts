@@ -36,6 +36,12 @@ interface StatsResponse {
   monthlyPiiCaged:    number;
   monthlyShadowAi:    number;
   topSites: Array<{ site: string; count: number }>;
+  inferenceRisk?: {
+    score:   number;
+    risky:   boolean;
+    clues:   string[];
+    message: string;
+  };
 }
 
 interface ShadowLogResponse {
@@ -247,6 +253,25 @@ async function renderOverview(): Promise<void> {
             Go to ChatGPT and type your email — watch it get protected.
           </strong>
         </li>`;
+    }
+  }
+
+  // Inference Risk banner — shown when last cage detected quasi-identifiers
+  const riskEl = document.getElementById('inference-risk-banner');
+  const risk   = resp?.inferenceRisk;
+  if (riskEl) {
+    if (risk && risk.risky) {
+      riskEl.style.display = 'block';
+      const msgEl = riskEl.querySelector('.inference-risk-msg');
+      if (msgEl) msgEl.textContent = risk.message;
+    } else if (risk && risk.score > 0) {
+      riskEl.style.display = 'block';
+      riskEl.classList.add('warn-only');
+      const msgEl = riskEl.querySelector('.inference-risk-msg');
+      if (msgEl) msgEl.textContent = risk.message;
+    } else {
+      riskEl.style.display = 'none';
+      riskEl.classList.remove('warn-only');
     }
   }
 }
