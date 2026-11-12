@@ -1,6 +1,6 @@
 # AI CAGE — Phase 5.8 Final Report (Updated)
 **Version :** v0.6.0  
-**Date updated :** 2026-11-11  
+**Date updated :** 2026-11-12  
 **Status :** ✅ PRODUCTION READY — Ready to sell
 
 ---
@@ -81,6 +81,7 @@ Security contract: no network calls in core ✅
 | Status indicator pill | ✅ | ✅ |
 | Toast notifications | ✅ | ✅ |
 | Update checker | ✅ | ✅ |
+| Plain-language report (summary) | ✅ | ✅ Full report |
 | Agent Cage | ❌ | ✅ |
 | Audit CSV export | ❌ | ✅ |
 | Account tab + license | ✅ activate | ✅ |
@@ -93,6 +94,7 @@ Security contract: no network calls in core ✅
 | Restore AI response | ✅ | ✅ |
 | Audit Log (read) | ✅ | ✅ |
 | Shadow AI catalogue | ✅ | ✅ |
+| Plain-language report (summary) | ✅ | ✅ Full report |
 | Account tab + license | ✅ activate | ✅ |
 | Agent Cage | ❌ | ✅ |
 | Export CSV | ❌ | ✅ |
@@ -134,6 +136,44 @@ Security contract: no network calls in core ✅
 | Cargo.toml version | ✅ | `Cargo.toml` v0.6.0 |
 | vite.config.ts explicit root | ✅ | `vite.config.ts` |
 | release.ps1 safety check | ✅ | `scripts/release.ps1` |
+| Free tier bar visible in PRO | ✅ | `popup.ts` — renderOverview() checks license |
+| Plain-language report feature | ✅ | `auditLog.ts`, `background.ts`, `popup.ts`, `popup.html` |
+
+---
+
+## 8b. Plain-Language Report — Feature Details
+
+**What it does:**
+Generates a plain-English protection report from the audit log — no jargon, no CSV.
+Designed for small business owners (lawyers, agencies, freelancers) who need to
+understand what AI CAGE protected, in simple words.
+
+**Free tier** receives a 1-page summary:
+- Period covered + days count
+- Total items protected + AI tools used
+- Entity type breakdown (email addresses, phone numbers, etc.)
+- Peak moment teaser: "Your most critical moment involved 24 items sent to ChatGPT."
+- Upgrade prompt for full narrative
+
+**Pro tier** receives the full report:
+- Everything in Free, plus:
+- Event-by-event narrative with exact date/time/site
+- Full entity breakdown per event
+- Complete Shadow AI section with per-site call counts
+- Customer name from license payload used in greeting
+
+**Technical implementation:**
+- `generatePlainReport()` in `packages/core/src/auditLog.ts` — pure function, zero network
+- `GET_PLAIN_REPORT` message handler in `background.ts` — calls `checkLicense()` for Pro flag
+- `exportPlainReport()` in `popup.ts` — downloads `.txt` file locally
+- `📋 Report` button in `popup.html` footer — dark button, left of Export CSV
+- 100% offline — no server call, no data transmitted
+- Output: `.txt` file, named `ai-cage-report-YYYY-MM-DD.txt`
+
+**Marketing value:**
+- Free users get a real, useful file they can share with their boss or client
+- It demonstrates value and creates upgrade desire ("Full event-by-event breakdown with Pro")
+- Pro users get a compliance-ready plain-language report alongside the technical CSV
 
 ---
 
@@ -168,6 +208,7 @@ Security contract: no network calls in core ✅
 | P1 | Chrome Web Store submission | 1 day |
 | P1 | Stripe Live mode + real Payment Link | 30 min |
 | P1 | Zapier: fix customer_email field mapping | 30 min |
+| P2 | Plain-language report PDF export (Pro) | v0.7.0 |
 | P2 | i18n FR/AR for extension popup | 4h |
 | P2 | Mobile app (React Native) | v0.7.0 |
 | P2 | Cage 4: Code Leak (VS Code extension) | v0.7.0 |

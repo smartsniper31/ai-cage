@@ -359,3 +359,491 @@ export async function getClearHistory(
   const raw = await storage.getItem(CLEAR_KEY);
   return raw ? (JSON.parse(raw) as ReturnType<typeof getClearHistory> extends Promise<infer T> ? T : never) : [];
 }
+
+// ---------------------------------------------------------------------------
+// Plain-language report generator
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps technical entity type keys to plain English labels.
+ * Covers all entity types emitted by presidio-lite.
+ */
+const ENTITY_LABELS: Record<string, string> = {
+  // Email
+  EMAIL_ADDRESS:        'email address',
+  EMAIL:                'email address',
+  // Phone
+  PHONE_NUMBER:         'phone number',
+  PHONE:                'phone number',
+  PHONE_TN:             'phone number',
+  // Person / name
+  PERSON:               'personal name',
+  PERSON_NAME:          'personal name',
+  // Financial
+  CREDIT_CARD:          'credit card number',
+  CREDIT_CARD_NUMBER:   'credit card number',
+  IBAN_CODE:            'bank account / IBAN',
+  IBAN:                 'bank account / IBAN',
+  US_BANK_NUMBER:       'bank account number',
+  // Identity documents
+  NRP:                  'national ID number',
+  CIN_TN:               'national ID (Tunisia)',
+  PASSPORT:             'passport number',
+  PASSPORT_NUMBER:      'passport number',
+  DRIVER_LICENSE:       'driver\'s licence',
+  US_DRIVER_LICENSE:    'driver\'s licence',
+  // Address / location
+  LOCATION:             'postal address',
+  ADDRESS:              'postal address',
+  POSTAL_ADDRESS:       'postal address',
+  ZIP_CODE:             'postal code',
+  // Digital identifiers
+  IP_ADDRESS:           'IP address',
+  URL:                  'web address (URL)',
+  // Credentials
+  PASSWORD:             'password / secret key',
+  API_KEY:              'API key / secret',
+  // Medical
+  MEDICAL_LICENSE:      'medical licence number',
+  US_ITIN:              'tax ID number',
+  US_SSN:               'social security number',
+  AU_TFN:               'tax file number',
+  AU_ACN:               'company number',
+  // Organisation
+  ORGANIZATION:         'organisation name',
+  ORG:                  'organisation name',
+  // Date
+  DATE_TIME:            'date / time',
+  AGE:                  'age',
+};
+
+/**
+ * Maps site hostnames to friendly product names for the report.
+ */
+const SITE_FRIENDLY: Record<string, string> = {
+  'chat.openai.com':          'ChatGPT',
+  'chatgpt.com':               'ChatGPT',
+  'api.openai.com':            'OpenAI API',
+  'gemini.google.com':         'Google Gemini',
+  'bard.google.com':           'Google Gemini',
+  'claude.ai':                 'Anthropic Claude',
+  'api.anthropic.com':         'Anthropic Claude',
+  'copilot.microsoft.com':     'Microsoft Copilot',
+  'bing.com':                  'Microsoft Copilot',
+  'mistral.ai':                'Mistral AI',
+  'api.mistral.ai':            'Mistral AI',
+  'meta.ai':                   'Meta AI',
+  'ai.meta.com':               'Meta AI',
+  'huggingface.co':            'Hugging Face',
+  'api.cohere.ai':             'Cohere',
+  'generativelanguage.googleapis.com': 'Google Gemini API',
+  'qwen.aliyun.com':           'Qwen (Alibaba)',
+  'dashscope.aliyuncs.com':    'Qwen API',
+  'perplexity.ai':             'Perplexity AI',
+  'you.com':                   'You.com AI',
+  'poe.com':                   'Poe AI',
+  'character.ai':              'Character.AI',
+  'grok.x.ai':                 'Grok (xAI)',
+  'api.x.ai':                  'Grok API',
+  'background':                'browser background',
+};
+
+/** Returns friendly site name or capitalises the hostname. */
+function friendlySite(site: string): string {
+  if (SITE_FRIENDLY[site]) return SITE_FRIENDLY[site];
+  // Strip www. and capitalise first letter
+  const clean = site.replace(/^www\./, '');
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+/** Returns "12 November 2026 at 12:40" from an ISO string. */
+function friendlyDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const day   = d.getDate();
+    const month = d.toLocaleString('en-GB', { month: 'long' });
+    const year  = d.getFullYear();
+    const h     = String(d.getHours()).padStart(2, '0');
+    const m     = String(d.getMinutes()).padStart(2, '0');
+    return `${day} ${month} ${year} at ${h}:${m}`;
+  } catch { return iso; }
+}
+
+/** Returns "3 November" from an ISO string (short version). */
+function shortDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return `${d.getDate()} ${d.toLocaleString('en-GB', { month: 'long' })}`;
+  } catch { return iso; }
+}
+
+/** Pluralise: 1 item / 2 items */
+function pl(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+export interface PlainReportOptions {
+  /** Customer / user name to greet. Defaults to 'there'. */
+  customerName?: string;
+  /** Whether the user has a Pro licence (affects what's included). */
+  isPro?: boolean;
+}
+
+export interface PlainReportResult {
+  /** The full plain-text report. */
+  text: string;
+  /** Period covered (ISO date strings). */
+  fromDate: string;
+  toDate: string;
+  /** Summary numbers for the caller. */
+  totalProtected: number;
+  totalShadowAi:  number;
+  uniqueSites:    number;
+}
+
+/**
+ * Generates a plain-language protection report from the audit log.
+ *
+ * FREE tier  → concise 1-page summary (no event-by-event breakdown).
+ * PRO tier   → full report with per-event narrative + peak moment analysis.
+ *
+ * SECURITY: reads only counts and types — zero PII values ever stored.
+ * 100% offline — no network calls.
+ *
+ * @param storage  - Storage adapter (chrome.storage / localStorage).
+ * @param options  - Display options (customer name, pro flag).
+ * @param fromDate - Report start. Defaults to start of current month.
+ * @param toDate   - Report end. Defaults to now.
+ */
+export async function generatePlainReport(
+  storage: StorageAdapter,
+  options: PlainReportOptions = {},
+  fromDate?: Date,
+  toDate?: Date,
+): Promise<PlainReportResult> {
+  const entries = await getAuditLog(storage);
+
+  const from = fromDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const to   = toDate   ?? new Date();
+
+  const { customerName = 'there', isPro = false } = options;
+
+  // ── Filter to range ───────────────────────────────────────────────────────
+  const inRange = entries.filter((e) => {
+    const t = new Date(e.timestamp);
+    return t >= from && t <= to;
+  });
+
+  const cageEvents   = inRange.filter(e => e.type === 'PII_CAGED');
+  const shadowEvents = inRange.filter(e => e.type === 'SHADOW_AI_DETECTED');
+
+  // ── Aggregate entity types ────────────────────────────────────────────────
+  const entityCounts = new Map<string, number>();
+  for (const e of cageEvents) {
+    for (const [k, v] of Object.entries(e.counts)) {
+      entityCounts.set(k, (entityCounts.get(k) ?? 0) + (v ?? 0));
+    }
+  }
+
+  const totalProtected = cageEvents.reduce((s, e) => s + e.totalCount, 0);
+  const totalShadowAi  = shadowEvents.reduce((s, e) => s + e.totalCount, 0);
+
+  // ── Unique sites ──────────────────────────────────────────────────────────
+  const siteSet = new Set<string>();
+  for (const e of cageEvents)   siteSet.add(e.site);
+  for (const e of shadowEvents) siteSet.add(e.site);
+  const uniqueSites = siteSet.size;
+
+  // ── Date range label ──────────────────────────────────────────────────────
+  const fromLabel = shortDate(from.toISOString());
+  const toLabel   = shortDate(to.toISOString());
+  const daysCount = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86400000));
+
+  // ── Entity breakdown (sorted by count desc, human labels) ─────────────────
+  const sortedEntities = [...entityCounts.entries()]
+    .sort((a, b) => b[1] - a[1]);
+
+  const entityLines = sortedEntities
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => {
+      const label = ENTITY_LABELS[k] ?? k.toLowerCase().replace(/_/g, ' ');
+      return `  - ${pl(v, label)}`;
+    })
+    .join('\n');
+
+  // ── AI sites used (friendly names) ────────────────────────────────────────
+  const siteCounts = new Map<string, number>();
+  for (const e of cageEvents) {
+    siteCounts.set(e.site, (siteCounts.get(e.site) ?? 0) + e.totalCount);
+  }
+  const siteList = [...siteCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([s]) => friendlySite(s));
+
+  const siteLabel = siteList.length === 0
+    ? 'no AI tools yet'
+    : siteList.length === 1
+      ? siteList[0]
+      : siteList.slice(0, -1).join(', ') + ' and ' + siteList.at(-1);
+
+  // ── Peak event (largest single cage event) ────────────────────────────────
+  const peakEvent = cageEvents.reduce<AuditEntry | null>(
+    (best, e) => (!best || e.totalCount > best.totalCount) ? e : best,
+    null,
+  );
+
+  // ── Shadow AI sites ───────────────────────────────────────────────────────
+  const shadowSiteSet = new Set(shadowEvents.map(e => friendlySite(e.site)));
+  const shadowLabel = [...shadowSiteSet].join(', ');
+
+  // ── Build the report text ─────────────────────────────────────────────────
+
+  const lines: string[] = [];
+
+  // Header
+  lines.push('=' .repeat(60));
+  lines.push('AI CAGE — Protection Report');
+  lines.push(`Period: ${fromLabel} to ${toLabel}`);
+  if (isPro) {
+    lines.push('Plan: Pro — Full Report');
+  } else {
+    lines.push('Plan: Free — Summary Report');
+    lines.push('Upgrade to Pro for the full event-by-event breakdown.');
+  }
+  lines.push('='.repeat(60));
+  lines.push('');
+
+  // Greeting
+  lines.push(`Hello ${customerName},`);
+  lines.push('');
+  lines.push(
+    `Here is your AI CAGE protection report covering the last ${pl(daysCount, 'day')}.`,
+  );
+  lines.push('');
+
+  // ── Summary section ───────────────────────────────────────────────────────
+  lines.push('--- SUMMARY ---');
+  lines.push('');
+
+  if (totalProtected === 0 && totalShadowAi === 0) {
+    lines.push('No activity recorded during this period.');
+    lines.push('');
+    lines.push(
+      'AI CAGE is active and monitoring. As soon as you paste sensitive',
+    );
+    lines.push('data into an AI tool, it will be protected automatically.');
+  } else {
+    if (totalProtected > 0) {
+      lines.push(
+        `You almost shared ${pl(totalProtected, 'sensitive piece of data')} with AI tools.`,
+      );
+      lines.push(`AI CAGE protected all of them before they were sent.`);
+      lines.push(`None of your real data ever left your device.`);
+    }
+    if (totalShadowAi > 0) {
+      lines.push('');
+      lines.push(
+        `In addition, AI CAGE detected ${pl(totalShadowAi, 'hidden AI call')} ` +
+        `that happened in your browser without you typing anything.`,
+      );
+      if (shadowLabel) {
+        lines.push(`These came from: ${shadowLabel}.`);
+      }
+    }
+  }
+
+  lines.push('');
+
+  // ── AI tools used ─────────────────────────────────────────────────────────
+  if (siteList.length > 0) {
+    lines.push('--- AI TOOLS USED ---');
+    lines.push('');
+    if (siteList.length === 1) {
+      lines.push(`During this period you used 1 AI tool: ${siteList[0]}.`);
+    } else {
+      lines.push(
+        `During this period you used ${pl(siteList.length, 'different AI tool')}: ${siteLabel}.`,
+      );
+    }
+    lines.push('');
+  }
+
+  // ── Sensitive data breakdown ───────────────────────────────────────────────
+  if (entityLines) {
+    lines.push('--- WHAT WAS PROTECTED ---');
+    lines.push('');
+    lines.push(
+      'Here is the breakdown of sensitive data that AI CAGE intercepted:',
+    );
+    lines.push('');
+    lines.push(entityLines);
+    lines.push('');
+    lines.push(
+      'Each of these items was replaced by a code before reaching the AI.',
+    );
+    lines.push(
+      'The AI saw codes like [EMAIL_1] or [PERSON_1] — never your real data.',
+    );
+    lines.push('');
+  }
+
+  // ── Peak event (Pro only: full narrative; Free: teaser) ──────────────────
+  if (peakEvent) {
+    lines.push('--- MOST IMPORTANT MOMENT ---');
+    lines.push('');
+
+    if (isPro) {
+      // Full narrative
+      const when = friendlyDate(peakEvent.timestamp);
+      const where = friendlySite(peakEvent.site);
+      lines.push(
+        `On ${when}, you pasted ${pl(peakEvent.totalCount, 'sensitive item')} ` +
+        `into ${where} in a single action.`,
+      );
+      lines.push(
+        `AI CAGE replaced all of them with protection codes instantly.`,
+      );
+      lines.push(`${where} never received any of your real data.`);
+
+      // Entity breakdown for this event
+      const peakEntityLines = Object.entries(peakEvent.counts)
+        .filter(([, v]) => (v ?? 0) > 0)
+        .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
+        .map(([k, v]) => {
+          const label = ENTITY_LABELS[k] ?? k.toLowerCase().replace(/_/g, ' ');
+          return `  - ${pl(v ?? 0, label)}`;
+        })
+        .join('\n');
+
+      if (peakEntityLines) {
+        lines.push('');
+        lines.push('In that single event:');
+        lines.push(peakEntityLines);
+      }
+    } else {
+      // Free tier — teaser only
+      const where = friendlySite(peakEvent.site);
+      lines.push(
+        `Your most critical moment involved ${pl(peakEvent.totalCount, 'sensitive item')} ` +
+        `sent to ${where}.`,
+      );
+      lines.push('');
+      lines.push(
+        '[Full event breakdown available with AI CAGE Pro]',
+      );
+      lines.push(
+        'Pro gives you the exact date, time, and type of each protected item.',
+      );
+    }
+    lines.push('');
+  }
+
+  // ── Pro: event-by-event log ───────────────────────────────────────────────
+  if (isPro && cageEvents.length > 0) {
+    lines.push('--- FULL EVENT LOG ---');
+    lines.push('');
+    lines.push(
+      'Below is every protection event during this period, in chronological order.',
+    );
+    lines.push('');
+
+    for (const e of cageEvents) {
+      const when  = friendlyDate(e.timestamp);
+      const where = friendlySite(e.site);
+      lines.push(`> ${when} — ${where}`);
+      lines.push(`  ${pl(e.totalCount, 'item')} protected.`);
+
+      const detail = Object.entries(e.counts)
+        .filter(([, v]) => (v ?? 0) > 0)
+        .map(([k, v]) => {
+          const label = ENTITY_LABELS[k] ?? k.toLowerCase().replace(/_/g, ' ');
+          return `${v} ${label}`;
+        })
+        .join(', ');
+      if (detail) lines.push(`  Types: ${detail}.`);
+      lines.push('');
+    }
+  }
+
+  // ── Shadow AI section (Pro only full details) ─────────────────────────────
+  if (shadowEvents.length > 0) {
+    lines.push('--- HIDDEN AI ACTIVITY ---');
+    lines.push('');
+
+    if (isPro) {
+      lines.push(
+        `AI CAGE detected ${pl(shadowEvents.length, 'hidden AI request')} ` +
+        `that your browser sent without your direct input.`,
+      );
+      lines.push(
+        'These are calls made by website scripts, browser extensions, or',
+      );
+      lines.push('background services connecting to AI APIs silently.');
+      lines.push('');
+
+      const shadowSiteMap = new Map<string, number>();
+      for (const e of shadowEvents) {
+        shadowSiteMap.set(
+          friendlySite(e.site),
+          (shadowSiteMap.get(friendlySite(e.site)) ?? 0) + 1,
+        );
+      }
+      for (const [site, count] of [...shadowSiteMap.entries()].sort((a, b) => b[1] - a[1])) {
+        lines.push(`  - ${site}: ${pl(count, 'hidden call')}`);
+      }
+    } else {
+      lines.push(
+        `AI CAGE detected ${pl(shadowEvents.length, 'hidden AI request')} in your browser.`,
+      );
+      lines.push('[Full hidden AI report available with AI CAGE Pro]');
+    }
+    lines.push('');
+  }
+
+  // ── Conclusion ────────────────────────────────────────────────────────────
+  lines.push('--- CONCLUSION ---');
+  lines.push('');
+
+  if (totalProtected === 0 && totalShadowAi === 0) {
+    lines.push('Nothing to report. AI CAGE is watching and ready.');
+  } else if (totalProtected > 0) {
+    lines.push('No data leak. Your sensitive data never left your device.');
+    lines.push(
+      `AI CAGE protected ${pl(totalProtected, 'item')} during this period.`,
+    );
+    lines.push('Every real value was replaced before reaching any AI server.');
+  } else {
+    lines.push('No PII was sent to AI tools this period.');
+    if (totalShadowAi > 0) {
+      lines.push(
+        `However, ${pl(totalShadowAi, 'hidden AI call')} was detected.`,
+      );
+      lines.push('Consider reviewing the AI tools installed in your browser.');
+    }
+  }
+
+  lines.push('');
+  lines.push('Your AI protection assistant,');
+  lines.push('AI CAGE');
+  lines.push('');
+  lines.push('-'.repeat(60));
+  lines.push('Generated locally on your device — zero data sent to any server.');
+  lines.push(`Report generated: ${friendlyDate(new Date().toISOString())}`);
+  if (!isPro) {
+    lines.push('');
+    lines.push(
+      'Want the full report with event-by-event details? Upgrade to Pro.',
+    );
+    lines.push('https://ai-cage-gamma.vercel.app/#pricing');
+  }
+  lines.push('='.repeat(60));
+
+  return {
+    text:           lines.join('\n'),
+    fromDate:       from.toISOString(),
+    toDate:         to.toISOString(),
+    totalProtected,
+    totalShadowAi,
+    uniqueSites,
+  };
+}

@@ -27,6 +27,7 @@ export {
   getAuditLog,
   getAuditSummary,
   exportAuditLogCSV,
+  generatePlainReport,
   clearAuditLog,
   getClearHistory,
   localStorageAdapter,
@@ -36,6 +37,8 @@ export type {
   AuditEntry,
   AuditEventType,
   StorageAdapter,
+  PlainReportOptions,
+  PlainReportResult,
 } from './auditLog.js';
 
 // ── Policy engine (Phase 3) ──────────────────────────────────────────────
