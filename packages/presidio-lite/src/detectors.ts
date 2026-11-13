@@ -38,13 +38,20 @@ const emailDetector: Detector = {
  * International phone numbers.
  * Covers +216 XX XXX XXX (Tunisia), +33 X XX XX XX XX (France),
  * +1 (NNN) NNN-NNNN (US/CA), and generic international formats.
+ *
+ * S1 FIX: Pattern 2 now requires a non-digit boundary before it
+ * (negative lookbehind) so it does not match sub-sequences inside
+ * RIB/IBAN numbers like "020 035 112" within "10 020 035 112233445566 77".
  */
 const phoneDetector: Detector = {
   name: 'Phone Number',
   type: 'PHONE_NUMBER',
   patterns: [
+    // International format with + prefix (most reliable)
     /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g,
-    /\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}/g,
+    // Local format: (NNN) NNN-NNNN or NNN NNN NNNN
+    // Negative lookbehind: not preceded by digit or space+digit (not inside RIB)
+    /(?<!\d[\s]?)(?<!\d)\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)/g,
   ],
   defaultScore: 0.75,
 };
@@ -381,15 +388,19 @@ const transcriptMarkerDetector: Detector = {
  *
  * P0-1 FIX: Require minimum 2 capitalised words to avoid matching
  * single-word labels like "Period:", "From:", "Summary:", "Date:".
- * Single-word labels are structural markers, not participant names.
+ *
+ * S2 FIX: Added explicit exclusion for common French/English label words
+ * that appear as "Word Word :" patterns but are NOT person names:
+ * "Clé Google", "Secret API", "Token GitHub", "Mot de passe", etc.
  */
 const meetingParticipantDetector: Detector = {
   name: 'Meeting Participant',
   type: 'MEETING_PARTICIPANT',
   patterns: [
     // Requires EXACTLY 2-3 title-case words before the colon (First Last: speech)
-    // Excludes single-word labels like "Period:", "Date:", "From:", "AI:"
-    /\b([A-ZÀ-Ÿ][a-zà-ÿ]{1,20}\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20})?)\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
+    // Excludes single-word labels AND known non-name word pairs
+    // Negative lookahead for common label pairs
+    /\b(?!(?:Cl[eé]\s+Google|Secret\s+API|Token\s+GitHub|Mot\s+de|Clé\s+API|API\s+Key|Mon\s+patron|Mon\s+propre)\b)([A-ZÀ-Ÿ][a-zà-ÿ]{1,20}\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20})?)\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
     // "John said:", "John asked:", "John replied:" — single word OK only with speech verb
     /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s+(?:said|asked|replied|noted|added|stated):\s/gi,
   ],
