@@ -48,14 +48,27 @@ let lastInferenceRisk: InferenceRisk | null = null;
 // ---------------------------------------------------------------------------
 // C2 — Deduplication cache: prevents double-counting the same cage event
 // that arrives twice (once from content.ts DOM intercept, once from
-// injected.ts network intercept) within a 2-second window.
-// Key: `${site}:${totalCount}` — Value: timestamp of last log
+// injected.ts network intercept).
+//
+// P0-5 FIX: Extended window to 5s (was 2s) — real-world tests showed
+// content.ts and injected.ts can be 3-4s apart on slow pages.
+// Key now includes a sorted entity-type hash so two genuinely different
+// events with the same count on the same site are not incorrectly deduped.
 // ---------------------------------------------------------------------------
 const cageDedupeCache = new Map<string, number>();
-const CAGE_DEDUPE_WINDOW_MS = 2000;
+const CAGE_DEDUPE_WINDOW_MS = 5000; // 5 seconds
 
-function isDuplicateCageEvent(site: string, totalCount: number): boolean {
-  const key = `${site}:${totalCount}`;
+function isDuplicateCageEvent(
+  site: string,
+  totalCount: number,
+  entities: CagedEntity[],
+): boolean {
+  // Build a stable type fingerprint: sorted comma-separated entity types
+  const typeFingerprint = entities
+    .map(e => e.type)
+    .sort()
+    .join(',');
+  const key = `${site}:${totalCount}:${typeFingerprint}`;
   const now = Date.now();
   const last = cageDedupeCache.get(key);
   if (last !== undefined && now - last < CAGE_DEDUPE_WINDOW_MS) {
@@ -125,8 +138,8 @@ async function handleCageReport(
     lastInferenceRisk = msg.inferenceRisk;
   }
 
-  // C2 — Skip if this is a duplicate event (same site + count within 2s)
-  if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
+  // C2 — Skip if this is a duplicate event (same site + count + types within 5s)
+  if (count > 0 && isDuplicateCageEvent(msg.site, count, msg.entities)) {
     console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
     sessionCageCount += count;
     tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);

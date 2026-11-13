@@ -750,29 +750,64 @@
     }
   }
   function pl(n, word) {
-    return `${n} ${word}${n === 1 ? "" : "s"}`;
+    if (n === 1) return `${n} ${word}`;
+    const irregulars = {
+      "piece of data": "pieces of data",
+      "hidden AI call": "hidden AI calls",
+      "hidden call": "hidden calls",
+      "hidden request": "hidden requests",
+      "different AI tool": "different AI tools",
+      "sensitive item": "sensitive items",
+      "sensitive piece of data": "sensitive pieces of data"
+    };
+    if (irregulars[word]) return `${n} ${irregulars[word]}`;
+    if (word.endsWith("s") || word.endsWith("x") || word.endsWith("z") || word.endsWith("ch") || word.endsWith("sh")) {
+      return `${n} ${word}es`;
+    }
+    return `${n} ${word}s`;
   }
   async function generatePlainReport(storage, options = {}, fromDate, toDate) {
     const entries = await getAuditLog(storage);
     const from = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1);
     const to = /* @__PURE__ */ new Date();
-    const { customerName = "there", isPro = false } = options;
+    const rawName = options.customerName ?? "";
+    const { customerName, isPro = false } = options;
+    const systemDefaults = ["ai cage pro customer", "ai cage customer", "demo customer", "there", ""];
+    const firstName = rawName && !systemDefaults.includes(rawName.toLowerCase()) ? rawName.split(/\s+/)[0] : "there";
     const inRange = entries.filter((e) => {
       const t = new Date(e.timestamp);
       return t >= from && t <= to;
     });
-    const cageEvents = inRange.filter((e) => e.type === "PII_CAGED");
+    const cageEvents = inRange.filter(
+      (e) => e.type === "PII_CAGED" && // Exclude events where ALL counts are MEETING_TRANSCRIPT_MARKER
+      Object.keys(e.counts).some(
+        (k) => k !== "MEETING_TRANSCRIPT_MARKER" && k !== "MEETING_PARTICIPANT"
+      )
+    );
     const shadowEvents = inRange.filter((e) => e.type === "SHADOW_AI_DETECTED");
+    const seenEventKeys = /* @__PURE__ */ new Set();
+    const dedupedCageEvents = cageEvents.filter((e) => {
+      const day = e.timestamp.slice(0, 10);
+      const typeKey = Object.keys(e.counts).sort().join(",");
+      const key = `${e.site}:${e.totalCount}:${day}:${typeKey}`;
+      if (seenEventKeys.has(key)) return false;
+      seenEventKeys.add(key);
+      return true;
+    });
     const entityCounts = /* @__PURE__ */ new Map();
-    for (const e of cageEvents) {
+    for (const e of dedupedCageEvents) {
       for (const [k, v] of Object.entries(e.counts)) {
+        if (k === "MEETING_TRANSCRIPT_MARKER" || k === "MEETING_PARTICIPANT") continue;
         entityCounts.set(k, (entityCounts.get(k) ?? 0) + (v ?? 0));
       }
     }
-    const totalProtected = cageEvents.reduce((s, e) => s + e.totalCount, 0);
+    const totalProtected = dedupedCageEvents.reduce((s, e) => {
+      const nonTranscriptCount = Object.entries(e.counts).filter(([k]) => k !== "MEETING_TRANSCRIPT_MARKER" && k !== "MEETING_PARTICIPANT").reduce((acc, [, v]) => acc + (v ?? 0), 0);
+      return s + nonTranscriptCount;
+    }, 0);
     const totalShadowAi = shadowEvents.reduce((s, e) => s + e.totalCount, 0);
     const siteSet = /* @__PURE__ */ new Set();
-    for (const e of cageEvents) siteSet.add(e.site);
+    for (const e of dedupedCageEvents) siteSet.add(e.site);
     for (const e of shadowEvents) siteSet.add(e.site);
     const uniqueSites = siteSet.size;
     const fromLabel = shortDate(from.toISOString());
@@ -784,12 +819,12 @@
       return `  - ${pl(v, label)}`;
     }).join("\n");
     const siteCounts = /* @__PURE__ */ new Map();
-    for (const e of cageEvents) {
+    for (const e of dedupedCageEvents) {
       siteCounts.set(e.site, (siteCounts.get(e.site) ?? 0) + e.totalCount);
     }
     const siteList = [...siteCounts.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => friendlySite(s));
     const siteLabel = siteList.length === 0 ? "no AI tools yet" : siteList.length === 1 ? siteList[0] : siteList.slice(0, -1).join(", ") + " and " + siteList.at(-1);
-    const peakEvent = cageEvents.reduce(
+    const peakEvent = dedupedCageEvents.reduce(
       (best, e) => !best || e.totalCount > best.totalCount ? e : best,
       null
     );
@@ -807,7 +842,7 @@
     }
     lines.push("=".repeat(60));
     lines.push("");
-    lines.push(`Hello ${customerName},`);
+    lines.push(`Hello ${firstName},`);
     lines.push("");
     lines.push(
       `Here is your AI CAGE protection report covering the last ${pl(daysCount, "day")}.`
@@ -907,14 +942,14 @@
       }
       lines.push("");
     }
-    if (isPro && cageEvents.length > 0) {
+    if (isPro && dedupedCageEvents.length > 0) {
       lines.push("--- FULL EVENT LOG ---");
       lines.push("");
       lines.push(
         "Below is every protection event during this period, in chronological order."
       );
       lines.push("");
-      for (const e of cageEvents) {
+      for (const e of dedupedCageEvents) {
         const when = friendlyDate(e.timestamp);
         const where = friendlySite(e.site);
         lines.push(`> ${when} — ${where}`);
@@ -1173,9 +1208,10 @@
   const tabCageCounts = /* @__PURE__ */ new Map();
   let lastInferenceRisk = null;
   const cageDedupeCache = /* @__PURE__ */ new Map();
-  const CAGE_DEDUPE_WINDOW_MS = 2e3;
-  function isDuplicateCageEvent(site, totalCount) {
-    const key = `${site}:${totalCount}`;
+  const CAGE_DEDUPE_WINDOW_MS = 5e3;
+  function isDuplicateCageEvent(site, totalCount, entities) {
+    const typeFingerprint = entities.map((e) => e.type).sort().join(",");
+    const key = `${site}:${totalCount}:${typeFingerprint}`;
     const now = Date.now();
     const last = cageDedupeCache.get(key);
     if (last !== void 0 && now - last < CAGE_DEDUPE_WINDOW_MS) {
@@ -1192,7 +1228,7 @@
     if (msg.inferenceRisk) {
       lastInferenceRisk = msg.inferenceRisk;
     }
-    if (count > 0 && isDuplicateCageEvent(msg.site, count)) {
+    if (count > 0 && isDuplicateCageEvent(msg.site, count, msg.entities)) {
       console.warn(`[AI CAGE] ⏭ Skipping duplicate cage event: ${count} items on ${msg.site}`);
       sessionCageCount += count;
       tabCageCounts.set(tabId, (tabCageCounts.get(tabId) ?? 0) + count);
