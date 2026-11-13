@@ -103,16 +103,35 @@ const creditCardDetector: Detector = {
 };
 
 /**
- * API keys — AWS, GitHub PAT, Stripe, Bearer tokens, generic key= patterns.
+ * API keys — AWS, GitHub PAT, Stripe, OpenAI, Anthropic, Google, Slack,
+ * Bearer tokens, generic key= patterns.
+ *
+ * P0-2 FIX: Added sk-test-/sk-proj- (OpenAI), sk-ant- (Anthropic),
+ * gsk_ (Groq), xoxb-/xoxp- (Slack), AIza (Google API).
  */
 const apiKeyDetector: Detector = {
   name: 'API Key / Secret',
   type: 'API_KEY',
   patterns: [
+    // AWS Access Key ID
     /\bAKIA[0-9A-Z]{16}\b/g,
+    // GitHub Personal Access Tokens (classic + fine-grained)
     /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,255}\b/g,
+    // Stripe — live + test (sk-live_, pk-live_, sk-test_, pk-test_)
     /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b/g,
+    // OpenAI (sk-...) — covers sk-test-, sk-proj-, sk-org-
+    /\bsk-(?:test|proj|org|[A-Za-z0-9])[A-Za-z0-9\-_]{15,}\b/g,
+    // Anthropic (sk-ant-)
+    /\bsk-ant-[A-Za-z0-9\-_]{20,}\b/g,
+    // Groq (gsk_)
+    /\bgsk_[A-Za-z0-9]{20,}\b/g,
+    // Slack Bot Token (xoxb-), User Token (xoxp-), Workspace (xoxs-)
+    /\bxox[bpsa]-[A-Za-z0-9\-]{16,}\b/g,
+    // Google API Key (AIza)
+    /\bAIza[A-Za-z0-9\-_]{35}\b/g,
+    // Generic key=/secret= patterns
     /\b(?:api[_\-]?key|secret[_\-]?key|access[_\-]?token)\s*[=:]\s*["']?[A-Za-z0-9\-_.+/]{20,}["']?/gi,
+    // Bearer tokens
     /Bearer\s+[A-Za-z0-9\-_.+/=]{20,}/g,
   ],
   defaultScore: 0.88,
@@ -146,12 +165,21 @@ const ipDetector: Detector = {
 
 /**
  * Generic secrets — password/token in config patterns.
+ *
+ * P0-2 FIX: Added French password patterns:
+ * "mot de passe", "mdp", "motdepasse" + "mon mot de passe est X"
  */
 const genericSecretDetector: Detector = {
   name: 'Generic Secret',
   type: 'GENERIC_SECRET',
   patterns: [
-    /\b(?:password|passwd|pwd|mot[_\-]?de[_\-]?passe)\s*[=:]\s*["']?[^\s"']{8,}["']?/gi,
+    // English: password= / pwd= / passwd=
+    /\b(?:password|passwd|pwd)\s*[=:]\s*["']?[^\s"']{6,}["']?/gi,
+    // French: mot de passe = / mdp = / motdepasse =
+    /\b(?:mot\s+de\s+passe|motdepasse|mdp)\s*[=:\-]\s*["']?[^\s"',;]{6,}["']?/gi,
+    // French natural language: "mon mot de passe est Azerty123"
+    /\b(?:mon\s+)?(?:mot\s+de\s+passe|mdp)\s+(?:est|is|:)\s+["']?([^\s"',;]{6,})["']?/gi,
+    // Generic token / secret / credential key-value
     /\b(?:token|secret|credential)\s*[=:]\s*["']?[A-Za-z0-9\-_.+/]{16,}["']?/gi,
   ],
   defaultScore: 0.82,
@@ -239,29 +267,26 @@ const carteSejourDetector: Detector = {
  *   2. Arabic name patterns: common Tunisian/Arab first names + "Ben/Bel/El/Al" + family names.
  *   3. French/European: title-cased word pairs not in a common stop-word list.
  *
- * False positive reduction:
- *   - Require minimum 2 words (no single-word matches).
- *   - Exclude matches that look like product/company names (ALL-CAPS words).
- *   - Arabic names use a curated prefix list (Ben, Bel, El, Al, Ould, Bent).
+ * P0-4 FIX: Added "Nom du client : X Y Z" and similar label patterns.
+ * Also tightened pattern 3 to require lowercase continuation (excludes
+ * single-word titles like "Passeport", "Adresse", "Téléphone").
  */
 const personNameDetector: Detector = {
   name: 'Person Name',
   type: 'PERSON_NAME',
   patterns: [
     // ── High-confidence: explicit label ──────────────────────────────────
-    // "Nom: Ahmed Ben Ali" / "Name: Marie Dupont"
-    /\b(?:Nom\s+(?:et\s+Pr[eé]nom|Complet)|Full\s+Name|Name|Pr[eé]nom\s+(?:et\s+Nom)?)\s*[:\-]\s*([A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+(?:\s+[A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+){1,3})/gi,
+    // "Nom: Ahmed Ben Ali" / "Name: Marie Dupont" / "Nom du client : Karim Ben Salah"
+    /\b(?:Nom\s+(?:du\s+client|et\s+Pr[eé]nom|Complet|de\s+l[''](?:employ[eé]|agent|utilisateur))|Full\s+Name|Name|Pr[eé]nom\s+(?:et\s+Nom)?|Nom)\s*[:\-]\s*([A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+(?:\s+[A-ZÀ-Ÿ\u0600-\u06FF][a-zA-Zà-ÿ\u0600-\u06FF]+){1,3})/gi,
 
     // ── Arabic-origin Tunisian names ──────────────────────────────────────
-    // Matches: Mohamed Ben Ali, Ahmed El Amri, Fatma Bel Hadj, etc.
-    // First-name list covers top 50 Tunisian first names (male + female).
-    /\b(?:Mohamed?|Mohamad|Muhamed?|Ahmad?|Ahmed?|Ali|Omar|Youssef|Yousef|Khaled|Khalid|Sami|Samir|Rami|Tarek|Tariq|Imed|Wissem|Wassim|Karim|Slim|Hamza|Walid|Fethi|Nabil|Hedi|Lotfi|Mounir|Hatem|Aymen|Bilel|Amine|Hichem|Sofien|Ramzi|Bassem|Maher|Faouzi|Adel|Zied|Chokri|Anis|Riyadh|Mondher|Riadh|Fatma|Ines|Sonia|Emna|Rim|Nour|Olfa|Mariem|Amira|Hela|Wafa|Asma|Manel|Rania|Sirine|Imen|Najet|Lobna|Sabrina|Salma|Yosra)\s+(?:Ben|Bel|El|Al|Ould|Bent|Bint|Bou|Bou\s*|Hadj)\s+[A-ZÀ-Ÿa-zà-ÿ]{2,20}/g,
+    /\b(?:Mohamed?|Mohamad|Muhamed?|Ahmad?|Ahmed?|Ali|Omar|Youssef|Yousef|Khaled|Khalid|Sami|Samir|Rami|Tarek|Tariq|Imed|Wissem|Wassim|Karim|Slim|Hamza|Walid|Fethi|Nabil|Hedi|Lotfi|Mounir|Hatem|Aymen|Bilel|Amine|Hichem|Sofien|Ramzi|Bassem|Maher|Faouzi|Adel|Zied|Chokri|Anis|Riyadh|Mondher|Riadh|Fatma|Ines|Sonia|Emna|Rim|Nour|Olfa|Mariem|Amira|Hela|Wafa|Asma|Manel|Rania|Sirine|Imen|Najet|Lobna|Sabrina|Salma|Yosra)\s+(?:Ben|Bel|El|Al|Ould|Bent|Bint|Bou|Hadj)\s+[A-ZÀ-Ÿa-zà-ÿ]{2,20}/g,
 
     // ── French / European name pairs ──────────────────────────────────────
-    // Two or three title-cased words; requires lower-case continuation
-    // to exclude acronyms (e.g. "HTTP Request" won't match because "Request"
-    // is a common English word — but we keep score low for this pattern).
-    /\b(?!(?:The|A|An|In|On|At|By|For|From|With|This|That|These|Those|It|Is|Are|Was|Were|Has|Have|Had|Be|Been|Being|Do|Does|Did|Will|Would|Could|Should|May|Might|Must|Shall|Can|Need|Dare|Used|Ought)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}\s+(?!(?:API|URL|HTTP|SQL|JSON|XML|CSS|HTML|PDF|CSV|AI|ML|UI|UX|ID|DB)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{2,20})?\b/g,
+    // Requires lower-case characters in both words to exclude single-word
+    // labels like "Passeport", "Adresse", "Téléphone" that are followed by ":"
+    // The negative lookahead prevents matching words directly before ":"
+    /\b(?!(?:The|A|An|In|On|At|By|For|From|With|This|That|These|Those|It|Is|Are|Was|Were|Has|Have|Had|Be|Been|Being|Do|Does|Did|Will|Would|Could|Should|May|Might|Must|Shall|Can|Need|Dare|Used|Ought|Nom|Email|Tel|Fax|Date|Adresse|Passeport|Passport|Telephone|IBAN|RIB|CIN|MF)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}\s+(?!(?:API|URL|HTTP|SQL|JSON|XML|CSS|HTML|PDF|CSV|AI|ML|UI|UX|ID|DB)\s)[A-ZÀ-Ÿ][a-zà-ÿ]{2,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{2,20})?(?!\s*:)\b/g,
   ],
   defaultScore: 0.58,
 };
@@ -339,14 +364,19 @@ const transcriptMarkerDetector: Detector = {
  * Meeting participant lines — identifies lines where a named person
  * is speaking in a transcript. Used by cageTranscript() to know which
  * lines to redact.
+ *
+ * P0-1 FIX: Require minimum 2 capitalised words to avoid matching
+ * single-word labels like "Period:", "From:", "Summary:", "Date:".
+ * Single-word labels are structural markers, not participant names.
  */
 const meetingParticipantDetector: Detector = {
   name: 'Meeting Participant',
   type: 'MEETING_PARTICIPANT',
   patterns: [
-    // "John Smith: Hello everyone" — name followed by colon and speech
-    /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
-    // "John said:", "John asked:", "John replied:"
+    // Requires EXACTLY 2-3 title-case words before the colon (First Last: speech)
+    // Excludes single-word labels like "Period:", "Date:", "From:", "AI:"
+    /\b([A-ZÀ-Ÿ][a-zà-ÿ]{1,20}\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20})?)\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
+    // "John said:", "John asked:", "John replied:" — single word OK only with speech verb
     /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s+(?:said|asked|replied|noted|added|stated):\s/gi,
   ],
   defaultScore: 0.68,
@@ -359,24 +389,30 @@ const meetingParticipantDetector: Detector = {
 /**
  * All active detectors, ordered highest-confidence first.
  * The deduplication in scan.ts will prefer the first match in case of overlap.
+ *
+ * P0-3 FIX: ibanDetector and ribTnDetector placed BEFORE phoneDetector.
+ * RIB TN (20 digits) and IBAN both contain digit sequences that phoneDetector
+ * would partially match. Higher score alone is insufficient when the phone
+ * pattern matches a SUB-SEQUENCE — ordering ensures longest/most-specific
+ * match runs first and the overlap deduplication discards the phone match.
  */
 export const ALL_DETECTORS: readonly Detector[] = [
-  privateKeyDetector,       // 1.00
-  mfTnDetector,             // 0.92
-  emailDetector,            // 0.95
-  creditCardDetector,       // 0.90
-  ibanDetector,             // 0.90
-  apiKeyDetector,           // 0.88
-  genericSecretDetector,    // 0.82
-  transcriptMarkerDetector, // 0.82 — Cage 5
-  ipDetector,               // 0.85
-  ribTnDetector,            // 0.80
-  passportTnDetector,       // 0.78
-  phoneDetector,            // 0.75
-  postalAddressDetector,    // 0.72 — NEW: street addresses
-  meetingParticipantDetector, // 0.68 — Cage 5
-  carteSejourDetector,      // 0.72
-  passportDetector,         // 0.70
-  cinTnDetector,            // 0.65
-  personNameDetector,       // 0.58
+  privateKeyDetector,       // 1.00 — PEM keys, unambiguous
+  mfTnDetector,             // 0.92 — Tunisian tax ID, very specific format
+  emailDetector,            // 0.95 — RFC email
+  creditCardDetector,       // 0.90 — Luhn-format card numbers
+  ibanDetector,             // 0.90 — ISO 13616, MUST be before phone
+  ribTnDetector,            // 0.80 — 20-digit TN RIB, MUST be before phone
+  apiKeyDetector,           // 0.88 — API keys (sk-, ghp_, etc.)
+  genericSecretDetector,    // 0.82 — passwords, tokens
+  transcriptMarkerDetector, // 0.82 — Cage 5 transcript markers
+  ipDetector,               // 0.85 — IPv4/IPv6
+  passportTnDetector,       // 0.78 — TN passport (1 letter + 7 digits)
+  phoneDetector,            // 0.75 — AFTER RIB/IBAN to avoid sub-match
+  postalAddressDetector,    // 0.72 — street addresses
+  carteSejourDetector,      // 0.72 — residence permit
+  meetingParticipantDetector, // 0.68 — Cage 5 participants
+  passportDetector,         // 0.70 — generic passport
+  cinTnDetector,            // 0.65 — TN CIN 8 digits
+  personNameDetector,       // 0.58 — names (broadest, last)
 ];

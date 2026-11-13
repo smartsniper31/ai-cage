@@ -495,9 +495,26 @@ function shortDate(iso: string): string {
   } catch { return iso; }
 }
 
-/** Pluralise: 1 item / 2 items */
+/** Pluralise correctly — handles irregular English plurals used in the report */
 function pl(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
+  if (n === 1) return `${n} ${word}`;
+  // Handle common irregular/special cases in our report vocabulary
+  const irregulars: Record<string, string> = {
+    'piece of data':  'pieces of data',
+    'hidden AI call': 'hidden AI calls',
+    'hidden call':    'hidden calls',
+    'hidden request': 'hidden requests',
+    'different AI tool': 'different AI tools',
+    'sensitive item': 'sensitive items',
+    'sensitive piece of data': 'sensitive pieces of data',
+  };
+  if (irregulars[word]) return `${n} ${irregulars[word]}`;
+  // Standard English pluralisation
+  if (word.endsWith('s') || word.endsWith('x') || word.endsWith('z') ||
+      word.endsWith('ch') || word.endsWith('sh')) {
+    return `${n} ${word}es`;
+  }
+  return `${n} ${word}s`;
 }
 
 export interface PlainReportOptions {
@@ -544,7 +561,17 @@ export async function generatePlainReport(
   const from = fromDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const to   = toDate   ?? new Date();
 
-  const { customerName = 'there', isPro = false } = options;
+  // P0-5c FIX: Extract first name only from customerName for natural greeting.
+  // "Karim Ben Salah" → "Karim". "AI CAGE Pro Customer" → "there" (fallback).
+  // Raw customerName from license payload: "firstname lastname" or "Company Name".
+  const rawName = options.customerName ?? '';
+  const { customerName, isPro = false } = options;
+
+  // Extract first word as first name, unless it looks like a system default
+  const systemDefaults = ['ai cage pro customer', 'ai cage customer', 'demo customer', 'there', ''];
+  const firstName = (rawName && !systemDefaults.includes(rawName.toLowerCase()))
+    ? rawName.split(/\s+/)[0]
+    : 'there';
 
   // ── Filter to range ───────────────────────────────────────────────────────
   const inRange = entries.filter((e) => {
@@ -552,24 +579,58 @@ export async function generatePlainReport(
     return t >= from && t <= to;
   });
 
-  const cageEvents   = inRange.filter(e => e.type === 'PII_CAGED');
+  // P0-5b FIX: Exclude MEETING_TRANSCRIPT_MARKER events from cage totals.
+  // meta.ai and other sites trigger transcript detection on their own UI text,
+  // producing false-positive counts (e.g. "127 meeting markers" from meta.ai).
+  // Transcript markers are only meaningful in Cage 5 (cageTranscript flow),
+  // not in the general PII cage count reported to the user.
+  const cageEvents = inRange.filter(e =>
+    e.type === 'PII_CAGED' &&
+    // Exclude events where ALL counts are MEETING_TRANSCRIPT_MARKER
+    Object.keys(e.counts).some(k =>
+      k !== 'MEETING_TRANSCRIPT_MARKER' && k !== 'MEETING_PARTICIPANT',
+    ),
+  );
   const shadowEvents = inRange.filter(e => e.type === 'SHADOW_AI_DETECTED');
 
+  // P0-5e FIX: Dedup cage events at report level.
+  // If the same (site, totalCount, same-day) appears more than once,
+  // keep only the first occurrence. This catches cases where the
+  // background dedup cache was reset (SW restart) between two rapid cages.
+  const seenEventKeys = new Set<string>();
+  const dedupedCageEvents = cageEvents.filter(e => {
+    const day = e.timestamp.slice(0, 10); // YYYY-MM-DD
+    const typeKey = Object.keys(e.counts).sort().join(',');
+    const key = `${e.site}:${e.totalCount}:${day}:${typeKey}`;
+    if (seenEventKeys.has(key)) return false;
+    seenEventKeys.add(key);
+    return true;
+  });
+
   // ── Aggregate entity types ────────────────────────────────────────────────
+  // Use dedupedCageEvents for all totals and breakdowns
   const entityCounts = new Map<string, number>();
-  for (const e of cageEvents) {
+  for (const e of dedupedCageEvents) {
     for (const [k, v] of Object.entries(e.counts)) {
+      // P0-5b: skip transcript/participant counts in PII totals
+      if (k === 'MEETING_TRANSCRIPT_MARKER' || k === 'MEETING_PARTICIPANT') continue;
       entityCounts.set(k, (entityCounts.get(k) ?? 0) + (v ?? 0));
     }
   }
 
-  const totalProtected = cageEvents.reduce((s, e) => s + e.totalCount, 0);
+  const totalProtected = dedupedCageEvents.reduce((s, e) => {
+    // Only count non-transcript entity types
+    const nonTranscriptCount = Object.entries(e.counts)
+      .filter(([k]) => k !== 'MEETING_TRANSCRIPT_MARKER' && k !== 'MEETING_PARTICIPANT')
+      .reduce((acc, [, v]) => acc + (v ?? 0), 0);
+    return s + nonTranscriptCount;
+  }, 0);
   const totalShadowAi  = shadowEvents.reduce((s, e) => s + e.totalCount, 0);
 
   // ── Unique sites ──────────────────────────────────────────────────────────
   const siteSet = new Set<string>();
-  for (const e of cageEvents)   siteSet.add(e.site);
-  for (const e of shadowEvents) siteSet.add(e.site);
+  for (const e of dedupedCageEvents) siteSet.add(e.site);
+  for (const e of shadowEvents)      siteSet.add(e.site);
   const uniqueSites = siteSet.size;
 
   // ── Date range label ──────────────────────────────────────────────────────
@@ -591,7 +652,7 @@ export async function generatePlainReport(
 
   // ── AI sites used (friendly names) ────────────────────────────────────────
   const siteCounts = new Map<string, number>();
-  for (const e of cageEvents) {
+  for (const e of dedupedCageEvents) {
     siteCounts.set(e.site, (siteCounts.get(e.site) ?? 0) + e.totalCount);
   }
   const siteList = [...siteCounts.entries()]
@@ -605,7 +666,7 @@ export async function generatePlainReport(
       : siteList.slice(0, -1).join(', ') + ' and ' + siteList.at(-1);
 
   // ── Peak event (largest single cage event) ────────────────────────────────
-  const peakEvent = cageEvents.reduce<AuditEntry | null>(
+  const peakEvent = dedupedCageEvents.reduce<AuditEntry | null>(
     (best, e) => (!best || e.totalCount > best.totalCount) ? e : best,
     null,
   );
@@ -619,7 +680,7 @@ export async function generatePlainReport(
   const lines: string[] = [];
 
   // Header
-  lines.push('=' .repeat(60));
+  lines.push('='.repeat(60));
   lines.push('AI CAGE — Protection Report');
   lines.push(`Period: ${fromLabel} to ${toLabel}`);
   if (isPro) {
@@ -631,8 +692,8 @@ export async function generatePlainReport(
   lines.push('='.repeat(60));
   lines.push('');
 
-  // Greeting
-  lines.push(`Hello ${customerName},`);
+  // P0-5c FIX: Use firstName (extracted above) — never "AI CAGE Pro Customer"
+  lines.push(`Hello ${firstName},`);
   lines.push('');
   lines.push(
     `Here is your AI CAGE protection report covering the last ${pl(daysCount, 'day')}.`,
@@ -757,7 +818,7 @@ export async function generatePlainReport(
   }
 
   // ── Pro: event-by-event log ───────────────────────────────────────────────
-  if (isPro && cageEvents.length > 0) {
+  if (isPro && dedupedCageEvents.length > 0) {
     lines.push('--- FULL EVENT LOG ---');
     lines.push('');
     lines.push(
@@ -765,7 +826,7 @@ export async function generatePlainReport(
     );
     lines.push('');
 
-    for (const e of cageEvents) {
+    for (const e of dedupedCageEvents) {
       const when  = friendlyDate(e.timestamp);
       const where = friendlySite(e.site);
       lines.push(`> ${when} — ${where}`);
