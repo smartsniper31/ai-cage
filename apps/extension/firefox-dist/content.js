@@ -12,8 +12,11 @@
     name: "Phone Number",
     type: "PHONE_NUMBER",
     patterns: [
+      // International format with + prefix (most reliable)
       /\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?[\s.\-]?\d{1,4}[\s.\-]?\d{1,9}/g,
-      /\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}/g
+      // Local format: (NNN) NNN-NNNN or NNN NNN NNNN
+      // Negative lookbehind: not preceded by digit or space+digit (not inside RIB)
+      new RegExp("(?<!\\d[\\s]?)(?<!\\d)\\(?\\d{3}\\)?[\\s.\\-]\\d{3}[\\s.\\-]\\d{4}(?!\\d)", "g")
     ],
     defaultScore: 0.75
   };
@@ -229,8 +232,9 @@
     type: "MEETING_PARTICIPANT",
     patterns: [
       // Requires EXACTLY 2-3 title-case words before the colon (First Last: speech)
-      // Excludes single-word labels like "Period:", "Date:", "From:", "AI:"
-      /\b([A-ZÀ-Ÿ][a-zà-ÿ]{1,20}\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20})?)\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
+      // Excludes single-word labels AND known non-name word pairs
+      // Negative lookahead for common label pairs
+      /\b(?!(?:Cl[eé]\s+Google|Secret\s+API|Token\s+GitHub|Mot\s+de|Clé\s+API|API\s+Key|Mon\s+patron|Mon\s+propre)\b)([A-ZÀ-Ÿ][a-zà-ÿ]{1,20}\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20}(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]{1,20})?)\s*:\s+(?=[A-ZÀ-Ÿa-zà-ÿ])/g,
       // "John said:", "John asked:", "John replied:" — single word OK only with speech verb
       /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,2})\s+(?:said|asked|replied|noted|added|stated):\s/gi
     ],
