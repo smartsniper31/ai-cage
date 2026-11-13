@@ -1,5 +1,5 @@
 AI CAGE v0.6.0 - Test Results
-Date: 2026-11-13 13:59:08
+Date: 2026-11-13 21:47:07
 ================================
 
 TOTAL: 202/202 PASS
@@ -14,5 +14,5 @@ ZIPS (dist/):
   firefox.zip  45.1 KB
 
 SHA256:
-  e0fdcd56c24235e1fc324a0eba337b6acc97395619ec1e16390d60d83b893475  chrome
-  54e0fa4f007383c2f135cbb613748d88996e85320b9d1bdc4c3e09bbb7111908  firefox
+  9e3335873398f2d1fc53e895c4188bb58d1cc0f16584a0ab00f580859bc9c887  chrome
+  75cee6544f3d041e332cf882897aeafb3ef36cb6b8843276002b913ed5d7b841  firefox
