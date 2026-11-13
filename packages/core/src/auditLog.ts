@@ -400,16 +400,20 @@ const ENTITY_LABELS: Record<string, string> = {
   // Financial
   CREDIT_CARD:          'credit card number',
   CREDIT_CARD_NUMBER:   'credit card number',
-  IBAN_CODE:            'bank account / IBAN',
-  IBAN:                 'bank account / IBAN',
+  IBAN_CODE:            'bank account (IBAN)',
+  IBAN:                 'bank account (IBAN)',
+  RIB_TN:               'Tunisian bank account (RIB)',
   US_BANK_NUMBER:       'bank account number',
   // Identity documents
   NRP:                  'national ID number',
-  CIN_TN:               'national ID (Tunisia)',
+  CIN_TN:               'Tunisian national ID',
   PASSPORT:             'passport number',
+  PASSPORT_TN:          'Tunisian passport',
   PASSPORT_NUMBER:      'passport number',
   DRIVER_LICENSE:       'driver\'s licence',
   US_DRIVER_LICENSE:    'driver\'s licence',
+  CARTE_SEJOUR:         'residence permit',
+  MF_TN:                'Tunisian tax ID',
   // Address / location
   LOCATION:             'postal address',
   ADDRESS:              'postal address',
@@ -417,10 +421,12 @@ const ENTITY_LABELS: Record<string, string> = {
   ZIP_CODE:             'postal code',
   // Digital identifiers
   IP_ADDRESS:           'IP address',
-  URL:                  'web address (URL)',
+  URL:                  'web address',
   // Credentials
-  PASSWORD:             'password / secret key',
-  API_KEY:              'API key / secret',
+  PRIVATE_KEY:          'private key',
+  GENERIC_SECRET:       'password / secret',
+  PASSWORD:             'password',
+  API_KEY:              'API key',
   // Medical
   MEDICAL_LICENSE:      'medical licence number',
   US_ITIN:              'tax ID number',
@@ -433,6 +439,9 @@ const ENTITY_LABELS: Record<string, string> = {
   // Date
   DATE_TIME:            'date / time',
   AGE:                  'age',
+  // Transcript (excluded from totals)
+  MEETING_TRANSCRIPT_MARKER: 'transcript marker',
+  MEETING_PARTICIPANT:       'transcript participant',
 };
 
 /**
