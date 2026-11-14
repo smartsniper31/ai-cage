@@ -487,10 +487,126 @@ function writeText(el: HTMLElement, text: string): void {
   }
 }
 
+// ─── FREE LIMIT MODAL ─────────────────────────────────────────────────────────
+/**
+ * Shows a hard-block modal when the Free tier 100-cage limit is reached.
+ * The user CANNOT send their data unprotected — they must either:
+ *   A) Upgrade to Pro (opens Stripe)
+ *   B) Cancel (they can manually remove PII before sending)
+ *
+ * SECURITY: We never let PII pass through after the limit.
+ * Sending unprotected data is not an option in this modal.
+ */
+function showLimitModal(monthly: number): void {
+  const root = getShadowRoot();
+  if (!root) return;
+
+  root.getElementById('cage-limit-modal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'cage-limit-modal';
+  modal.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:2147483647',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'background:rgba(0,0,0,.55)', 'padding:16px',
+  ].join(';');
+
+  modal.innerHTML = `
+    <div style="
+      background:#fff;border-radius:16px;padding:24px;
+      max-width:380px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);
+      font-family:system-ui,-apple-system,sans-serif;
+    ">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:36px;margin-bottom:8px">🔒</div>
+        <div style="font-size:17px;font-weight:800;color:#0f172a;margin-bottom:4px">
+          Free limit reached
+        </div>
+        <div style="font-size:13px;color:#64748b;line-height:1.5">
+          You have used <strong style="color:#dc2626">100 / 100</strong> free cages this month.<br>
+          Your data was <strong>not sent</strong> — it is still protected.
+        </div>
+      </div>
+
+      <div style="
+        background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;
+        padding:12px 14px;margin-bottom:16px;
+      ">
+        <div style="font-size:11px;font-weight:800;color:#15803d;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">
+          ✅ Upgrade to Pro — Unlimited cages
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;color:#166534">
+          <div>🔒 Unlimited cages / month</div>
+          <div>🧠 Inference Cage™ auto</div>
+          <div>🔄 Ephemeral Tokens™</div>
+          <div>📋 Full audit report</div>
+          <div>🤖 Agent Cage</div>
+          <div>📄 CSV export</div>
+        </div>
+        <div style="margin-top:8px;font-size:13px;font-weight:800;color:#15803d">
+          €5 / user / month · Cancel anytime
+        </div>
+      </div>
+
+      <button id="cage-limit-upgrade" style="
+        width:100%;padding:13px;background:#15803d;color:#fff;
+        border:none;border-radius:10px;font-size:14px;font-weight:800;
+        cursor:pointer;margin-bottom:8px;
+      ">🚀 Upgrade to Pro →</button>
+
+      <button id="cage-limit-cancel" style="
+        width:100%;padding:11px;background:#f1f5f9;color:#374151;
+        border:none;border-radius:10px;font-size:13px;font-weight:600;
+        cursor:pointer;
+      ">Cancel — I will remove sensitive data first</button>
+
+      <div style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:center;line-height:1.5">
+        Your data was NOT sent. AI CAGE blocked the request.<br>
+        Remove any sensitive information before sending manually.
+      </div>
+    </div>`;
+
+  root.appendChild(modal);
+
+  modal.querySelector('#cage-limit-upgrade')?.addEventListener('click', () => {
+    modal.remove();
+    try {
+      void chrome.runtime.sendMessage({ type: 'OPEN_UPGRADE' });
+    } catch {
+      window.open('https://ai-cage-gamma.vercel.app/#pricing', '_blank');
+    }
+  });
+
+  modal.querySelector('#cage-limit-cancel')?.addEventListener('click', () => {
+    modal.remove();
+    showToast('⚠️ Request cancelled — remove sensitive data before sending', 'warning', 4000);
+  });
+}
+
 // ─── CAGE LOGIC ────────────────────────────────────────────────────────────────
-function handlePrompt(el: HTMLElement): void {
+async function handlePrompt(el: HTMLElement): Promise<void> {
   const raw = readText(el);
   if (!raw || raw.length < 3) return;
+
+  // ── P0 BUSINESS FIX: Hard-enforce Free tier 100-cage limit ────────────────
+  // Before scanning for PII, check whether the monthly limit is reached.
+  // If yes: block the prompt entirely and show the upgrade modal.
+  // The prompt is NOT modified — user can still send it after removing PII manually.
+  // SECURITY: we never let PII pass in clear text after the limit.
+  try {
+    const limitResp = await chrome.runtime.sendMessage<
+      { type: string },
+      { limitReached: boolean; isPro: boolean; monthly: number }
+    >({ type: 'CHECK_LIMIT' });
+
+    if (limitResp?.limitReached) {
+      showLimitModal(limitResp.monthly);
+      // Prevent the keydown/click event from submitting the form
+      return;
+    }
+  } catch {
+    // If background is unreachable, fail safe — allow caging (better than blocking)
+  }
 
   const { cagedText, entities, totalCaged, inferenceRisk } = cageText(raw);
   if (totalCaged === 0 && !inferenceRisk.risky) return;
@@ -531,7 +647,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   const isPrompt = PROMPT_SELECTORS.some(sel => {
     try { return target.matches(sel) || !!target.closest(sel); } catch { return false; }
   });
-  if (isPrompt) handlePrompt(target);
+  if (isPrompt) void handlePrompt(target);
 }, true);
 
 function hookButtons(): void {
@@ -539,7 +655,7 @@ function hookButtons(): void {
     document.querySelectorAll<HTMLElement>(sel).forEach(btn => {
       if (btn.getAttribute(CAGED_ATTR) === '1') return;
       btn.setAttribute(CAGED_ATTR, '1');
-      btn.addEventListener('click', () => { const p = findPrompt(); if (p) handlePrompt(p); }, true);
+      btn.addEventListener('click', () => { const p = findPrompt(); if (p) void handlePrompt(p); }, true);
     });
   });
 }
@@ -548,7 +664,7 @@ document.addEventListener('submit', (e: Event) => {
   const form = e.target as HTMLFormElement;
   try {
     const input = form.querySelector<HTMLElement>(PROMPT_SELECTORS.join(','));
-    if (input) handlePrompt(input);
+    if (input) void handlePrompt(input);
   } catch { /* ignore */ }
 }, true);
 

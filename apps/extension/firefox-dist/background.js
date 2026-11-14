@@ -1402,6 +1402,23 @@
         });
         return true;
       }
+      if (msg.type === "CHECK_LIMIT") {
+        void Promise.all([
+          getAuditSummary(chromeStorageAdapter),
+          checkLicense(chromeStorageAdapter, 0)
+        ]).then(([summary, licInfo]) => {
+          const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
+          const monthly = summary.totalCaged;
+          const FREE_MAX = 100;
+          sendResponse({
+            limitReached: !isPro && monthly >= FREE_MAX,
+            isPro,
+            monthly: Math.min(monthly, FREE_MAX)
+            // cap displayed value at 100
+          });
+        });
+        return true;
+      }
     }
   );
   chrome.tabs.onRemoved.addListener((tabId) => {

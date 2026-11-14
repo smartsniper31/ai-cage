@@ -260,9 +260,37 @@ function showNotification(message: string, type: 'ok' | 'warn' | 'error' = 'ok',
   document.body.appendChild(notif);
   setTimeout(() => notif.remove(), durationMs);
 }
-cageBtn.addEventListener('click', () => {
+const FREE_LIMIT_DESKTOP = 100;
+
+cageBtn.addEventListener('click', async () => {
   const text = inputEl.value.trim();
   if (!text) return;
+
+  // ── P0 BUSINESS FIX: Hard-enforce Free tier 100-cage limit ──────────────
+  const licCheck = await checkLicense(store, 0);
+  const isProDesk = licCheck.tier === 'PRO' || licCheck.tier === 'ENTERPRISE';
+  if (!isProDesk) {
+    const summary = await getAuditSummary(store);
+    const monthly = summary.totalCaged;
+    if (monthly >= FREE_LIMIT_DESKTOP) {
+      // Show upgrade modal — do NOT cage
+      const confirmed = confirm(
+        `Free limit reached — ${Math.min(monthly, FREE_LIMIT_DESKTOP)} / ${FREE_LIMIT_DESKTOP} cages used this month.\n\n` +
+        `Your data was NOT sent.\n\n` +
+        `Upgrade to Pro for unlimited cages — €5/user/month.\n\n` +
+        `Click OK to open the Account tab and activate Pro.\n` +
+        `Click Cancel to dismiss (remove sensitive data before proceeding).`
+      );
+      if (confirmed) {
+        activatePanel('account');
+        void renderAccountPanel();
+      } else {
+        showNotification('⚠️ Cage blocked — Free limit reached. Remove sensitive data before proceeding.', 'warn', 5000);
+      }
+      return;
+    }
+  }
+
   const { cagedText, entities, totalCaged, inferenceRisk } = cageText(text);
   outputEl.value = cagedText;
   lastEntities   = entities;
