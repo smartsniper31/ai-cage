@@ -1,6 +1,9 @@
 # AI CAGE — Architecture
 
-> **Core Principle:** PII never leaves the user's machine. Caging happens before the network. Uncaging happens after.
+**Version:** v0.6.0
+**Last updated:** 2026-11-14
+
+> **Core Principle:** PII never leaves the user's machine. Caging happens before the network. Uncaging happens after. Tokens rotate every session.
 
 ---
 
@@ -14,12 +17,16 @@ flowchart LR
 
         subgraph CAGE["🔒 AI CAGE Layer"]
             direction TB
-            SCAN["presidio-lite\nscanText()"]
+            SALT["SESSION_SALT\n(rotates per session)"]
+            SCAN["presidio-lite\nscanText() — 16 PII types"]
+            INFER["detectQuasiIdentifiers()\nInference Cage™"]
             CORE["@ai-cage/core\ncageText()"]
             SCAN --> CORE
+            SALT --> CORE
+            INFER --> CORE
         end
 
-        CORE -->|"Caged text\n[CAGED_EMAIL_1]…"| SEND
+        CORE -->|"Caged text\n[CAGED_EMAIL_K3P2_1]…"| SEND
         SEND["HTTP Request\n(sanitised only)"]
 
         RESP["AI Response\n(with placeholders)"] --> UNCAGE
@@ -48,14 +55,15 @@ flowchart LR
 
 ```mermaid
 graph TD
-    subgraph MONO["ai-cage monorepo"]
+    subgraph MONO["ai-cage monorepo (pnpm workspaces)"]
         subgraph PKGS["packages/"]
-            PL["@ai-cage/presidio-lite\n─────────────────\nRegex PII detectors\nTypes: EMAIL, IBAN, CIN_TN\nRIB_TN, CARD, APIKEY…\nZero dependencies"]
-            CORE["@ai-cage/core\n─────────────────\ncageText()\nuncageText()\nsummariseCaged()\nDepends on presidio-lite"]
+            PL["@ai-cage/presidio-lite\n─────────────────\n16 PII types (regex)\n15 injection patterns\ndeduplicateMatches()\nZero dependencies"]
+            CORE["@ai-cage/core\n─────────────────\ncageText() + SESSION_SALT\nuncageText()\ndetectQuasiIdentifiers()\ngeneratePlainReport()\nlogEvent() + sanitiseDetail()\ncheckLicense()\nDepends on presidio-lite"]
         end
         subgraph APPS["apps/"]
-            EXT["@ai-cage/extension\n─────────────────\nChrome MV3\nbackground.ts\ncontent.ts\npopup.ts"]
-            DESK["@ai-cage/desktop\n─────────────────\nTauri 1.6\nRust backend\nTypeScript UI"]
+            EXT["@ai-cage/extension\n─────────────────\nChrome/Edge/Firefox MV3\nbackground.ts (dedup, cooldown)\ncontent.ts (intercept + InferenceRisk)\ninjected.ts (fetch/XHR patch)\npopup.ts (UI + Report button)"]
+            DESK["@ai-cage/desktop\n─────────────────\nTauri 1.6 — Rust + TypeScript\nFull cage/uncage/restore UI\nAudit log + Plain Report\nAgent Cage simulation"]
+            LAND["apps/landing\n─────────────────\nVercel static site\nindex.html + install.html\nsuccess.html"]
         end
     end
 
@@ -70,13 +78,13 @@ graph TD
 
 | Package | Language | Role | Network? |
 |---------|----------|------|----------|
-| `@ai-cage/presidio-lite` | TypeScript | Regex PII pattern library | ❌ Never |
-| `@ai-cage/core` | TypeScript | `cageText` / `uncageText` API | ❌ Never |
-| `@ai-cage/extension` | TS + Chrome APIs | MV3 content/background scripts | ❌ Never¹ |
+| `@ai-cage/presidio-lite` | TypeScript | 16 PII regex detectors + 15 injection patterns | ❌ Never |
+| `@ai-cage/core` | TypeScript | cageText / uncageText / SESSION_SALT / InferenceRisk / generatePlainReport / auditLog / license | ❌ Never |
+| `@ai-cage/extension` | TS + Chrome APIs | MV3 content/background/injected scripts + popup | ❌ Never¹ |
 | `@ai-cage/desktop` | Rust + TypeScript | Tauri native desktop app | ❌ Never² |
 
-> ¹ The extension intercepts network traffic but does NOT initiate any itself.
-> ² `tauri::api::http` is explicitly disabled in `Cargo.toml` and `tauri.conf.json`.
+> ¹ Extension intercepts network traffic but initiates zero requests itself.
+> ² `tauri::api::http` is explicitly disabled in `Cargo.toml`.
 
 ---
 
@@ -86,38 +94,88 @@ graph TD
 sequenceDiagram
     actor User
     participant Page as AI Chat Page
-    participant CS as content.ts<br/>(Content Script)
-    participant BG as background.ts<br/>(Service Worker)
+    participant CS as content.ts
+    participant INJ as injected.ts
+    participant BG as background.ts
     participant AI as Monster AI API
 
     User->>Page: Types prompt with PII
     Page->>CS: keydown Enter / button click
-    CS->>CS: cageText() — local, offline
-    Note over CS: PII replaced with [CAGED_X]
-    CS->>BG: chrome.runtime.sendMessage<br/>CAGE_REPORT (summary only)
-    BG->>BG: updateBadge(count)
+    CS->>CS: cageText() — SESSION_SALT rotates per session
+    Note over CS: [CAGED_EMAIL_K3P2_1] — different every session
+    CS->>CS: detectQuasiIdentifiers() — Inference Risk
+    CS->>BG: CAGE_REPORT (entities + inferenceRisk)
+    BG->>BG: isDuplicateCageEvent() — 5s dedup window
+    BG->>BG: logEvent() — sanitiseDetail() strips any caged tokens
+    BG->>BG: updateBadge(count) + store lastInferenceRisk
     CS->>Page: Write caged text back to input
-    Page->>AI: HTTP POST (caged text only ✅)
-    AI->>Page: Response with [CAGED_X] tokens
-    CS->>CS: uncageText() — local restore
+    Page->>INJ: fetch() intercepted
+    INJ->>AI: HTTP POST (caged text only ✅)
+    AI->>Page: Response with [CAGED_K3P2] tokens
+    CS->>CS: uncageText() — restore locally
     CS->>User: Full response with original values
 ```
 
 ---
 
-## Cage Architecture — 7 Threat Surfaces
+## Key Design Patterns
 
-AI CAGE is designed around 7 threat surfaces ("cages"). V1 implements **Cage 1**.
+### SESSION_SALT — Ephemeral Tokens™
 
-| # | Cage Name | V1 Status | Description |
-|---|-----------|-----------|-------------|
-| 1 | **Chat Leak** | ✅ Implemented | PII in prompts sent to AI chat interfaces |
-| 2 | Shadow AI | 🔜 Planned | Employees using unapproved AI tools |
-| 3 | Agent Rogue | 🔜 Planned | AI agents with tool-use accessing internal systems |
-| 4 | Code Leak | 🔜 Planned | Source code + secrets pasted into AI code assistants |
-| 5 | Voice/Video | 🔜 Planned | Transcripts and meeting summaries sent to AI |
-| 6 | Credential Hijack | 🔜 Planned | API keys / passwords in AI context windows |
-| 7 | Compliance | 🔜 Planned | GDPR/HIPAA/SOC2 audit trail generation |
+```typescript
+// packages/core/src/cage.ts
+function generateSessionSalt(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+export const SESSION_SALT: string = generateSessionSalt(); // once per module load = once per session
+```
+
+Each session gets a unique 4-char salt. `[CAGED_EMAIL_K3P2_1]` in session 1 becomes `[CAGED_EMAIL_A7X9_1]` in session 2. The AI cannot correlate prompts across sessions — this is the Linkage Attack prevention guarantee.
+
+### Deduplication Pipeline
+
+```
+content.ts fires CAGE_REPORT
+    → background.ts: isDuplicateCageEvent(site, count, entityTypes, 5s window)
+        → If duplicate: skip logEvent, still update badge
+        → If new: logEvent() + sanitiseDetail() strips any CAGED tokens from detail field
+    → generatePlainReport(): dedupedCageEvents — second dedup layer at report time
+```
+
+### Inference Risk
+
+```typescript
+// packages/core/src/cage.ts
+// 8 quasi-identifier patterns:
+// age, team_size, amount, specific_date, city, role, deal_ref, sector
+// Rule: score >= 3 → risky = true → warn (Free) or auto-cage (Pro)
+export function detectQuasiIdentifiers(text: string): InferenceRisk
+```
+
+### Shadow AI Cooldown
+
+```typescript
+// apps/extension/src/background.ts
+const SHADOW_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes per hostname
+// Same hostname logged at most once per 5 min — prevents ChatGPT polling spam
+```
+
+---
+
+## The 9 Cages — v0.6.0 Status
+
+| # | Cage Name | v0.6.0 Status | Implementation |
+|---|-----------|:-------------:|----------------|
+| 1 | **Chat Leak** — PII in AI prompts | ✅ **Live** | `cageText()` + content.ts |
+| 2 | **Shadow AI** — 47 unmonitored endpoints | ✅ **Live** | `matchAiEndpoint()` + background.ts |
+| 3 | **Agent Rogue** — Prompt injection + tool policy | ✅ **Live** | `cageToolCall()` + `scanForInjection()` |
+| 4 | Code Leak — VS Code extension | 🔜 v0.7.0 | Planned |
+| 5 | Voice/Video — Meeting transcripts | 🔜 v0.7.0 | `cageTranscript()` partial |
+| 6 | Credential Hijack — API keys | ⚡ Partial | Covered by Cage 1 (API_KEY detector) |
+| 7 | **Compliance** — Audit log + CSV + Plain Report | ✅ **Live** | `logEvent()` + `generatePlainReport()` |
+| 8 | **Inference Cage™** — Quasi-identifier combinations | ✅ **Live** | `detectQuasiIdentifiers()` |
+| 9 | **Ephemeral Tokens™** — Session token rotation | ✅ **Live** | `SESSION_SALT` in `cage.ts` |
 
 ---
 
@@ -125,21 +183,44 @@ AI CAGE is designed around 7 threat surfaces ("cages"). V1 implements **Cage 1**
 
 ### Why regex and not an ML model?
 
-- **Offline-first**: No model download, no inference server, zero latency on first use.
-- **Auditable**: Every detection rule is a readable regex in `detectors.ts`. Security engineers can review without an ML background.
+- **Offline-first**: Zero model download, zero inference server, zero latency.
+- **Auditable**: Every detection rule is a readable regex in `detectors.ts`.
 - **Deterministic**: Same input → same output. Reproducible in court/audit.
 - **Zero cost**: No GPU, no cloud, no subscription.
 
-ML-based NER (e.g. a WASM ONNX model) is planned for V2 for higher recall on unstructured names and addresses.
+ML-based NER is on the v0.8.0 roadmap for higher recall on unstructured names.
+
+### Why SESSION_SALT instead of a fixed counter?
+
+Fixed tokens like `[EMAIL_1]` are stable across sessions — the AI can correlate 10 sessions of the same user into a behavioral profile without ever seeing direct PII. A per-session random salt makes cross-session correlation mathematically infeasible.
+
+### Why deduplication at two layers?
+
+The extension has two intercept paths: DOM mutation (content.ts) and network fetch (injected.ts). Both fire for the same user action. Without dedup, every cage event is counted twice. The 5-second + entity-fingerprint window handles SW restarts between events.
+
+### Why sanitiseDetail() in logEvent()?
+
+The `detail` field in audit entries comes from background.ts string interpolation. If that string accidentally contains a caged token (e.g., from a site's own debug output), the audit log becomes unreadable. `sanitiseDetail()` replaces any `[CAGED_..._N]` pattern with `[PROTECTED]` before writing to storage.
 
 ### Why Tauri and not Electron?
 
 - ~10× smaller binary (no bundled Chromium).
-- Rust backend = memory-safe, no Node.js attack surface.
-- `tauri::api::http` is explicitly disabled — the Rust process literally cannot make HTTP calls.
+- Rust backend — memory-safe, `tauri::api::http` explicitly disabled.
+- Native OS integration without Node.js attack surface.
 
 ### Why MV3 and not MV2?
 
-- MV3 is the only supported extension model going forward in Chrome.
-- Service workers (not persistent background pages) reduce memory footprint.
-- `declarativeNetRequest` (future) is more privacy-preserving than `webRequest`.
+MV3 is the only supported Chrome extension model going forward. Service workers reduce memory footprint. `webRequest` is replaced by `declarativeNetRequest` on the roadmap.
+
+---
+
+## Security Contracts (CI-enforced)
+
+```bash
+# Pre-commit hook — blocks any commit that adds network calls to core
+grep -r "fetch\|XMLHttpRequest\|WebSocket\|navigator.sendBeacon" packages/core/src packages/presidio-lite/src
+# Must return zero matches
+
+# Vite bundle check (release.ps1 step 2b)
+# Verifies desktop dist/index.html contains no old version strings
+```

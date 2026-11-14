@@ -1,35 +1,37 @@
-# AI CAGE — Phase 5.8 Final Report (Updated)
-**Version :** v0.6.0  
-**Date updated :** 2026-11-12  
-**Status :** ✅ PRODUCTION READY — Ready to sell
+# AI CAGE — v0.6.0 Final Release Report
+
+**Version:** v0.6.0
+**Date updated:** 2026-11-14
+**Status:** ✅ PRODUCTION READY — Client-ready, all P0 bugs resolved, all fixes tested
 
 ---
 
-## 1. Build Sizes
+## 1. Build Sizes (latest)
 
-| File | Size | Gzip |
-|------|------|------|
-| `apps/extension/dist/background.js` | 21.29 kB | 5.53 kB |
-| `apps/extension/dist/content.js` | 31.14 kB | 9.58 kB |
-| `apps/extension/dist/injected.js` | 12.87 kB | 3.89 kB |
-| `apps/extension/dist/popup.js` | ~24 kB | — |
-| `apps/desktop/dist/index.html` | 25.33 kB | 6.50 kB |
-| `apps/desktop/dist/assets/index.js` | 45.32 kB | 16.72 kB |
-| `apps/landing/dist/index.html` | ~35 kB | ~8 kB |
-| `dist/ai-cage-extension-v0.6.0-chrome.zip` | 37 KB | — |
-| `dist/ai-cage-extension-v0.6.0-firefox.zip` | 37 KB | — |
-| `dist/ai-cage-desktop-v0.6.0-windows-setup.exe` | 1.05 MB | — |
-| `dist/ai-cage-desktop-v0.6.0-windows.msi` | 1.54 MB | — |
+| File | Size | Notes |
+|------|------|-------|
+| `apps/extension/dist/background.js` | ~41 kB | Includes generatePlainReport, dedup, cooldown |
+| `apps/extension/dist/content.js` | ~36 kB | Includes inferenceRisk, Ephemeral Tokens |
+| `apps/extension/dist/popup.js` | ~27 kB | Report button, InferenceRisk banner, PRO gating |
+| `apps/extension/dist/injected.js` | 12.87 kB | Network interceptor |
+| `apps/desktop/dist/index.html` | 25.65 kB | |
+| `apps/desktop/dist/assets/index.js` | **59.41 kB** | All fixes T1-T3 included |
+| `apps/landing/dist/index.html` | ~60 kB | AI Secrets section, Inference Cage, competitive table |
+| `dist/ai-cage-extension-v0.6.0-chrome.zip` | **46 KB** | All P0+R+S+T fixes |
+| `dist/ai-cage-extension-v0.6.0-firefox.zip` | **46 KB** | All P0+R+S+T fixes |
+| `ai-cage-desktop-windows-setup.exe` | 1.06 MB | Tauri — T1-T3 fixes included |
+| `ai-cage-desktop-windows.msi` | 1.54 MB | Tauri — T1-T3 fixes included |
 
 ---
 
 ## 2. Test Results
 
 ```
-PRESIDIO-LITE : 74/74 ✅
+PRESIDIO-LITE : 74/74  ✅
 CORE          : 128/128 ✅
 TOTAL         : 202/202 ✅
-Security contract: no network calls in core ✅
+Security contract: no network calls in core packages ✅
+Pre-commit hook: blocks any network call addition ✅
 ```
 
 ---
@@ -38,23 +40,23 @@ Security contract: no network calls in core ✅
 
 | Item | Value |
 |------|-------|
-| Latest commit | `3a20ba8` |
+| Latest commit | `c0dab41` |
 | Branch | `master` |
 | Tag | `v0.6.0` |
 | Remote | `origin/master` up to date |
 
 ---
 
-## 4. GitHub Release v0.6.0 — 6 assets
+## 4. GitHub Release v0.6.0 — 6 Assets
 
-| Asset | Size | Built |
-|-------|------|-------|
-| `ai-cage-desktop-v0.6.0-windows-setup.exe` | 1.05 MB | 10/11/2026 |
-| `ai-cage-desktop-v0.6.0-windows.msi` | 1.54 MB | 10/11/2026 |
-| `ai-cage-extension-v0.6.0-chrome.zip` | 37 KB | 11/11/2026 |
-| `ai-cage-extension-v0.6.0-firefox.zip` | 37 KB | 11/11/2026 |
-| `checksums-v0.6.0.txt` | SHA256 | 11/11/2026 |
-| `test-results-v0.6.0.txt` | — | — |
+| Asset | Size | Last rebuilt |
+|-------|------|-------------|
+| `ai-cage-desktop-windows-setup.exe` | 1.06 MB | 14/11/2026 (T1-T3) |
+| `ai-cage-desktop-windows.msi` | 1.54 MB | 14/11/2026 (T1-T3) |
+| `ai-cage-extension-v0.6.0-chrome.zip` | 46 KB | 14/11/2026 |
+| `ai-cage-extension-v0.6.0-firefox.zip` | 46 KB | 14/11/2026 |
+| `checksums-v0.6.0.txt` | SHA256 | 14/11/2026 |
+| `test-results-v0.6.0.txt` | 202/202 | 14/11/2026 |
 
 ---
 
@@ -64,9 +66,8 @@ Security contract: no network calls in core ✅
 |------|-------|
 | URL | https://ai-cage-gamma.vercel.app/ |
 | Auto-deploy | ✅ on every git push origin master |
-| Root Directory | `apps/landing` |
-| Build Command | `npm run build` |
-| Output | `dist/` |
+| Root directory | `apps/landing` |
+| Pages live | index.html, install.html, success.html, version.json |
 
 ---
 
@@ -76,104 +77,119 @@ Security contract: no network calls in core ✅
 
 | Feature | Free | Pro |
 |---------|------|-----|
-| PII cage (16 types) | ✅ 100/month | ✅ Unlimited |
-| Shadow AI detection | ✅ | ✅ |
-| Status indicator pill | ✅ | ✅ |
-| Toast notifications | ✅ | ✅ |
+| PII cage — 16 types | ✅ 100/month | ✅ Unlimited |
+| SESSION_SALT Ephemeral Tokens™ | ✅ | ✅ |
+| Inference Risk warning | ✅ | ✅ auto-cage |
+| Shadow AI detection (47 endpoints, 5min cooldown) | ✅ | ✅ |
+| Status pill + toast notifications | ✅ | ✅ |
 | Update checker | ✅ | ✅ |
-| Plain-language report (summary) | ✅ | ✅ Full report |
-| Agent Cage | ❌ | ✅ |
+| Plain-language report (summary) | ✅ | ✅ Full |
+| Agent Cage + injection detection | ❌ | ✅ |
 | Audit CSV export | ❌ | ✅ |
-| Account tab + license | ✅ activate | ✅ |
+| Account tab + license activation | ✅ | ✅ |
 
-### Desktop (Windows)
+### Desktop App (Windows)
 
 | Feature | Free | Pro |
 |---------|------|-----|
-| Cage PII (manual) | ✅ | ✅ |
+| Cage PII (manual) — 16 types | ✅ | ✅ |
+| SESSION_SALT Ephemeral Tokens™ | ✅ | ✅ |
+| Inference Risk warning | ✅ | ✅ |
 | Restore AI response | ✅ | ✅ |
 | Audit Log (read) | ✅ | ✅ |
-| Shadow AI catalogue | ✅ | ✅ |
-| Plain-language report (summary) | ✅ | ✅ Full report |
-| Account tab + license | ✅ activate | ✅ |
-| Agent Cage | ❌ | ✅ |
+| Shadow AI catalogue (47 endpoints) | ✅ | ✅ |
+| Plain-language report (summary) | ✅ | ✅ Full |
+| Account tab + license activation | ✅ | ✅ |
+| Agent Cage simulation | ❌ | ✅ |
 | Export CSV | ❌ | ✅ |
 
 ---
 
-## 7. PII Detectors — 16 types
+## 7. PII Detectors — 16 Types (ordered by score)
 
 | Type | Score | Coverage |
 |------|-------|----------|
 | PRIVATE_KEY | 1.00 | PEM keys |
 | EMAIL_ADDRESS | 0.95 | RFC 5321 |
-| CREDIT_CARD | 0.90 | Visa/MC/Amex |
-| IBAN | 0.90 | ISO 13616 |
-| API_KEY | 0.88 | GitHub/AWS/Stripe |
-| GENERIC_SECRET | 0.82 | password=, key= |
-| IP_ADDRESS | 0.85 | IPv4 |
-| RIB_TN | 0.80 | Tunisian RIB |
-| PASSPORT_TN | 0.78 | Tunisian passport |
-| PHONE_NUMBER | 0.75 | +216, +33, +1 |
-| **POSTAL_ADDRESS** | **0.72** | **NEW: FR/EN/TN streets** |
-| CARTE_SEJOUR | 0.72 | FR/TN permit |
-| PASSPORT | 0.70 | Generic |
-| CIN_TN | 0.65 | Tunisian ID |
-| PERSON_NAME | 0.58 | Arabic/Latin names |
-| MF_TN | 0.92 | Matricule Fiscal |
+| MF_TN | 0.92 | Tunisian Matricule Fiscal |
+| CREDIT_CARD | 0.90 | Visa/MC/Amex (Luhn) |
+| IBAN | 0.90 | ISO 13616, before PHONE in detector order |
+| API_KEY | 0.88 | AKIA, ghp_ (min 20), sk-test/ant/proj, gsk_, xoxb-, AIza (no-boundary fix) |
+| GENERIC_SECRET | 0.82 | password=, mot de passe [qualifier] :, mdp |
+| IP_ADDRESS | 0.85 | IPv4/IPv6 |
+| RIB_TN | 0.80 | 2+3+3+12+2 (5-block fix T1), 2+3+12+2, 2+3+13+2 |
+| PASSPORT_TN | 0.78 | 1 letter + 7 digits |
+| PHONE_NUMBER | 0.75 | +intl, local (no-RIB-overlap fix S1) |
+| POSTAL_ADDRESS | 0.72 | FR/EN/TN streets + Tunisian cities |
+| CARTE_SEJOUR | 0.72 | FR/TN residence permit |
+| PASSPORT | 0.70 | Generic 1-2 letters + 6-9 digits |
+| CIN_TN | 0.65 | 8-digit Tunisian national ID |
+| PERSON_NAME | 0.58 | "Nom du client : X" label pattern + Arabic names + European pairs |
 
 ---
 
-## 8. QA Fixes Applied (v0.6.0 final)
+## 8. All Fixes Applied
 
-| Fix | Status | File |
-|-----|--------|------|
-| P1 — Address detector | ✅ | `detectors.ts` |
-| P2 — Restore empty message | ✅ | `main.ts` |
-| P3 — Shadow AI disclaimer | ✅ | `desktop/index.html` |
-| P4 — Branded icon | ✅ | `src-tauri/icons/` |
-| Root cause desktop version | ✅ | `desktop/index.html` (single file) |
-| Cargo.toml version | ✅ | `Cargo.toml` v0.6.0 |
-| vite.config.ts explicit root | ✅ | `vite.config.ts` |
-| release.ps1 safety check | ✅ | `scripts/release.ps1` |
-| Free tier bar visible in PRO | ✅ | `popup.ts` — renderOverview() checks license |
-| Plain-language report feature | ✅ | `auditLog.ts`, `background.ts`, `popup.ts`, `popup.html` |
+### Original QA Fixes (pre-v0.6.0)
+| Fix | Status |
+|-----|--------|
+| P1 — Address detector | ✅ |
+| P2 — Restore empty message | ✅ |
+| P3 — Shadow AI disclaimer | ✅ |
+| P4 — Branded icon | ✅ |
+| Free tier bar hidden in PRO | ✅ |
 
----
+### P0 Fixes (post-first-test)
+| Fix | File | Detail |
+|-----|------|--------|
+| P0-1 — Report self-caging | `detectors.ts` | MEETING_PARTICIPANT requires 2+ words before colon |
+| P0-2 — sk-test/ant/AIza/ghp_ not caged | `detectors.ts` | Added all modern API key patterns + French password |
+| P0-3 — RIB broken as PHONE+SEJOUR | `detectors.ts` | RIB/IBAN ordered before PHONE in ALL_DETECTORS |
+| P0-4 — Label "Passeport" caged | `detectors.ts` | personName pattern3 negative lookahead before `:` |
+| P0-5 — Dedup 24+24, transcript false+, greeting, plurals | `background.ts`, `auditLog.ts` | 5s+fingerprint dedup, dedupedCageEvents, firstName, pl() |
 
-## 8b. Plain-Language Report — Feature Details
+### C Fixes (stability)
+| Fix | File | Detail |
+|-----|------|--------|
+| C1 — sanitiseDetail | `auditLog.ts` | Strips CAGED tokens from detail field |
+| C2 — dedup double-count | `background.ts` | 5s window + entity type fingerprint |
+| C3 — Shadow AI spam | `background.ts` | 5-minute cooldown per hostname |
+| C4 — SW restart spam | `background.ts` | EXTENSION_STARTED only on onInstalled |
 
-**What it does:**
-Generates a plain-English protection report from the audit log — no jargon, no CSV.
-Designed for small business owners (lawyers, agencies, freelancers) who need to
-understand what AI CAGE protected, in simple words.
+### R Fixes (post-test-1)
+| Fix | Detail |
+|-----|--------|
+| R1 — RIB 12-digit block | Added pattern for 2+3+12+2 format |
+| R2 — ghp_ min length | Reduced from 36 to 20 chars |
+| R3 — AIzaSyA no boundary | Pattern works after space/colon |
+| R4 — mot de passe [qualifier] | Accepts words between "passe" and colon |
+| R5 — Nom du client label | Captures up to 5 words after label |
+| R6 — Test/Validation exclusion | PARTICIPANT and personName exclusion lists |
+| R7 — ENTITY_LABELS plurals | Fixed labels: "Tunisian passport" not "passport tn" |
 
-**Free tier** receives a 1-page summary:
-- Period covered + days count
-- Total items protected + AI tools used
-- Entity type breakdown (email addresses, phone numbers, etc.)
-- Peak moment teaser: "Your most critical moment involved 24 items sent to ChatGPT."
-- Upgrade prompt for full narrative
+### S Fixes (post-test-2)
+| Fix | Detail |
+|-----|--------|
+| S1 — Phone no-RIB overlap | Phone pattern 2 uses negative lookbehind `(?<!\d)` |
+| S2 — Clé Google as PARTICIPANT | meetingParticipant excludes known label pairs |
+| S3 — Nom du client space-before-colon | `\s*[:\-]\s*` confirmed working |
 
-**Pro tier** receives the full report:
-- Everything in Free, plus:
-- Event-by-event narrative with exact date/time/site
-- Full entity breakdown per event
-- Complete Shadow AI section with per-site call counts
-- Customer name from license payload used in greeting
+### T Fixes (post-test-3)
+| Fix | Detail |
+|-----|--------|
+| T1 — RIB 5-block | Pattern `\d{2}[\s]\d{3}[\s]\d{3}[\s]\d{12}[\s]\d{2}` |
+| T2+T3 — Ben Test as PARTICIPANT | PARTICIPANT excludes `Test`, `Validation`, `Demo` as 2nd word |
 
-**Technical implementation:**
-- `generatePlainReport()` in `packages/core/src/auditLog.ts` — pure function, zero network
-- `GET_PLAIN_REPORT` message handler in `background.ts` — calls `checkLicense()` for Pro flag
-- `exportPlainReport()` in `popup.ts` — downloads `.txt` file locally
-- `📋 Report` button in `popup.html` footer — dark button, left of Export CSV
-- 100% offline — no server call, no data transmitted
-- Output: `.txt` file, named `ai-cage-report-YYYY-MM-DD.txt`
-
-**Marketing value:**
-- Free users get a real, useful file they can share with their boss or client
-- It demonstrates value and creates upgrade desire ("Full event-by-event breakdown with Pro")
-- Pro users get a compliance-ready plain-language report alongside the technical CSV
+### New Features (v0.6.0)
+| Feature | Files |
+|---------|-------|
+| Plain-language report Free/Pro | `auditLog.ts`, `background.ts`, `popup.ts`, `main.ts` |
+| SESSION_SALT Ephemeral Tokens™ | `cage.ts` |
+| Inference Cage™ (detectQuasiIdentifiers) | `cage.ts`, `content.ts`, `popup.ts`, `main.ts` |
+| Landing: AI Secrets section | `landing/index.html` |
+| Landing: competitive table | `landing/index.html` |
+| install.html: 16 PII + InferenceRisk FAQ | `landing/install.html` |
+| success.html: Pro features banner | `landing/success.html` |
 
 ---
 
@@ -183,33 +199,34 @@ understand what AI CAGE protected, in simple words.
 |----------|--------|
 | Desktop browser (Chrome/Edge/Firefox) | ✅ LIVE |
 | Desktop app (Windows) | ✅ LIVE |
-| Mobile browser | ⚠️ Landing shows "Mobile coming soon" banner |
-| Mobile app (iOS/Android) | 🔜 v0.7.0 roadmap |
+| Mobile browser | ⚠️ "Mobile coming soon" banner on landing |
+| Mobile app (iOS/Android) | 🔜 v0.7.0 |
 
 ---
 
-## 10. Payment Flow
+## 10. Payment & Activation Flow
 
 | Step | Status |
 |------|--------|
-| Stripe Payment Link | ✅ Test mode active |
-| success.html post-payment | ✅ 3-step activation guide |
-| `tools/generate-key.html` | ✅ Manual key generator |
+| Stripe Payment Link (test mode) | ✅ Active |
+| success.html — Pro features banner + activation steps | ✅ Updated |
+| `tools/generate-key.html` — Manual key generator | ✅ Working |
 | Email via `aicage.support@gmail.com` | ✅ Working |
 | Zapier auto-license | ⚠️ Configured, email field fix needed |
-| Go Live (Stripe production) | 🔜 When ready for real clients |
+| Stripe Production mode | 🔜 Before first real client |
 
 ---
 
-## 11. Next Steps — v0.7.0 Roadmap
+## 11. v0.7.0 Roadmap
 
 | Priority | Feature | Effort |
 |----------|---------|--------|
 | P1 | Chrome Web Store submission | 1 day |
-| P1 | Stripe Live mode + real Payment Link | 30 min |
-| P1 | Zapier: fix customer_email field mapping | 30 min |
-| P2 | Plain-language report PDF export (Pro) | v0.7.0 |
-| P2 | i18n FR/AR for extension popup | 4h |
-| P2 | Mobile app (React Native) | v0.7.0 |
-| P2 | Cage 4: Code Leak (VS Code extension) | v0.7.0 |
+| P1 | Stripe Live mode | 30 min |
+| P1 | Zapier: fix customer_email field | 30 min |
+| P2 | Phase 2: delay/noise/UA rotation (Behavioral Noise) | 2 days |
+| P2 | Cage 4: VS Code extension (Code Leak) | 1 week |
+| P2 | Mobile app (React Native) | 4 weeks |
+| P2 | Plain Report PDF export (Pro) | 1 day |
+| P3 | i18n FR/AR for extension popup | 4h |
 | P3 | ed25519 license signing (replace djb2) | v0.8.0 |
