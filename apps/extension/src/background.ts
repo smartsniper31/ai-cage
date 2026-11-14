@@ -380,6 +380,14 @@ chrome.runtime.onMessage.addListener(
       });
       return true;
     }
+
+    // OPEN_UPGRADE — triggered from content.ts limit modal "Upgrade to Pro" button.
+    // Opens the Stripe payment page in a new tab.
+    if (msg.type === 'OPEN_UPGRADE') {
+      void chrome.tabs.create({ url: 'https://ai-cage-gamma.vercel.app/#pricing' });
+      sendResponse({ ok: true });
+      return true;
+    }
   },
 );
 

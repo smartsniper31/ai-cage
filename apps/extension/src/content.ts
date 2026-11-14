@@ -33,9 +33,37 @@ const SHADOW_HOST_ID = 'ai-cage-host-v6';
 const CAGED_ATTR     = 'data-ai-cage-done';
 const FONT           = 'system-ui,-apple-system,sans-serif';
 
-// ─── Session state ─────────────────────────────────────────────────────────────
+// ─── SESSION STATE ─────────────────────────────────────────────────────────────
 let sessionTotal    = 0;
 let pendingEntities: CagedEntity[] = [];
+
+// ── P1 FIX: Synchronous limit guard ──────────────────────────────────────────
+// The browser fires and processes keydown events synchronously.
+// Once we await anything, the form has already been submitted.
+// Solution: maintain a synchronous in-memory flag updated every 30s by a
+// background poll. The keydown handler reads this flag in 0ms, calls
+// preventDefault() BEFORE any async operation, then shows the modal.
+//
+// Fail-safe: flag starts as FALSE — we never block before we have confirmation.
+// If the background SW is unavailable, caging is allowed (better than blocking).
+let limitReachedSync = false;
+
+async function refreshLimitFlag(): Promise<void> {
+  try {
+    const resp = await chrome.runtime.sendMessage<
+      { type: string },
+      { limitReached: boolean; isPro: boolean; monthly: number }
+    >({ type: 'CHECK_LIMIT' });
+    limitReachedSync = resp?.limitReached ?? false;
+  } catch {
+    // Background SW unavailable — fail safe, do not block
+    limitReachedSync = false;
+  }
+}
+
+// Poll every 30 seconds to keep the sync flag current
+void refreshLimitFlag();
+setInterval(() => void refreshLimitFlag(), 30_000);
 
 // ─── Shadow DOM host (toast + decision panel only — NO bubble, NO mini-popup) ──
 let shadowRoot: ShadowRoot | null = null;
@@ -523,7 +551,7 @@ function showLimitModal(monthly: number): void {
           Free limit reached
         </div>
         <div style="font-size:13px;color:#64748b;line-height:1.5">
-          You have used <strong style="color:#dc2626">100 / 100</strong> free cages this month.<br>
+          You have used <strong style="color:#dc2626">${Math.min(monthly, 100)} / 100</strong> free cages this month.<br>
           Your data was <strong>not sent</strong> — it is still protected.
         </div>
       </div>
@@ -647,7 +675,29 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   const isPrompt = PROMPT_SELECTORS.some(sel => {
     try { return target.matches(sel) || !!target.closest(sel); } catch { return false; }
   });
-  if (isPrompt) void handlePrompt(target);
+  if (!isPrompt) return;
+
+  // P1 FIX: Check the synchronous flag BEFORE any await.
+  // If the limit is reached, preventDefault() blocks the form submission
+  // in 0ms — before the browser can send the request.
+  // Then show the modal async (UI only, no security implication).
+  if (limitReachedSync) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    void (async () => {
+      // Refresh the flag to get the exact monthly count for the modal
+      await refreshLimitFlag();
+      const resp = await chrome.runtime.sendMessage<
+        { type: string },
+        { limitReached: boolean; isPro: boolean; monthly: number }
+      >({ type: 'CHECK_LIMIT' }).catch(() => null);
+      showLimitModal(resp?.monthly ?? 100);
+    })();
+    return;
+  }
+
+  // Limit not reached — proceed with async caging
+  void handlePrompt(target);
 }, true);
 
 function hookButtons(): void {
@@ -655,7 +705,23 @@ function hookButtons(): void {
     document.querySelectorAll<HTMLElement>(sel).forEach(btn => {
       if (btn.getAttribute(CAGED_ATTR) === '1') return;
       btn.setAttribute(CAGED_ATTR, '1');
-      btn.addEventListener('click', () => { const p = findPrompt(); if (p) void handlePrompt(p); }, true);
+      btn.addEventListener('click', (e) => {
+        // P1 FIX: synchronous guard on button click too
+        if (limitReachedSync) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          void (async () => {
+            const resp = await chrome.runtime.sendMessage<
+              { type: string },
+              { limitReached: boolean; isPro: boolean; monthly: number }
+            >({ type: 'CHECK_LIMIT' }).catch(() => null);
+            showLimitModal(resp?.monthly ?? 100);
+          })();
+          return;
+        }
+        const p = findPrompt();
+        if (p) void handlePrompt(p);
+      }, true);
     });
   });
 }
