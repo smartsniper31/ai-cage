@@ -1419,6 +1419,11 @@
         });
         return true;
       }
+      if (msg.type === "OPEN_UPGRADE") {
+        void chrome.tabs.create({ url: "https://ai-cage-gamma.vercel.app/#pricing" });
+        sendResponse({ ok: true });
+        return true;
+      }
     }
   );
   chrome.tabs.onRemoved.addListener((tabId) => {

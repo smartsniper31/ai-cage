@@ -438,6 +438,17 @@
   const FONT = "system-ui,-apple-system,sans-serif";
   let sessionTotal = 0;
   let pendingEntities = [];
+  let limitReachedSync = false;
+  async function refreshLimitFlag() {
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "CHECK_LIMIT" });
+      limitReachedSync = (resp == null ? void 0 : resp.limitReached) ?? false;
+    } catch {
+      limitReachedSync = false;
+    }
+  }
+  void refreshLimitFlag();
+  setInterval(() => void refreshLimitFlag(), 3e4);
   let shadowRoot = null;
   function getShadowRoot() {
     if (shadowRoot) return shadowRoot;
@@ -848,7 +859,7 @@
           Free limit reached
         </div>
         <div style="font-size:13px;color:#64748b;line-height:1.5">
-          You have used <strong style="color:#dc2626">100 / 100</strong> free cages this month.<br>
+          You have used <strong style="color:#dc2626">${Math.min(monthly, 100)} / 100</strong> free cages this month.<br>
           Your data was <strong>not sent</strong> — it is still protected.
         </div>
       </div>
@@ -952,14 +963,34 @@
         return false;
       }
     });
-    if (isPrompt) void handlePrompt(target);
+    if (!isPrompt) return;
+    if (limitReachedSync) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void (async () => {
+        await refreshLimitFlag();
+        const resp = await chrome.runtime.sendMessage({ type: "CHECK_LIMIT" }).catch(() => null);
+        showLimitModal((resp == null ? void 0 : resp.monthly) ?? 100);
+      })();
+      return;
+    }
+    void handlePrompt(target);
   }, true);
   function hookButtons() {
     SEND_SELECTORS.forEach((sel) => {
       document.querySelectorAll(sel).forEach((btn) => {
         if (btn.getAttribute(CAGED_ATTR) === "1") return;
         btn.setAttribute(CAGED_ATTR, "1");
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", (e) => {
+          if (limitReachedSync) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            void (async () => {
+              const resp = await chrome.runtime.sendMessage({ type: "CHECK_LIMIT" }).catch(() => null);
+              showLimitModal((resp == null ? void 0 : resp.monthly) ?? 100);
+            })();
+            return;
+          }
           const p = findPrompt();
           if (p) void handlePrompt(p);
         }, true);
