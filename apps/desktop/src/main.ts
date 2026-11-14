@@ -262,6 +262,87 @@ function showNotification(message: string, type: 'ok' | 'warn' | 'error' = 'ok',
 }
 const FREE_LIMIT_DESKTOP = 100;
 
+/**
+ * Shows a professional upgrade modal when the Free tier limit is reached.
+ * Replaces the browser's native confirm() which looks unprofessional.
+ */
+function showDesktopLimitModal(monthly: number, onUpgrade: () => void): void {
+  const existing = document.getElementById('cage-limit-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cage-limit-modal';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:9999',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'background:rgba(0,0,0,.55)', 'padding:20px',
+  ].join(';');
+
+  overlay.innerHTML = `
+    <div style="
+      background:#fff;border-radius:16px;padding:28px 32px;
+      max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);
+      font-family:system-ui,-apple-system,sans-serif;
+    ">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:40px;margin-bottom:10px">🔒</div>
+        <div style="font-size:17px;font-weight:800;color:#0f172a;margin-bottom:4px">
+          Free limit reached
+        </div>
+        <div style="font-size:13px;color:#64748b;line-height:1.5">
+          You have used <strong style="color:#dc2626">${Math.min(monthly, FREE_LIMIT_DESKTOP)} / ${FREE_LIMIT_DESKTOP}</strong> free cages this month.<br>
+          Your data was <strong>not sent</strong> — it is still safe.
+        </div>
+      </div>
+
+      <div style="background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:12px 14px;margin-bottom:18px">
+        <div style="font-size:11px;font-weight:800;color:#15803d;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">
+          ✅ Upgrade to Pro — Unlimited cages
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;color:#166534">
+          <div>🔒 Unlimited cages / month</div>
+          <div>🧠 Inference Cage™ auto</div>
+          <div>🔄 Ephemeral Tokens™</div>
+          <div>📋 Full audit report</div>
+          <div>🤖 Agent Cage</div>
+          <div>📄 CSV export</div>
+        </div>
+        <div style="margin-top:8px;font-size:13px;font-weight:800;color:#15803d">
+          €5 / user / month · Cancel anytime
+        </div>
+      </div>
+
+      <button id="desk-limit-upgrade" style="
+        width:100%;padding:12px;background:#15803d;color:#fff;
+        border:none;border-radius:10px;font-size:14px;font-weight:800;
+        cursor:pointer;margin-bottom:8px;
+      ">🚀 Upgrade to Pro →</button>
+
+      <button id="desk-limit-cancel" style="
+        width:100%;padding:10px;background:#f1f5f9;color:#374151;
+        border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;
+      ">Cancel — I will remove sensitive data first</button>
+
+      <div style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:center;line-height:1.5">
+        Your data was NOT sent. Remove sensitive information<br>before proceeding manually.
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('desk-limit-upgrade')?.addEventListener('click', () => {
+    overlay.remove();
+    onUpgrade();
+  });
+  document.getElementById('desk-limit-cancel')?.addEventListener('click', () => {
+    overlay.remove();
+    showNotification('⚠️ Cage blocked — Free limit reached. Remove sensitive data before proceeding.', 'warn', 5000);
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
 cageBtn.addEventListener('click', async () => {
   const text = inputEl.value.trim();
   if (!text) return;
@@ -273,20 +354,10 @@ cageBtn.addEventListener('click', async () => {
     const summary = await getAuditSummary(store);
     const monthly = summary.totalCaged;
     if (monthly >= FREE_LIMIT_DESKTOP) {
-      // Show upgrade modal — do NOT cage
-      const confirmed = confirm(
-        `Free limit reached — ${Math.min(monthly, FREE_LIMIT_DESKTOP)} / ${FREE_LIMIT_DESKTOP} cages used this month.\n\n` +
-        `Your data was NOT sent.\n\n` +
-        `Upgrade to Pro for unlimited cages — €5/user/month.\n\n` +
-        `Click OK to open the Account tab and activate Pro.\n` +
-        `Click Cancel to dismiss (remove sensitive data before proceeding).`
-      );
-      if (confirmed) {
+      showDesktopLimitModal(monthly, () => {
         activatePanel('account');
         void renderAccountPanel();
-      } else {
-        showNotification('⚠️ Cage blocked — Free limit reached. Remove sensitive data before proceeding.', 'warn', 5000);
-      }
+      });
       return;
     }
   }
