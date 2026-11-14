@@ -169,7 +169,7 @@ async function renderOverview(): Promise<void> {
     checkLicense(chromeStorageAdapter, 0),
   ]);
 
-  const monthly = resp?.monthlyPiiCaged   ?? 0;
+  const monthly = Math.min(resp?.monthlyPiiCaged ?? 0, FREE_LIMIT); // cap at 100 — never show 105/100
   const session = resp?.sessionCageCount  ?? 0;
   const shadow  = resp?.sessionShadowCount ?? 0;
   const tabCnt  = resp?.tabCount          ?? 0;

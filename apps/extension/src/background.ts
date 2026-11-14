@@ -115,13 +115,18 @@ interface GetPlainReportMessage {
   type: 'GET_PLAIN_REPORT';
 }
 
+interface CheckLimitMessage {
+  type: 'CHECK_LIMIT';
+}
+
 type IncomingMessage =
   | CageReportMessage
   | GetStatsMessage
   | GetShadowLogMessage
   | GetAuditLogMessage
   | ExportAuditCSVMessage
-  | GetPlainReportMessage;
+  | GetPlainReportMessage
+  | CheckLimitMessage;
 
 // ---------------------------------------------------------------------------
 // Cage 1: Handle PII cage reports from content.ts
@@ -352,6 +357,26 @@ chrome.runtime.onMessage.addListener(
           { isPro, customerName },
         );
         sendResponse({ report: result.text, isPro });
+      });
+      return true;
+    }
+
+    // CHECK_LIMIT — called by content.ts BEFORE cageText() to enforce Free tier hard block.
+    // Returns: { limitReached, isPro, monthly }
+    // content.ts must block caging and show upgrade modal if limitReached && !isPro.
+    if (msg.type === 'CHECK_LIMIT') {
+      void Promise.all([
+        getAuditSummary(chromeStorageAdapter),
+        checkLicense(chromeStorageAdapter, 0),
+      ]).then(([summary, licInfo]) => {
+        const isPro    = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
+        const monthly  = summary.totalCaged;
+        const FREE_MAX = 100;
+        sendResponse({
+          limitReached: !isPro && monthly >= FREE_MAX,
+          isPro,
+          monthly:      Math.min(monthly, FREE_MAX), // cap displayed value at 100
+        });
       });
       return true;
     }

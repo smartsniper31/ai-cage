@@ -259,7 +259,7 @@
       ),
       checkLicense(chromeStorageAdapter, 0)
     ]);
-    const monthly = (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0;
+    const monthly = Math.min((resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0, FREE_LIMIT);
     const session = (resp == null ? void 0 : resp.sessionCageCount) ?? 0;
     const shadow = (resp == null ? void 0 : resp.sessionShadowCount) ?? 0;
     const tabCnt = (resp == null ? void 0 : resp.tabCount) ?? 0;
