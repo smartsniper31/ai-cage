@@ -235,7 +235,7 @@
       if ((d == null ? void 0 : d.type) === "AI_CAGE_ENTITIES" && d.entities) {
         d.entities.forEach((e) => {
           const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-          if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+          if (match == null ? void 0 : match[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
         });
       }
     });
@@ -262,7 +262,7 @@
       if (typeof body === "string" && body.length > 2) {
         body = await processRequestBody(body);
       }
-      const newInit = body !== (init == null ? void 0 : init.body) ? { ...init, body } : init;
+      const newInit = body !== (init == null ? void 0 : init.body) && body !== void 0 ? { ...init, body } : init;
       const response = await _fetch(input, newInit);
       const ct = response.headers.get("content-type") ?? "";
       if (ct.includes("text/event-stream")) {

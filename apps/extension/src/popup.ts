@@ -101,7 +101,7 @@ function openUpgrade(): void {
 
 // ─── Tab switching ─────────────────────────────────────────────────────────────
 
-function activateTab(tabId: 'overview' | 'shadow' | 'agent'): void {
+function activateTab(tabId: 'overview' | 'shadow' | 'agent' | 'account'): void {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(pane => {
     (pane as HTMLElement).style.display = 'none';
@@ -636,7 +636,10 @@ async function checkForUpdates(installedVersion: string): Promise<void> {
     if (!latest || latest === installedVersion) return;
 
     // Compare semver simply: split by '.' and compare numerically
-    const toNum = (v: string) => v.split('.').map(Number);
+    const toNum = (v: string): [number, number, number] => {
+      const parts = v.split('.').map(Number);
+      return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+    };
     const [iMaj, iMin, iPat] = toNum(installedVersion);
     const [lMaj, lMin, lPat] = toNum(latest);
     const isNewer =
