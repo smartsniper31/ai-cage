@@ -82,7 +82,7 @@ function activatePanel(id: string): void {
   navBtns.forEach((b) => b.classList.toggle('active', b.dataset['panel'] === id));
   panels.forEach((p) => { p.style.display = p.id === `panel-${id}` ? 'flex' : 'none'; });
   if (id === 'audit')   void renderAuditLog();
-  if (id === 'shadow')  renderShadowList();
+  if (id === 'shadow')  void renderShadowList();
   if (id === 'agent')   void renderAgentPolicy();
   if (id === 'account') void renderAccountPanel();
 }
@@ -635,33 +635,81 @@ clearLogBtn.addEventListener('click', async () => {
 // ---------------------------------------------------------------------------
 // Panel 4 — Shadow AI
 // ---------------------------------------------------------------------------
-function renderShadowList(): void {
+async function renderShadowList(): Promise<void> {
+  // ── Compute stats from the catalogue ─────────────────────────────────────
+  const total     = ALL_AI_ENDPOINTS.length;
+  const critical  = ALL_AI_ENDPOINTS.filter(e => e.riskLevel === 'critical').length;
+  const high      = ALL_AI_ENDPOINTS.filter(e => e.riskLevel === 'high').length;
+  const cats      = new Set(ALL_AI_ENDPOINTS.map(e => e.category)).size;
+
+  // Fill stat-cards
+  const setEl = (id: string, v: number | string) => {
+    const el = document.getElementById(id); if (el) el.textContent = String(v);
+  };
+  setEl('shadow-stat-total',      total);
+  setEl('shadow-stat-critical',   critical);
+  setEl('shadow-stat-high',       high);
+  setEl('shadow-stat-categories', cats);
+  setEl('shadow-total-count',     String(total));
+
+  // ── Build catalogue by category ──────────────────────────────────────────
   const byCategory = new Map<string, typeof ALL_AI_ENDPOINTS[number][]>();
   for (const ep of ALL_AI_ENDPOINTS) {
     const list = byCategory.get(ep.category) ?? [];
     list.push(ep);
     byCategory.set(ep.category, list);
   }
+
   const LABEL: Record<string, string> = {
-    'llm-api': '🤖 Direct LLM APIs (Critical)',
-    'dev-tool': '💻 Developer AI Tools',
+    'llm-api':       '🤖 Direct LLM APIs',
+    'dev-tool':      '💻 Developer AI Tools',
     'saas-embedded': '📦 SaaS with Embedded AI',
-    'infra': '⚙️ AI Infrastructure / Proxies',
+    'infra':         '⚙️ AI Infrastructure / Proxies',
   };
-  const RISK_COLOR: Record<string, string> = {
-    critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a',
-  };
+
   shadowListEl.innerHTML = [...byCategory.entries()].map(([cat, eps]) => `
-    <li class="shadow-category">
+    <li class="shadow-category" data-cat="${cat}">
       <div class="shadow-cat-label">${LABEL[cat] ?? cat}</div>
       <ul class="shadow-eps">
         ${eps.map((ep) => `
-          <li class="shadow-ep">
+          <li class="shadow-ep" data-risk="${ep.riskLevel}">
             <span class="ep-name">${escHtml(ep.name)}</span>
-            <span class="ep-risk" style="color:${RISK_COLOR[ep.riskLevel] ?? '#64748b'}">${ep.riskLevel.toUpperCase()}</span>
+            <span class="ep-risk ${ep.riskLevel}">${ep.riskLevel.toUpperCase()}</span>
           </li>`).join('')}
       </ul>
     </li>`).join('');
+
+  // ── Wire filter buttons (once — guard with dataset.wired) ────────────────
+  const filtersBar = document.getElementById('shadow-filters-bar');
+  if (filtersBar && !filtersBar.dataset['wired']) {
+    filtersBar.dataset['wired'] = '1';
+
+    filtersBar.querySelectorAll<HTMLButtonElement>('.shadow-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Update active state
+        filtersBar.querySelectorAll('.shadow-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const filter = btn.dataset['filter'] ?? 'all';
+
+        // Show/hide items by data-risk — no re-render
+        shadowListEl.querySelectorAll<HTMLLIElement>('.shadow-ep').forEach(li => {
+          if (filter === 'all') {
+            li.classList.remove('hidden-by-filter');
+          } else {
+            li.classList.toggle('hidden-by-filter', li.dataset['risk'] !== filter);
+          }
+        });
+
+        // Hide category headers that have no visible items
+        shadowListEl.querySelectorAll<HTMLLIElement>('.shadow-category').forEach(cat => {
+          const hasVisible = [...cat.querySelectorAll<HTMLLIElement>('.shadow-ep')]
+            .some(ep => !ep.classList.contains('hidden-by-filter'));
+          (cat as HTMLElement).style.display = hasVisible ? '' : 'none';
+        });
+      });
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
