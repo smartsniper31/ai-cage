@@ -17,7 +17,6 @@ import {
   VERSION,
 } from '@ai-cage/core';
 import type { CagedEntity, AuditEntry, AgentPolicy } from '@ai-cage/core';
-import { scanForInjection } from '@ai-cage/presidio-lite';
 
 const store = localStorageAdapter;
 
