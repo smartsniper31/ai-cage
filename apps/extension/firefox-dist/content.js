@@ -918,23 +918,31 @@
   async function handlePrompt(el) {
     const raw = readText(el);
     if (!raw || raw.length < 3) return;
-    try {
-      const limitResp = await chrome.runtime.sendMessage({ type: "CHECK_LIMIT" });
-      if (limitResp == null ? void 0 : limitResp.limitReached) {
-        showLimitModal(limitResp.monthly);
-        return;
-      }
-    } catch {
-    }
     const { cagedText, entities, totalCaged, inferenceRisk } = cageText(raw);
-    if (totalCaged === 0 && !inferenceRisk.risky) return;
-    if (totalCaged > 0) {
+    const hasPii = totalCaged > 0;
+    if (hasPii) {
       pendingEntities = [...pendingEntities, ...entities];
       writeText(el, cagedText);
       shareEntitiesWithPage(entities);
       sessionTotal += totalCaged;
       updateBadge();
       updateStatus("caged");
+    }
+    if (hasPii) {
+      try {
+        const limitResp = await chrome.runtime.sendMessage({ type: "CHECK_LIMIT" });
+        if (limitResp == null ? void 0 : limitResp.limitReached) {
+          writeText(el, raw);
+          pendingEntities = pendingEntities.slice(0, pendingEntities.length - entities.length);
+          sessionTotal -= totalCaged;
+          showLimitModal(limitResp.monthly);
+          return;
+        }
+      } catch {
+      }
+    }
+    if (!hasPii && !inferenceRisk.risky) return;
+    if (hasPii) {
       const typeLabels = [...new Set(entities.map((e) => e.type.replace(/_/g, " ").toLowerCase()))].slice(0, 2);
       const more = entities.length > 2 ? ` +${entities.length - 2}` : "";
       showToast(`🔒 ${totalCaged} protected (${typeLabels.join(", ")}${more})`);

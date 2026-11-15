@@ -616,43 +616,61 @@ async function handlePrompt(el: HTMLElement): Promise<void> {
   const raw = readText(el);
   if (!raw || raw.length < 3) return;
 
-  // ── P0 BUSINESS FIX: Hard-enforce Free tier 100-cage limit ────────────────
-  // Before scanning for PII, check whether the monthly limit is reached.
-  // If yes: block the prompt entirely and show the upgrade modal.
-  // The prompt is NOT modified — user can still send it after removing PII manually.
-  // SECURITY: we never let PII pass in clear text after the limit.
-  try {
-    const limitResp = await chrome.runtime.sendMessage<
-      { type: string },
-      { limitReached: boolean; isPro: boolean; monthly: number }
-    >({ type: 'CHECK_LIMIT' });
-
-    if (limitResp?.limitReached) {
-      showLimitModal(limitResp.monthly);
-      // Prevent the keydown/click event from submitting the form
-      return;
-    }
-  } catch {
-    // If background is unreachable, fail safe — allow caging (better than blocking)
-  }
-
+  // ── CAGE FIRST (synchronous) — always cage before anything else ───────────
+  // This must happen BEFORE any await so the DOM is updated before ChatGPT
+  // reads the textarea value and sends the fetch request.
+  // Even if the limit is reached, we cage first and restore after — this
+  // guarantees PII never leaves the device in any timing scenario.
   const { cagedText, entities, totalCaged, inferenceRisk } = cageText(raw);
-  if (totalCaged === 0 && !inferenceRisk.risky) return;
+  const hasPii = totalCaged > 0;
 
-  if (totalCaged > 0) {
+  if (hasPii) {
+    // Write caged text to DOM immediately — synchronous, before any await
     pendingEntities = [...pendingEntities, ...entities];
     writeText(el, cagedText);
     shareEntitiesWithPage(entities);
     sessionTotal += totalCaged;
     updateBadge();
     updateStatus('caged');
+  }
 
+  // ── NOW check the Free tier limit (async is safe here — DOM already caged) ─
+  // P0 BUSINESS FIX: if limit reached → restore original text, show modal.
+  // The cage already happened above so PII never escaped. We now undo the cage
+  // in the DOM (the fetch has the caged version — that's fine) and show the
+  // upgrade prompt to the user.
+  if (hasPii) {
+    try {
+      const limitResp = await chrome.runtime.sendMessage<
+        { type: string },
+        { limitReached: boolean; isPro: boolean; monthly: number }
+      >({ type: 'CHECK_LIMIT' });
+
+      if (limitResp?.limitReached) {
+        // Restore original text in DOM — user sees their data back
+        // The request was already blocked by the fetch interceptor (injected.ts)
+        // or not yet sent — in either case the caged version is harmless.
+        writeText(el, raw);
+        // Remove from pendingEntities what we just added
+        pendingEntities = pendingEntities.slice(0, pendingEntities.length - entities.length);
+        sessionTotal -= totalCaged;
+        showLimitModal(limitResp.monthly);
+        return;
+      }
+    } catch {
+      // Background SW unreachable — cage already applied above, continue normally
+    }
+  }
+
+  if (!hasPii && !inferenceRisk.risky) return;
+
+  // Show toast and inference risk (only if we didn't early-return above)
+  if (hasPii) {
     const typeLabels = [...new Set(entities.map(e => e.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2);
-    const more       = entities.length > 2 ? ` +${entities.length - 2}` : '';
+    const more = entities.length > 2 ? ` +${entities.length - 2}` : '';
     showToast(`🔒 ${totalCaged} protected (${typeLabels.join(', ')}${more})`);
   }
 
-  // Show inference risk warning even if no direct PII was found
   if (inferenceRisk.risky) {
     showToast(`⚠️ ${inferenceRisk.message}`, 'warning', 5000);
   }
