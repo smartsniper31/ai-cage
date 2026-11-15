@@ -4,9 +4,9 @@
  *
  * Tabs:
  *   1. Overview  — PII caged stats + free-tier progress bar + upgrade flow
- *   2. Shadow AI — AI endpoints detected calling from this browser
+ *   2. Shadow AI — Hidden AI endpoint detection + Pro monetisation teaser
  *   3. Agent     — Injection events (Pro feature lock shown for Free users)
- *   4. Account   — Pro license activation / deactivation (FIX B)
+ *   4. Account   — Pro license activation / deactivation
  *
  * Upgrade flow:
  *   - Progress bar shows free tier usage (0 → 100 cages/month)
@@ -14,6 +14,13 @@
  *   - At 100 cages → full watermark + all upgrade CTAs open Stripe
  *   - Agent tab → locked notice for Free users
  *   - Account tab → paste license key → activate → watermark disappears
+ *
+ * Shadow AI monetisation (primary Pro sales vector):
+ *   - Free: 1 site visible in full + N sites blurred with 🔒 Pro badge
+ *   - Free (> 1 site): upgrade CTA below list with real site count
+ *   - Pro: all sites visible with full detail (initiator, category, time)
+ *   - Pro (> 3 sites): risk-level filter bar (Critical / High / Medium)
+ *   - Tab badge: red pill showing site count, updated from Overview + Shadow
  */
 
 import { checkLicense, activateLicense, deactivateLicense } from '@ai-cage/core';
@@ -565,10 +572,11 @@ async function renderShadowAi(): Promise<void> {
     });
   });
 
-  // ── 3.4 — Upgrade CTA (Free only, when detections exist) ─────────────────
+  // ── 3.4 — Upgrade CTA (Free only, > 1 site — with 1 site the user sees
+  // everything already, no point selling "see the other sites") ─────────────
   const ctaEl  = document.getElementById('shadow-upgrade-cta');
   const ctaCnt = document.getElementById('shadow-cta-count');
-  if (!isPro && totalSites > 0 && ctaEl) {
+  if (!isPro && totalSites > 1 && ctaEl) {
     if (ctaCnt) ctaCnt.textContent = String(totalSites);
     ctaEl.classList.add('show');
 
@@ -586,6 +594,13 @@ async function renderShadowAi(): Promise<void> {
   const filtersEl = document.getElementById('shadow-filters');
   if (isPro && totalSites > 3 && filtersEl) {
     filtersEl.classList.add('show');
+
+    // Fix 1 — reset active state on every re-render to stay in sync with the
+    // freshly rebuilt list (user may have filtered then navigated away and back)
+    filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    filtersEl.querySelector<HTMLButtonElement>('[data-filter="all"]')?.classList.add('active');
+    // Reset any hidden items from a previous filter pass
+    listEl.querySelectorAll<HTMLLIElement>('.shadow-item').forEach(li => { li.style.display = ''; });
 
     // Wire filter buttons once — guard against double-wiring on re-render
     if (!filtersEl.dataset['wired']) {
