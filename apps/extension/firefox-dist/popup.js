@@ -607,7 +607,10 @@
       const data = await res.json();
       const latest = data.version ?? "";
       if (!latest || latest === installedVersion) return;
-      const toNum = (v) => v.split(".").map(Number);
+      const toNum = (v) => {
+        const parts = v.split(".").map(Number);
+        return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+      };
       const [iMaj, iMin, iPat] = toNum(installedVersion);
       const [lMaj, lMin, lPat] = toNum(latest);
       const isNewer = lMaj > iMaj || lMaj === iMaj && lMin > iMin || lMaj === iMaj && lMin === iMin && lPat > iPat;

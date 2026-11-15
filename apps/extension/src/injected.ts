@@ -348,7 +348,8 @@
       // Map to label-based store for restoring
       d.entities.forEach(e => {
         const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-        if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+        // match[1] is guaranteed by the capture group — non-null assertion is safe
+        if (match?.[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
       });
     }
   });
@@ -392,7 +393,12 @@
       body = await processRequestBody(body);
     }
 
-    const newInit = body !== init?.body ? { ...init, body } : init;
+    // FIX: exactOptionalPropertyTypes — only spread body into newInit when it
+    // is defined, otherwise pass init as-is to avoid body:undefined mismatch.
+    const newInit: RequestInit | undefined =
+      body !== init?.body && body !== undefined
+        ? { ...init, body }
+        : init;
     const response = await _fetch(input, newInit);
 
     const ct = response.headers.get('content-type') ?? '';
@@ -421,7 +427,7 @@
     const xhr = new _XHR();
     let _url = '';
     const _open = xhr.open.bind(xhr);
-    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a = true, us?: string | null, pw?: string | null) {
+    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a: boolean = true, us?: string | null, pw?: string | null) {
       _url = String(u); return _open(m, u, a, us, pw);
     };
     const _send = xhr.send.bind(xhr);

@@ -337,7 +337,8 @@ function showNetworkPanel(
   function decide(mode: 'cage' | 'pass', cageItems: typeof items): void {
     if (sent) return;
     sent = true;
-    root.getElementById('cage-panel')?.remove();
+    // root is guaranteed non-null here: showGate() returns early if root is null (line 302)
+    root!.getElementById('cage-panel')?.remove();
     sendGateDecision(gateId, mode, cageItems);
 
     if (mode === 'cage') {

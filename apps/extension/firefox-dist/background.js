@@ -1349,14 +1349,13 @@
       var _a;
       const msg = message;
       if (msg.type === "AGENT_EVENT") {
-        const agentMsg = msg;
         void logEvent(
           {
             type: "AGENT_TOOL_CALL",
-            site: agentMsg.site,
-            counts: { blocked: agentMsg.blocked ? 1 : 0 },
+            site: msg.site,
+            counts: { blocked: msg.blocked ? 1 : 0 },
             totalCount: 1,
-            detail: agentMsg.detail
+            detail: msg.detail
           },
           chromeStorageAdapter
         );

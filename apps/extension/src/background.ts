@@ -119,6 +119,17 @@ interface CheckLimitMessage {
   type: 'CHECK_LIMIT';
 }
 
+interface AgentEventMessage {
+  type: 'AGENT_EVENT';
+  site: string;
+  detail: string;
+  blocked: boolean;
+}
+
+interface OpenUpgradeMessage {
+  type: 'OPEN_UPGRADE';
+}
+
 type IncomingMessage =
   | CageReportMessage
   | GetStatsMessage
@@ -126,7 +137,9 @@ type IncomingMessage =
   | GetAuditLogMessage
   | ExportAuditCSVMessage
   | GetPlainReportMessage
-  | CheckLimitMessage;
+  | CheckLimitMessage
+  | AgentEventMessage
+  | OpenUpgradeMessage;
 
 // ---------------------------------------------------------------------------
 // Cage 1: Handle PII cage reports from content.ts
@@ -305,14 +318,13 @@ chrome.runtime.onMessage.addListener(
     const msg = message as IncomingMessage;
 
     if (msg.type === 'AGENT_EVENT') {
-      const agentMsg = msg as { type: string; site: string; detail: string; blocked: boolean };
       void logEvent(
         {
           type: 'AGENT_TOOL_CALL' as never,
-          site: agentMsg.site,
-          counts: { blocked: agentMsg.blocked ? 1 : 0 },
+          site: msg.site,
+          counts: { blocked: msg.blocked ? 1 : 0 },
           totalCount: 1,
-          detail: agentMsg.detail,
+          detail: msg.detail,
         },
         chromeStorageAdapter,
       );
