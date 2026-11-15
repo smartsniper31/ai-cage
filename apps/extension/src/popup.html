@@ -199,6 +199,26 @@
       text-align: center; padding: 16px 0; line-height: 1.7;
     }
 
+    /* ── Shadow AI — Filters (Pro, > 3 sites) ── */
+    .shadow-filters {
+      display: none; /* shown by renderShadowAi() when isPro && totalSites > 3 */
+      gap: 4px; margin-bottom: 8px; flex-wrap: wrap;
+    }
+    .shadow-filters.show { display: flex; }
+    .filter-btn {
+      padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted);
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+    .filter-btn:hover { background: var(--bg); }
+    .filter-btn.active {
+      background: var(--text); color: #fff; border-color: var(--text);
+    }
+    .filter-btn.active.critical { background: var(--red);   border-color: var(--red); }
+    .filter-btn.active.high     { background: var(--amber); border-color: var(--amber); }
+    .filter-btn.active.medium   { background: var(--green); border-color: var(--green); }
+
     /* ── Shadow AI — Monetisation (Pro teaser) ── */
 
     /* Locked item — blurred row for Free users */
@@ -464,7 +484,16 @@
     <!-- 2.5 — Section label (class already defined in CSS, unused until now) -->
     <div class="section-label">Hidden AI Activity</div>
 
-    <ul id="shadow-list"><li class="empty">Loading…</li></ul>
+    <!-- 4.1 — Filter bar (Pro only, > 3 sites — shown by renderShadowAi()) -->
+    <div class="shadow-filters" id="shadow-filters">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn critical" data-filter="critical">🔴 Critical</button>
+      <button class="filter-btn high"     data-filter="high">🟠 High</button>
+      <button class="filter-btn medium"   data-filter="medium">🟢 Medium</button>
+    </div>
+
+    <!-- 4.4 — max-height + scroll so the popup never grows beyond the viewport -->
+    <ul id="shadow-list" style="max-height:220px;overflow-y:auto;padding-right:2px"><li class="empty">Loading…</li></ul>
 
     <!-- 3.1 — Upgrade CTA (hidden by default, shown by renderShadowAi() for Free users) -->
     <div class="shadow-upgrade-cta" id="shadow-upgrade-cta">

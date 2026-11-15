@@ -401,7 +401,7 @@
     }
   }
   async function renderShadowAi() {
-    var _a;
+    var _a, _b, _c;
     const listEl = document.getElementById("shadow-list");
     if (!listEl) return;
     let resp;
@@ -429,7 +429,8 @@
       setText("shadow-calls-count", "0");
       setText("shadow-critical-count", "0");
       setText("shadow-last-seen", "—");
-      (_a = document.getElementById("shadow-upgrade-cta")) == null ? void 0 : _a.classList.remove("show");
+      (_a = document.getElementById("shadow-filters")) == null ? void 0 : _a.classList.remove("show");
+      (_b = document.getElementById("shadow-upgrade-cta")) == null ? void 0 : _b.classList.remove("show");
       const badge = document.getElementById("shadow-tab-badge");
       if (badge) {
         badge.textContent = "";
@@ -442,11 +443,13 @@
         statusEl2.style.color = "";
         statusEl2.style.borderColor = "";
       }
-      listEl.innerHTML = `
-      <li class="empty">
-        No hidden AI calls detected yet.<br>
-        Keep browsing — we're watching for you.
-      </li>`;
+      listEl.innerHTML = isPro ? `<li class="empty">
+           ✅ Your browsing is clean — no hidden AI calls detected.<br>
+           AI CAGE is monitoring all outbound requests.
+         </li>` : `<li class="empty">
+           No hidden AI calls detected yet.<br>
+           Keep browsing — we're watching for you.
+         </li>`;
       return;
     }
     const bysite = /* @__PURE__ */ new Map();
@@ -497,8 +500,8 @@
       const riskClass = info.detail.riskLevel ?? "unknown";
       if (isPro) {
         return `
-      <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
-          title="Click to expand">
+      <li class="shadow-item" data-idx="${i}" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button" title="Click to expand">
         <div class="shadow-row">
           <div>
             <span class="shadow-site">${escHtml(displayName)}</span>
@@ -519,8 +522,8 @@
       }
       if (i === 0) {
         return `
-      <li class="shadow-item" data-idx="0" tabindex="0" role="button"
-          title="Click to expand">
+      <li class="shadow-item" data-idx="0" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button" title="Click to expand">
         <div class="shadow-row">
           <div>
             <span class="shadow-site">${escHtml(displayName)}</span>
@@ -539,7 +542,8 @@
       </li>`;
       }
       return `
-      <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
+      <li class="shadow-item shadow-locked" data-idx="${i}" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button"
           title="Upgrade to Pro to see this site"
           aria-label="Locked — upgrade to Pro to see this site">
         <div class="shadow-row">
@@ -590,6 +594,43 @@
       }
     } else if (ctaEl) {
       ctaEl.classList.remove("show");
+    }
+    const filtersEl = document.getElementById("shadow-filters");
+    if (isPro && totalSites > 3 && filtersEl) {
+      filtersEl.classList.add("show");
+      if (!filtersEl.dataset["wired"]) {
+        filtersEl.dataset["wired"] = "1";
+        filtersEl.querySelectorAll(".filter-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            filtersEl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            const filter = btn.dataset["filter"] ?? "all";
+            listEl.querySelectorAll(".shadow-item").forEach((li) => {
+              if (filter === "all") {
+                li.style.display = "";
+              } else {
+                li.style.display = li.dataset["risk"] === filter ? "" : "none";
+              }
+            });
+            const visible = [...listEl.querySelectorAll(".shadow-item")].filter((li) => li.style.display !== "none");
+            let noResultEl = listEl.querySelector(".filter-empty");
+            if (visible.length === 0) {
+              if (!noResultEl) {
+                noResultEl = document.createElement("li");
+                noResultEl.className = "empty filter-empty";
+                listEl.appendChild(noResultEl);
+              }
+              noResultEl.textContent = `No ${filter} risk sites detected.`;
+            } else if (noResultEl) {
+              noResultEl.remove();
+            }
+          });
+        });
+      }
+    } else if (filtersEl) {
+      filtersEl.classList.remove("show");
+      filtersEl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      (_c = filtersEl.querySelector('[data-filter="all"]')) == null ? void 0 : _c.classList.add("active");
     }
   }
   async function renderAgentTab() {

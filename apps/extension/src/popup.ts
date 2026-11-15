@@ -391,7 +391,8 @@ async function renderShadowAi(): Promise<void> {
     setText('shadow-critical-count', '0');
     setText('shadow-last-seen',      '—');
 
-    // Hide CTA and tab badge
+    // Hide filters, CTA and tab badge
+    document.getElementById('shadow-filters')?.classList.remove('show');
     document.getElementById('shadow-upgrade-cta')?.classList.remove('show');
     const badge = document.getElementById('shadow-tab-badge');
     if (badge) { badge.textContent = ''; badge.classList.remove('show'); }
@@ -403,11 +404,17 @@ async function renderShadowAi(): Promise<void> {
       statusEl.style.color       = '';
       statusEl.style.borderColor = '';
     }
-    listEl.innerHTML = `
-      <li class="empty">
-        No hidden AI calls detected yet.<br>
-        Keep browsing — we're watching for you.
-      </li>`;
+
+    // 4.3 — Empty state message differs by tier
+    listEl.innerHTML = isPro
+      ? `<li class="empty">
+           ✅ Your browsing is clean — no hidden AI calls detected.<br>
+           AI CAGE is monitoring all outbound requests.
+         </li>`
+      : `<li class="empty">
+           No hidden AI calls detected yet.<br>
+           Keep browsing — we're watching for you.
+         </li>`;
     return;
   }
 
@@ -474,8 +481,8 @@ async function renderShadowAi(): Promise<void> {
     // ── PRO : full detail on every item ──────────────────────────────────
     if (isPro) {
       return `
-      <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
-          title="Click to expand">
+      <li class="shadow-item" data-idx="${i}" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button" title="Click to expand">
         <div class="shadow-row">
           <div>
             <span class="shadow-site">${escHtml(displayName)}</span>
@@ -497,11 +504,9 @@ async function renderShadowAi(): Promise<void> {
 
     // ── FREE : first item visible, rest blurred with 🔒 Pro ───────────────
     if (i === 0) {
-      // First item — fully visible, detail OPEN by default (Fix B: show Alex
-      // exactly what he gets on item 1 so he understands what's locked on 2..N)
       return `
-      <li class="shadow-item" data-idx="0" tabindex="0" role="button"
-          title="Click to expand">
+      <li class="shadow-item" data-idx="0" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button" title="Click to expand">
         <div class="shadow-row">
           <div>
             <span class="shadow-site">${escHtml(displayName)}</span>
@@ -522,7 +527,8 @@ async function renderShadowAi(): Promise<void> {
 
     // Locked items — blurred, click opens upgrade (Fix C: aria-label for keyboard)
     return `
-      <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
+      <li class="shadow-item shadow-locked" data-idx="${i}" data-risk="${escHtml(riskClass)}"
+          tabindex="0" role="button"
           title="Upgrade to Pro to see this site"
           aria-label="Locked — upgrade to Pro to see this site">
         <div class="shadow-row">
@@ -574,6 +580,56 @@ async function renderShadowAi(): Promise<void> {
     }
   } else if (ctaEl) {
     ctaEl.classList.remove('show');
+  }
+
+  // ── 4.2 — Filters (Pro only, when > 3 sites) ─────────────────────────────
+  const filtersEl = document.getElementById('shadow-filters');
+  if (isPro && totalSites > 3 && filtersEl) {
+    filtersEl.classList.add('show');
+
+    // Wire filter buttons once — guard against double-wiring on re-render
+    if (!filtersEl.dataset['wired']) {
+      filtersEl.dataset['wired'] = '1';
+
+      filtersEl.querySelectorAll<HTMLButtonElement>('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          // Update active state
+          filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          const filter = btn.dataset['filter'] ?? 'all';
+
+          // Show/hide list items by data-risk attribute — no re-render needed
+          listEl.querySelectorAll<HTMLLIElement>('.shadow-item').forEach(li => {
+            if (filter === 'all') {
+              li.style.display = '';
+            } else {
+              li.style.display = li.dataset['risk'] === filter ? '' : 'none';
+            }
+          });
+
+          // Show "no results" message if everything is filtered out
+          const visible = [...listEl.querySelectorAll<HTMLLIElement>('.shadow-item')]
+            .filter(li => li.style.display !== 'none');
+          let noResultEl = listEl.querySelector<HTMLLIElement>('.filter-empty');
+          if (visible.length === 0) {
+            if (!noResultEl) {
+              noResultEl = document.createElement('li');
+              noResultEl.className = 'empty filter-empty';
+              listEl.appendChild(noResultEl);
+            }
+            noResultEl.textContent = `No ${filter} risk sites detected.`;
+          } else if (noResultEl) {
+            noResultEl.remove();
+          }
+        });
+      });
+    }
+  } else if (filtersEl) {
+    filtersEl.classList.remove('show');
+    // Reset to "All" when filters hidden (tier change or < 4 sites)
+    filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    filtersEl.querySelector<HTMLButtonElement>('[data-filter="all"]')?.classList.add('active');
   }
 }
 
