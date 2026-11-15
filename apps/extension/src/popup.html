@@ -166,15 +166,34 @@
 
     /* ── Shadow AI list ── */
     #shadow-list { list-style: none; }
-    .shadow-item { padding: 7px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-    .shadow-item:last-child { border-bottom: none; }
-    .shadow-site   { font-weight: 700; font-size: 12px; color: var(--red); }
-    .shadow-meta   { font-size: 10px; color: var(--muted); margin-top: 1px; }
-    .shadow-detail {
-      font-size: 10px; color: var(--muted); margin-top: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .shadow-item {
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; outline: none;
     }
-    .shadow-detail.expanded { white-space: normal; overflow: visible; }
+    .shadow-item:last-child { border-bottom: none; }
+    .shadow-item:focus-visible { box-shadow: 0 0 0 2px var(--green); border-radius: 4px; }
+
+    .shadow-row    { display: flex; justify-content: space-between; align-items: center; }
+    .shadow-site   { font-weight: 700; font-size: 12px; color: var(--red); }
+    .shadow-meta   { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+    /* Risk badge — coloured by level */
+    .shadow-risk { font-size: 9px; font-weight: 700; border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+    .shadow-risk.critical { background: #fee2e2; color: var(--red); }
+    .shadow-risk.high     { background: #fef3c7; color: var(--amber); }
+    .shadow-risk.medium   { background: #f0fdf4; color: var(--green); }
+    .shadow-risk.low      { background: #f1f5f9; color: var(--muted); }
+    .shadow-risk.unknown  { background: #f1f5f9; color: var(--muted); }
+
+    /* Expandable detail panel */
+    .shadow-detail {
+      display: none; margin-top: 6px; padding: 6px 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; font-size: 10px;
+    }
+    .shadow-detail.expanded { display: block; }
+    .shadow-product { display: block; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+    .shadow-field   { display: block; color: var(--muted); line-height: 1.6; }
     .empty {
       font-size: 12px; color: var(--muted);
       text-align: center; padding: 16px 0; line-height: 1.7;
@@ -374,10 +393,30 @@
 
   <!-- ══ SHADOW AI ══ -->
   <div class="tab-pane" id="pane-shadow" style="display:none">
-    <p style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6">
-      These tools made requests to AI APIs from your browser.<br>
-      <strong>88% of AI traffic is invisible</strong> to most companies.
-    </p>
+
+    <!-- 2.1 — Stat cards (mirrors Overview stats-grid) -->
+    <div class="stats-grid" id="shadow-stats-grid">
+      <div class="stat-card">
+        <div class="stat-number red" id="shadow-sites-count">—</div>
+        <div class="stat-label">Sites detected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="shadow-calls-count">—</div>
+        <div class="stat-label">Total calls</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number amber" id="shadow-critical-count">—</div>
+        <div class="stat-label">Critical risk</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" style="font-size:13px" id="shadow-last-seen">—</div>
+        <div class="stat-label">Last seen</div>
+      </div>
+    </div>
+
+    <!-- 2.5 — Section label (class already defined in CSS, unused until now) -->
+    <div class="section-label">Hidden AI Activity</div>
+
     <ul id="shadow-list"><li class="empty">Loading…</li></ul>
   </div>
 

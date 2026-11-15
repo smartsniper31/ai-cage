@@ -278,6 +278,45 @@ async function renderOverview(): Promise<void> {
 
 // ─── Shadow AI tab ─────────────────────────────────────────────────────────────
 
+// ── Shadow AI — site name mapping (mirrors SITE_FRIENDLY in auditLog.ts) ──────
+// Kept in sync manually. Used to display human-readable names instead of raw hostnames.
+const SHADOW_SITE_FRIENDLY: Record<string, string> = {
+  'api.openai.com':                      'OpenAI API',
+  'chat.openai.com':                     'ChatGPT',
+  'chatgpt.com':                         'ChatGPT',
+  'api.anthropic.com':                   'Anthropic Claude API',
+  'claude.ai':                           'Claude',
+  'generativelanguage.googleapis.com':   'Google Gemini API',
+  'gemini.google.com':                   'Google Gemini',
+  'us-central1-aiplatform.googleapis.com': 'Google Vertex AI',
+  'api.mistral.ai':                      'Mistral AI',
+  'mistral.ai':                          'Mistral AI',
+  'api.cohere.ai':                       'Cohere',
+  'api.groq.com':                        'Groq',
+  'api.perplexity.ai':                   'Perplexity AI',
+  'perplexity.ai':                       'Perplexity AI',
+  'copilot.microsoft.com':               'Microsoft Copilot',
+  'api.githubcopilot.com':               'GitHub Copilot',
+  'api.x.ai':                            'Grok (xAI)',
+  'dashscope.aliyuncs.com':             'Qwen API',
+  'capi.grammarly.com':                  'Grammarly AI',
+  'api.notion.com':                      'Notion AI',
+  'slack.com':                           'Slack AI',
+  'app.slack.com':                       'Slack AI',
+  'otter.ai':                            'Otter.ai',
+  'fireflies.ai':                        'Fireflies AI',
+  'bedrock-runtime.amazonaws.com':       'AWS Bedrock',
+  'huggingface.co':                      'Hugging Face',
+  'api.together.xyz':                    'Together AI',
+  'api.replicate.com':                   'Replicate',
+  'openrouter.ai':                       'OpenRouter',
+};
+
+/** Returns the friendly product name for a hostname, or the hostname itself. */
+function friendlyShadowSite(hostname: string): string {
+  return SHADOW_SITE_FRIENDLY[hostname] ?? hostname;
+}
+
 // ── Shadow AI detail payload (matches JSON written by background.ts FIX 1.2) ──
 interface ShadowDetailPayload {
   initiator:  string;
@@ -328,7 +367,24 @@ async function renderShadowAi(): Promise<void> {
   }
 
   const entries = resp?.entries ?? [];
+
+  // ── Empty state ───────────────────────────────────────────────────────────
   if (entries.length === 0) {
+    // Reset stat-cards to zero
+    setText('shadow-sites-count',    '0');
+    setText('shadow-calls-count',    '0');
+    setText('shadow-critical-count', '0');
+    setText('shadow-last-seen',      '—');
+
+    // Status pill — clean state
+    const statusEl = document.getElementById('status-text');
+    if (statusEl) {
+      statusEl.textContent   = '👁️ No hidden AI activity detected yet';
+      statusEl.style.background   = '';
+      statusEl.style.color        = '';
+      statusEl.style.borderColor  = '';
+    }
+
     listEl.innerHTML = `
       <li class="empty">
         No hidden AI calls detected yet.<br>
@@ -337,7 +393,8 @@ async function renderShadowAi(): Promise<void> {
     return;
   }
 
-  // Aggregate by site — keep the most informative detail payload (last seen)
+  // ── Aggregate by site ─────────────────────────────────────────────────────
+  // Keep the most informative detail payload (last seen per site)
   const bysite = new Map<string, {
     count: number; lastSeen: string; detail: ShadowDetailPayload;
   }>();
@@ -359,25 +416,61 @@ async function renderShadowAi(): Promise<void> {
     }
   }
 
-  // Render — addEventListener replaces inline onclick (CSP-safe, keyboard-accessible)
+  // ── 2.2 — Compute summary numbers for stat-cards ─────────────────────────
+  const totalSites    = bysite.size;
+  const totalCalls    = [...bysite.values()].reduce((s, v) => s + v.count, 0);
+  const criticalCount = [...bysite.values()].filter(v => v.detail.riskLevel === 'critical').length;
+  const lastEntry     = entries[entries.length - 1];
+  const lastSeenStr   = lastEntry ? formatDate(lastEntry.timestamp) : '—';
+
+  setText('shadow-sites-count',    totalSites);
+  setText('shadow-calls-count',    totalCalls);
+  setText('shadow-critical-count', criticalCount);
+  setText('shadow-last-seen',      lastSeenStr);
+
+  // ── 2.2 — Update status pill (contextual, like renderOverview) ────────────
+  const statusEl = document.getElementById('status-text');
+  if (statusEl) {
+    if (criticalCount > 0) {
+      statusEl.textContent  = `⚠️ ${criticalCount} critical Shadow AI site${criticalCount > 1 ? 's' : ''} detected — ${totalCalls} call${totalCalls > 1 ? 's' : ''}`;
+      statusEl.style.background  = '#fef2f2';
+      statusEl.style.color       = '#991b1b';
+      statusEl.style.borderColor = '#fecaca';
+    } else {
+      statusEl.textContent  = `👁️ ${totalSites} Shadow AI site${totalSites > 1 ? 's' : ''} detected — ${totalCalls} total call${totalCalls > 1 ? 's' : ''}`;
+      statusEl.style.background  = '#fffbeb';
+      statusEl.style.color       = '#92400e';
+      statusEl.style.borderColor = '#fde68a';
+    }
+  }
+
+  // ── Render list ───────────────────────────────────────────────────────────
+  // 2.6 — Use SITE_FRIENDLY display name; keep raw hostname as subtitle
   listEl.innerHTML = [...bysite.entries()]
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([site, info], i) => `
+    .map(([site, info], i) => {
+      const displayName = friendlyShadowSite(site);
+      const riskClass   = info.detail.riskLevel ?? 'unknown';
+      return `
       <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
           title="Click to expand">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="shadow-site">${escHtml(site)}</div>
+        <div class="shadow-row">
+          <div>
+            <span class="shadow-site">${escHtml(displayName)}</span>
+            <span class="shadow-risk ${escHtml(riskClass)}">${escHtml(riskClass)}</span>
+          </div>
           <div class="shadow-meta">
             ${info.count} call${info.count > 1 ? 's' : ''} · ${formatDate(info.lastSeen)} ▾
           </div>
         </div>
         <div class="shadow-detail">
           <span class="shadow-product">${escHtml(info.detail.product)}</span>
+          <span class="shadow-field">Host: ${escHtml(site)}</span>
           <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
           <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
-          <span class="shadow-field">Risk: <strong>${escHtml(info.detail.riskLevel)}</strong></span>
         </div>
-      </li>`)
+      </li>`;
+    })
     .join('');
 
   // Attach click + keyboard listeners — never use inline onclick in extensions
