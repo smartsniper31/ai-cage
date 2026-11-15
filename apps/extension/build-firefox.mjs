@@ -64,6 +64,21 @@ if (manifest['background']?.['service_worker']) {
   // Keep service_worker for Firefox 121+ but also add scripts for older versions
 }
 
+// Firefox icon fix: Firefox recommends 48px and 96px as primary toolbar sizes.
+// Without 96px, Firefox scales 128px down and the result is blurry.
+// We explicitly set 48 and 96 as the preferred sizes for Firefox toolbar.
+const ffIcons = {
+  '16':  'icons/icon16.png',
+  '32':  'icons/icon32.png',
+  '48':  'icons/icon48.png',
+  '96':  'icons/icon96.png',
+  '128': 'icons/icon128.png',
+};
+manifest['icons'] = ffIcons;
+if (manifest['action']) {
+  manifest['action']['default_icon'] = ffIcons;
+}
+
 // Bump version for Firefox (match main version)
 manifest['version'] = '0.6.0';
 
