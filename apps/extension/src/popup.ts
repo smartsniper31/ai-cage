@@ -278,13 +278,54 @@ async function renderOverview(): Promise<void> {
 
 // ─── Shadow AI tab ─────────────────────────────────────────────────────────────
 
-async function renderShadowAi(): Promise<void> {
-  const resp = await chrome.runtime.sendMessage<{ type: string }, ShadowLogResponse>(
-    { type: 'GET_SHADOW_LOG' },
-  );
+// ── Shadow AI detail payload (matches JSON written by background.ts FIX 1.2) ──
+interface ShadowDetailPayload {
+  initiator:  string;
+  riskLevel:  string;
+  product:    string;
+  category:   string;
+  endpointId: string;
+}
 
+/** Parse the structured JSON detail written by background.ts.
+ *  Falls back gracefully if the entry pre-dates the JSON format. */
+function parseShadowDetail(raw: string | undefined): ShadowDetailPayload {
+  if (!raw) return { initiator: 'unknown', riskLevel: 'unknown', product: '—', category: '—', endpointId: '' };
+  try {
+    const parsed = JSON.parse(raw) as Partial<ShadowDetailPayload>;
+    return {
+      initiator:  parsed.initiator  ?? 'browser background',
+      riskLevel:  parsed.riskLevel  ?? 'unknown',
+      product:    parsed.product    ?? '—',
+      category:   parsed.category   ?? '—',
+      endpointId: parsed.endpointId ?? '',
+    };
+  } catch {
+    // Legacy pipe-separated format — degrade gracefully
+    return { initiator: raw, riskLevel: 'unknown', product: '—', category: '—', endpointId: '' };
+  }
+}
+
+async function renderShadowAi(): Promise<void> {
   const listEl = document.getElementById('shadow-list');
   if (!listEl) return;
+
+  // FIX 1.4: wrap entire fetch+render in try/catch — if SW is down (MV3
+  // idle timeout), sendMessage rejects. Without this the list stays frozen
+  // on "Loading…" with no feedback to the user.
+  let resp: ShadowLogResponse;
+  try {
+    resp = await chrome.runtime.sendMessage<{ type: string }, ShadowLogResponse>(
+      { type: 'GET_SHADOW_LOG' },
+    );
+  } catch {
+    listEl.innerHTML = `
+      <li class="empty">
+        ⚠️ Could not load Shadow AI data.<br>
+        Close and reopen the extension to refresh.
+      </li>`;
+    return;
+  }
 
   const entries = resp?.entries ?? [];
   if (entries.length === 0) {
@@ -296,38 +337,59 @@ async function renderShadowAi(): Promise<void> {
     return;
   }
 
-  // Aggregate by site
-  const bysite = new Map<string, { count: number; lastSeen: string; detail: string }>();
+  // Aggregate by site — keep the most informative detail payload (last seen)
+  const bysite = new Map<string, {
+    count: number; lastSeen: string; detail: ShadowDetailPayload;
+  }>();
   for (const e of entries) {
+    const parsed = parseShadowDetail(e.detail);
     const existing = bysite.get(e.site);
     if (existing) {
       existing.count += e.totalCount;
-      if (e.timestamp > existing.lastSeen) existing.lastSeen = e.timestamp;
+      if (e.timestamp > existing.lastSeen) {
+        existing.lastSeen = e.timestamp;
+        existing.detail   = parsed;
+      }
     } else {
       bysite.set(e.site, {
         count:    e.totalCount,
         lastSeen: e.timestamp,
-        detail:   e.detail ?? '',
+        detail:   parsed,
       });
     }
   }
 
-  // Render — each item toggles detail on click
+  // Render — addEventListener replaces inline onclick (CSP-safe, keyboard-accessible)
   listEl.innerHTML = [...bysite.entries()]
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([site, info]) => `
-      <li class="shadow-item"
-          onclick="var d=this.querySelector('.shadow-detail');d.classList.toggle('expanded');"
+    .map(([site, info], i) => `
+      <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
           title="Click to expand">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="shadow-site">${escHtml(site)}</div>
-          <div style="font-size:10px;color:#64748b">
+          <div class="shadow-meta">
             ${info.count} call${info.count > 1 ? 's' : ''} · ${formatDate(info.lastSeen)} ▾
           </div>
         </div>
-        <div class="shadow-detail">${escHtml(info.detail)}</div>
+        <div class="shadow-detail">
+          <span class="shadow-product">${escHtml(info.detail.product)}</span>
+          <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
+          <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
+          <span class="shadow-field">Risk: <strong>${escHtml(info.detail.riskLevel)}</strong></span>
+        </div>
       </li>`)
     .join('');
+
+  // Attach click + keyboard listeners — never use inline onclick in extensions
+  listEl.querySelectorAll<HTMLLIElement>('.shadow-item').forEach(li => {
+    const toggle = (): void => {
+      li.querySelector('.shadow-detail')?.classList.toggle('expanded');
+    };
+    li.addEventListener('click', toggle);
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
 }
 
 // ─── Agent tab ─────────────────────────────────────────────────────────────────

@@ -341,12 +341,37 @@
       }
     }
   }
+  function parseShadowDetail(raw) {
+    if (!raw) return { initiator: "unknown", riskLevel: "unknown", product: "—", category: "—", endpointId: "" };
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        initiator: parsed.initiator ?? "browser background",
+        riskLevel: parsed.riskLevel ?? "unknown",
+        product: parsed.product ?? "—",
+        category: parsed.category ?? "—",
+        endpointId: parsed.endpointId ?? ""
+      };
+    } catch {
+      return { initiator: raw, riskLevel: "unknown", product: "—", category: "—", endpointId: "" };
+    }
+  }
   async function renderShadowAi() {
-    const resp = await chrome.runtime.sendMessage(
-      { type: "GET_SHADOW_LOG" }
-    );
     const listEl = document.getElementById("shadow-list");
     if (!listEl) return;
+    let resp;
+    try {
+      resp = await chrome.runtime.sendMessage(
+        { type: "GET_SHADOW_LOG" }
+      );
+    } catch {
+      listEl.innerHTML = `
+      <li class="empty">
+        ⚠️ Could not load Shadow AI data.<br>
+        Close and reopen the extension to refresh.
+      </li>`;
+      return;
+    }
     const entries = (resp == null ? void 0 : resp.entries) ?? [];
     if (entries.length === 0) {
       listEl.innerHTML = `
@@ -358,30 +383,51 @@
     }
     const bysite = /* @__PURE__ */ new Map();
     for (const e of entries) {
+      const parsed = parseShadowDetail(e.detail);
       const existing = bysite.get(e.site);
       if (existing) {
         existing.count += e.totalCount;
-        if (e.timestamp > existing.lastSeen) existing.lastSeen = e.timestamp;
+        if (e.timestamp > existing.lastSeen) {
+          existing.lastSeen = e.timestamp;
+          existing.detail = parsed;
+        }
       } else {
         bysite.set(e.site, {
           count: e.totalCount,
           lastSeen: e.timestamp,
-          detail: e.detail ?? ""
+          detail: parsed
         });
       }
     }
-    listEl.innerHTML = [...bysite.entries()].sort((a, b) => b[1].count - a[1].count).map(([site, info]) => `
-      <li class="shadow-item"
-          onclick="var d=this.querySelector('.shadow-detail');d.classList.toggle('expanded');"
+    listEl.innerHTML = [...bysite.entries()].sort((a, b) => b[1].count - a[1].count).map(([site, info], i) => `
+      <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
           title="Click to expand">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="shadow-site">${escHtml(site)}</div>
-          <div style="font-size:10px;color:#64748b">
+          <div class="shadow-meta">
             ${info.count} call${info.count > 1 ? "s" : ""} · ${formatDate(info.lastSeen)} ▾
           </div>
         </div>
-        <div class="shadow-detail">${escHtml(info.detail)}</div>
+        <div class="shadow-detail">
+          <span class="shadow-product">${escHtml(info.detail.product)}</span>
+          <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
+          <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
+          <span class="shadow-field">Risk: <strong>${escHtml(info.detail.riskLevel)}</strong></span>
+        </div>
       </li>`).join("");
+    listEl.querySelectorAll(".shadow-item").forEach((li) => {
+      const toggle = () => {
+        var _a;
+        (_a = li.querySelector(".shadow-detail")) == null ? void 0 : _a.classList.toggle("expanded");
+      };
+      li.addEventListener("click", toggle);
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    });
   }
   async function renderAgentTab() {
     const resp = await chrome.runtime.sendMessage({ type: "GET_AUDIT_LOG" });
