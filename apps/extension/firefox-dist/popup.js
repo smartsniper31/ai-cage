@@ -268,6 +268,16 @@
     setText("monthly-shadow", (resp == null ? void 0 : resp.monthlyShadowAi) ?? 0);
     setText("session-count", session);
     setText("tab-count", tabCnt);
+    const tabBadgeOv = document.getElementById("shadow-tab-badge");
+    if (tabBadgeOv) {
+      if (shadow > 0) {
+        tabBadgeOv.textContent = String(shadow);
+        tabBadgeOv.classList.add("show");
+      } else {
+        tabBadgeOv.textContent = "";
+        tabBadgeOv.classList.remove("show");
+      }
+    }
     const progressWrap = document.getElementById("free-progress-wrap");
     const upgradeBanner = document.getElementById("upgrade-banner");
     if (isPro) {
@@ -391,13 +401,20 @@
     }
   }
   async function renderShadowAi() {
+    var _a;
     const listEl = document.getElementById("shadow-list");
     if (!listEl) return;
     let resp;
+    let isPro = false;
     try {
-      resp = await chrome.runtime.sendMessage(
-        { type: "GET_SHADOW_LOG" }
-      );
+      const [shadowResp, licInfo] = await Promise.all([
+        chrome.runtime.sendMessage(
+          { type: "GET_SHADOW_LOG" }
+        ),
+        checkLicense(chromeStorageAdapter, 0)
+      ]);
+      resp = shadowResp;
+      isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
     } catch {
       listEl.innerHTML = `
       <li class="empty">
@@ -412,6 +429,12 @@
       setText("shadow-calls-count", "0");
       setText("shadow-critical-count", "0");
       setText("shadow-last-seen", "—");
+      (_a = document.getElementById("shadow-upgrade-cta")) == null ? void 0 : _a.classList.remove("show");
+      const badge = document.getElementById("shadow-tab-badge");
+      if (badge) {
+        badge.textContent = "";
+        badge.classList.remove("show");
+      }
       const statusEl2 = document.getElementById("status-text");
       if (statusEl2) {
         statusEl2.textContent = "👁️ No hidden AI activity detected yet";
@@ -437,11 +460,7 @@
           existing.detail = parsed;
         }
       } else {
-        bysite.set(e.site, {
-          count: e.totalCount,
-          lastSeen: e.timestamp,
-          detail: parsed
-        });
+        bysite.set(e.site, { count: e.totalCount, lastSeen: e.timestamp, detail: parsed });
       }
     }
     const totalSites = bysite.size;
@@ -467,11 +486,40 @@
         statusEl.style.borderColor = "#fde68a";
       }
     }
-    listEl.innerHTML = [...bysite.entries()].sort((a, b) => b[1].count - a[1].count).map(([site, info], i) => {
+    const tabBadge = document.getElementById("shadow-tab-badge");
+    if (tabBadge) {
+      tabBadge.textContent = String(totalSites);
+      tabBadge.classList.add("show");
+    }
+    const sorted = [...bysite.entries()].sort((a, b) => b[1].count - a[1].count);
+    listEl.innerHTML = sorted.map(([site, info], i) => {
       const displayName = friendlyShadowSite(site);
       const riskClass = info.detail.riskLevel ?? "unknown";
-      return `
+      if (isPro) {
+        return `
       <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
+          title="Click to expand">
+        <div class="shadow-row">
+          <div>
+            <span class="shadow-site">${escHtml(displayName)}</span>
+            <span class="shadow-risk ${escHtml(riskClass)}">${escHtml(riskClass)}</span>
+          </div>
+          <div class="shadow-meta">
+            ${info.count} call${info.count > 1 ? "s" : ""} · ${formatDate(info.lastSeen)} ▾
+          </div>
+        </div>
+        <div class="shadow-detail">
+          <span class="shadow-product">${escHtml(info.detail.product)}</span>
+          <span class="shadow-field">Host: ${escHtml(site)}</span>
+          <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
+          <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
+          <span class="shadow-field">Time: ${formatDate(info.lastSeen)}</span>
+        </div>
+      </li>`;
+      }
+      if (i === 0) {
+        return `
+      <li class="shadow-item" data-idx="0" tabindex="0" role="button"
           title="Click to expand">
         <div class="shadow-row">
           <div>
@@ -489,11 +537,28 @@
           <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
         </div>
       </li>`;
+      }
+      return `
+      <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
+          title="Upgrade to Pro to see this site">
+        <div class="shadow-row">
+          <div>
+            <span class="shadow-site shadow-blur">${escHtml(displayName)}</span>
+            <span class="shadow-risk shadow-blur ${escHtml(riskClass)}">${escHtml(riskClass)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="shadow-meta shadow-blur">
+              ${info.count} call${info.count > 1 ? "s" : ""} · ${formatDate(info.lastSeen)}
+            </span>
+            <span class="shadow-lock-badge">🔒 Pro</span>
+          </div>
+        </div>
+      </li>`;
     }).join("");
-    listEl.querySelectorAll(".shadow-item").forEach((li) => {
+    listEl.querySelectorAll(".shadow-item:not(.shadow-locked)").forEach((li) => {
       const toggle = () => {
-        var _a;
-        (_a = li.querySelector(".shadow-detail")) == null ? void 0 : _a.classList.toggle("expanded");
+        var _a2;
+        (_a2 = li.querySelector(".shadow-detail")) == null ? void 0 : _a2.classList.toggle("expanded");
       };
       li.addEventListener("click", toggle);
       li.addEventListener("keydown", (e) => {
@@ -503,6 +568,28 @@
         }
       });
     });
+    listEl.querySelectorAll(".shadow-locked").forEach((li) => {
+      li.addEventListener("click", openUpgrade);
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openUpgrade();
+        }
+      });
+    });
+    const ctaEl = document.getElementById("shadow-upgrade-cta");
+    const ctaCnt = document.getElementById("shadow-cta-count");
+    if (!isPro && totalSites > 0 && ctaEl) {
+      if (ctaCnt) ctaCnt.textContent = String(totalSites);
+      ctaEl.classList.add("show");
+      const btn = document.getElementById("shadow-upgrade-btn");
+      if (btn && !btn.dataset["wired"]) {
+        btn.dataset["wired"] = "1";
+        btn.addEventListener("click", openUpgrade);
+      }
+    } else if (ctaEl) {
+      ctaEl.classList.remove("show");
+    }
   }
   async function renderAgentTab() {
     const resp = await chrome.runtime.sendMessage({ type: "GET_AUDIT_LOG" });
