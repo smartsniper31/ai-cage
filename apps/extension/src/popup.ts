@@ -497,7 +497,8 @@ async function renderShadowAi(): Promise<void> {
 
     // ── FREE : first item visible, rest blurred with 🔒 Pro ───────────────
     if (i === 0) {
-      // First item — fully visible, detail shown immediately
+      // First item — fully visible, detail OPEN by default (Fix B: show Alex
+      // exactly what he gets on item 1 so he understands what's locked on 2..N)
       return `
       <li class="shadow-item" data-idx="0" tabindex="0" role="button"
           title="Click to expand">
@@ -510,7 +511,7 @@ async function renderShadowAi(): Promise<void> {
             ${info.count} call${info.count > 1 ? 's' : ''} · ${formatDate(info.lastSeen)} ▾
           </div>
         </div>
-        <div class="shadow-detail">
+        <div class="shadow-detail expanded">
           <span class="shadow-product">${escHtml(info.detail.product)}</span>
           <span class="shadow-field">Host: ${escHtml(site)}</span>
           <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
@@ -519,10 +520,11 @@ async function renderShadowAi(): Promise<void> {
       </li>`;
     }
 
-    // Locked items — blurred, click opens upgrade
+    // Locked items — blurred, click opens upgrade (Fix C: aria-label for keyboard)
     return `
       <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
-          title="Upgrade to Pro to see this site">
+          title="Upgrade to Pro to see this site"
+          aria-label="Locked — upgrade to Pro to see this site">
         <div class="shadow-row">
           <div>
             <span class="shadow-site shadow-blur">${escHtml(displayName)}</span>
@@ -900,6 +902,10 @@ function wireAccountTab(): void {
         await renderAccountTab();
         // Also refresh overview to hide watermark & progress bar
         await renderOverview();
+        // Fix A — hide Shadow CTA and tab badge immediately (Pro has no locked items)
+        document.getElementById('shadow-upgrade-cta')?.classList.remove('show');
+        const shadowBadgeEl = document.getElementById('shadow-tab-badge');
+        if (shadowBadgeEl) { shadowBadgeEl.textContent = ''; shadowBadgeEl.classList.remove('show'); }
       } else {
         input?.classList.add('error');
         setLicenseMsg(

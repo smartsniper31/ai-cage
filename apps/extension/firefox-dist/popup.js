@@ -530,7 +530,7 @@
             ${info.count} call${info.count > 1 ? "s" : ""} · ${formatDate(info.lastSeen)} ▾
           </div>
         </div>
-        <div class="shadow-detail">
+        <div class="shadow-detail expanded">
           <span class="shadow-product">${escHtml(info.detail.product)}</span>
           <span class="shadow-field">Host: ${escHtml(site)}</span>
           <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
@@ -540,7 +540,8 @@
       }
       return `
       <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
-          title="Upgrade to Pro to see this site">
+          title="Upgrade to Pro to see this site"
+          aria-label="Locked — upgrade to Pro to see this site">
         <div class="shadow-row">
           <div>
             <span class="shadow-site shadow-blur">${escHtml(displayName)}</span>
@@ -794,6 +795,7 @@
   function wireAccountTab() {
     var _a, _b, _c;
     (_a = document.getElementById("license-activate-btn")) == null ? void 0 : _a.addEventListener("click", async () => {
+      var _a2;
       const input = document.getElementById("license-input");
       const key = (input == null ? void 0 : input.value.trim()) ?? "";
       if (!key) {
@@ -814,6 +816,12 @@
         btn.disabled = false;
         await renderAccountTab();
         await renderOverview();
+        (_a2 = document.getElementById("shadow-upgrade-cta")) == null ? void 0 : _a2.classList.remove("show");
+        const shadowBadgeEl = document.getElementById("shadow-tab-badge");
+        if (shadowBadgeEl) {
+          shadowBadgeEl.textContent = "";
+          shadowBadgeEl.classList.remove("show");
+        }
       } else {
         input == null ? void 0 : input.classList.add("error");
         setLicenseMsg(
