@@ -401,7 +401,7 @@
     }
   }
   async function renderShadowAi() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const listEl = document.getElementById("shadow-list");
     if (!listEl) return;
     let resp;
@@ -584,7 +584,7 @@
     });
     const ctaEl = document.getElementById("shadow-upgrade-cta");
     const ctaCnt = document.getElementById("shadow-cta-count");
-    if (!isPro && totalSites > 0 && ctaEl) {
+    if (!isPro && totalSites > 1 && ctaEl) {
       if (ctaCnt) ctaCnt.textContent = String(totalSites);
       ctaEl.classList.add("show");
       const btn = document.getElementById("shadow-upgrade-btn");
@@ -598,6 +598,11 @@
     const filtersEl = document.getElementById("shadow-filters");
     if (isPro && totalSites > 3 && filtersEl) {
       filtersEl.classList.add("show");
+      filtersEl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      (_c = filtersEl.querySelector('[data-filter="all"]')) == null ? void 0 : _c.classList.add("active");
+      listEl.querySelectorAll(".shadow-item").forEach((li) => {
+        li.style.display = "";
+      });
       if (!filtersEl.dataset["wired"]) {
         filtersEl.dataset["wired"] = "1";
         filtersEl.querySelectorAll(".filter-btn").forEach((btn) => {
@@ -630,7 +635,7 @@
     } else if (filtersEl) {
       filtersEl.classList.remove("show");
       filtersEl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
-      (_c = filtersEl.querySelector('[data-filter="all"]')) == null ? void 0 : _c.classList.add("active");
+      (_d = filtersEl.querySelector('[data-filter="all"]')) == null ? void 0 : _d.classList.add("active");
     }
   }
   async function renderAgentTab() {
