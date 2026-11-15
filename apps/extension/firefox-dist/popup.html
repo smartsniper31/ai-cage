@@ -199,7 +199,54 @@
       text-align: center; padding: 16px 0; line-height: 1.7;
     }
 
-    /* ── Upgrade banner ── */
+    /* ── Shadow AI — Monetisation (Pro teaser) ── */
+
+    /* Locked item — blurred row for Free users */
+    .shadow-locked { cursor: pointer; }
+    .shadow-blur   {
+      filter: blur(3.5px); user-select: none;
+      color: var(--muted); pointer-events: none;
+    }
+    .shadow-lock-badge {
+      font-size: 9px; font-weight: 800;
+      color: var(--red); background: var(--red-bg);
+      border: 1px solid #fecaca; border-radius: 4px;
+      padding: 1px 6px; white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* Upgrade CTA — shown below the list for Free users with detections */
+    .shadow-upgrade-cta {
+      display: none;
+      margin-top: 10px;
+      background: var(--red-bg);
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 11px;
+    }
+    .shadow-upgrade-cta.show { display: block; }
+    .shadow-upgrade-cta-title {
+      font-weight: 800; color: #991b1b; margin-bottom: 4px; font-size: 11px;
+    }
+    .shadow-upgrade-cta-sub {
+      color: #991b1b; opacity: .85; line-height: 1.5; margin-bottom: 9px;
+    }
+    .shadow-upgrade-btn {
+      display: inline-block; background: var(--red); color: #fff;
+      border: none; border-radius: 7px; padding: 7px 14px;
+      font-size: 11px; font-weight: 800; cursor: pointer;
+      width: 100%; text-align: center; transition: opacity .15s;
+    }
+    .shadow-upgrade-btn:hover { opacity: .88; }
+
+    /* Tab badge — red pill on the Shadow tab button */
+    .tab-badge {
+      display: none; background: var(--red); color: #fff;
+      border-radius: 999px; font-size: 8px; font-weight: 800;
+      padding: 1px 5px; margin-left: 3px; vertical-align: middle;
+      line-height: 1.4;
+    }
+    .tab-badge.show { display: inline-block; }
     .upgrade-banner {
       background: linear-gradient(135deg, #15803d, #16a34a);
       color: #fff; border-radius: 10px; padding: 12px 14px;
@@ -329,7 +376,7 @@
   <!-- ── Tabs (4) ── -->
   <div class="tabs" role="tablist">
     <button class="tab-btn" id="tab-overview" role="tab" aria-selected="true">📊 Overview</button>
-    <button class="tab-btn" id="tab-shadow"   role="tab" aria-selected="false">👁️ Shadow</button>
+    <button class="tab-btn" id="tab-shadow" role="tab" aria-selected="false">👁️ Shadow<span class="tab-badge" id="shadow-tab-badge"></span></button>
     <button class="tab-btn" id="tab-agent"    role="tab" aria-selected="false">🤖 Agent</button>
     <button class="tab-btn" id="tab-account"  role="tab" aria-selected="false">⚙️ Account</button>
   </div>
@@ -418,6 +465,16 @@
     <div class="section-label">Hidden AI Activity</div>
 
     <ul id="shadow-list"><li class="empty">Loading…</li></ul>
+
+    <!-- 3.1 — Upgrade CTA (hidden by default, shown by renderShadowAi() for Free users) -->
+    <div class="shadow-upgrade-cta" id="shadow-upgrade-cta">
+      <div class="shadow-upgrade-cta-title">👁️ <span id="shadow-cta-count">?</span> sites are using AI without telling you.</div>
+      <div class="shadow-upgrade-cta-sub">
+        In Free mode you see which sites. With Pro you see exactly what data
+        each site tried to send, at what time, and whether it was caged.
+      </div>
+      <button class="shadow-upgrade-btn" id="shadow-upgrade-btn">🔒 Unlock Pro — full detail →</button>
+    </div>
   </div>
 
   <!-- ══ AGENT ══ -->

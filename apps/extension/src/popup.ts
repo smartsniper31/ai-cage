@@ -182,6 +182,18 @@ async function renderOverview(): Promise<void> {
   setText('session-count',  session);
   setText('tab-count',      tabCnt);
 
+  // 3.5 — Feed shadow tab badge from Overview data (session shadow count)
+  const tabBadgeOv = document.getElementById('shadow-tab-badge');
+  if (tabBadgeOv) {
+    if (shadow > 0) {
+      tabBadgeOv.textContent = String(shadow);
+      tabBadgeOv.classList.add('show');
+    } else {
+      tabBadgeOv.textContent = '';
+      tabBadgeOv.classList.remove('show');
+    }
+  }
+
   // Progress bar: only show for Free tier users
   const progressWrap = document.getElementById('free-progress-wrap');
   const upgradeBanner = document.getElementById('upgrade-banner');
@@ -349,14 +361,18 @@ async function renderShadowAi(): Promise<void> {
   const listEl = document.getElementById('shadow-list');
   if (!listEl) return;
 
-  // FIX 1.4: wrap entire fetch+render in try/catch — if SW is down (MV3
-  // idle timeout), sendMessage rejects. Without this the list stays frozen
-  // on "Loading…" with no feedback to the user.
+  // ── 3.2 — Fetch data + licence in parallel ────────────────────────────────
   let resp: ShadowLogResponse;
+  let isPro = false;
   try {
-    resp = await chrome.runtime.sendMessage<{ type: string }, ShadowLogResponse>(
-      { type: 'GET_SHADOW_LOG' },
-    );
+    const [shadowResp, licInfo] = await Promise.all([
+      chrome.runtime.sendMessage<{ type: string }, ShadowLogResponse>(
+        { type: 'GET_SHADOW_LOG' },
+      ),
+      checkLicense(chromeStorageAdapter, 0),
+    ]);
+    resp  = shadowResp;
+    isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
   } catch {
     listEl.innerHTML = `
       <li class="empty">
@@ -370,21 +386,23 @@ async function renderShadowAi(): Promise<void> {
 
   // ── Empty state ───────────────────────────────────────────────────────────
   if (entries.length === 0) {
-    // Reset stat-cards to zero
     setText('shadow-sites-count',    '0');
     setText('shadow-calls-count',    '0');
     setText('shadow-critical-count', '0');
     setText('shadow-last-seen',      '—');
 
-    // Status pill — clean state
+    // Hide CTA and tab badge
+    document.getElementById('shadow-upgrade-cta')?.classList.remove('show');
+    const badge = document.getElementById('shadow-tab-badge');
+    if (badge) { badge.textContent = ''; badge.classList.remove('show'); }
+
     const statusEl = document.getElementById('status-text');
     if (statusEl) {
-      statusEl.textContent   = '👁️ No hidden AI activity detected yet';
-      statusEl.style.background   = '';
-      statusEl.style.color        = '';
-      statusEl.style.borderColor  = '';
+      statusEl.textContent  = '👁️ No hidden AI activity detected yet';
+      statusEl.style.background  = '';
+      statusEl.style.color       = '';
+      statusEl.style.borderColor = '';
     }
-
     listEl.innerHTML = `
       <li class="empty">
         No hidden AI calls detected yet.<br>
@@ -394,7 +412,6 @@ async function renderShadowAi(): Promise<void> {
   }
 
   // ── Aggregate by site ─────────────────────────────────────────────────────
-  // Keep the most informative detail payload (last seen per site)
   const bysite = new Map<string, {
     count: number; lastSeen: string; detail: ShadowDetailPayload;
   }>();
@@ -408,15 +425,11 @@ async function renderShadowAi(): Promise<void> {
         existing.detail   = parsed;
       }
     } else {
-      bysite.set(e.site, {
-        count:    e.totalCount,
-        lastSeen: e.timestamp,
-        detail:   parsed,
-      });
+      bysite.set(e.site, { count: e.totalCount, lastSeen: e.timestamp, detail: parsed });
     }
   }
 
-  // ── 2.2 — Compute summary numbers for stat-cards ─────────────────────────
+  // ── Stat-cards ────────────────────────────────────────────────────────────
   const totalSites    = bysite.size;
   const totalCalls    = [...bysite.values()].reduce((s, v) => s + v.count, 0);
   const criticalCount = [...bysite.values()].filter(v => v.detail.riskLevel === 'critical').length;
@@ -428,7 +441,7 @@ async function renderShadowAi(): Promise<void> {
   setText('shadow-critical-count', criticalCount);
   setText('shadow-last-seen',      lastSeenStr);
 
-  // ── 2.2 — Update status pill (contextual, like renderOverview) ────────────
+  // ── Status pill ───────────────────────────────────────────────────────────
   const statusEl = document.getElementById('status-text');
   if (statusEl) {
     if (criticalCount > 0) {
@@ -444,13 +457,22 @@ async function renderShadowAi(): Promise<void> {
     }
   }
 
-  // ── Render list ───────────────────────────────────────────────────────────
-  // 2.6 — Use SITE_FRIENDLY display name; keep raw hostname as subtitle
-  listEl.innerHTML = [...bysite.entries()]
-    .sort((a, b) => b[1].count - a[1].count)
-    .map(([site, info], i) => {
-      const displayName = friendlyShadowSite(site);
-      const riskClass   = info.detail.riskLevel ?? 'unknown';
+  // ── 3.5 — Tab badge ───────────────────────────────────────────────────────
+  const tabBadge = document.getElementById('shadow-tab-badge');
+  if (tabBadge) {
+    tabBadge.textContent = String(totalSites);
+    tabBadge.classList.add('show');
+  }
+
+  // ── 3.3 — Render list : Free → 1 visible + N locked | Pro → all visible ──
+  const sorted = [...bysite.entries()].sort((a, b) => b[1].count - a[1].count);
+
+  listEl.innerHTML = sorted.map(([site, info], i) => {
+    const displayName = friendlyShadowSite(site);
+    const riskClass   = info.detail.riskLevel ?? 'unknown';
+
+    // ── PRO : full detail on every item ──────────────────────────────────
+    if (isPro) {
       return `
       <li class="shadow-item" data-idx="${i}" tabindex="0" role="button"
           title="Click to expand">
@@ -468,13 +490,56 @@ async function renderShadowAi(): Promise<void> {
           <span class="shadow-field">Host: ${escHtml(site)}</span>
           <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
           <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
+          <span class="shadow-field">Time: ${formatDate(info.lastSeen)}</span>
         </div>
       </li>`;
-    })
-    .join('');
+    }
 
-  // Attach click + keyboard listeners — never use inline onclick in extensions
-  listEl.querySelectorAll<HTMLLIElement>('.shadow-item').forEach(li => {
+    // ── FREE : first item visible, rest blurred with 🔒 Pro ───────────────
+    if (i === 0) {
+      // First item — fully visible, detail shown immediately
+      return `
+      <li class="shadow-item" data-idx="0" tabindex="0" role="button"
+          title="Click to expand">
+        <div class="shadow-row">
+          <div>
+            <span class="shadow-site">${escHtml(displayName)}</span>
+            <span class="shadow-risk ${escHtml(riskClass)}">${escHtml(riskClass)}</span>
+          </div>
+          <div class="shadow-meta">
+            ${info.count} call${info.count > 1 ? 's' : ''} · ${formatDate(info.lastSeen)} ▾
+          </div>
+        </div>
+        <div class="shadow-detail">
+          <span class="shadow-product">${escHtml(info.detail.product)}</span>
+          <span class="shadow-field">Host: ${escHtml(site)}</span>
+          <span class="shadow-field">Initiator: ${escHtml(info.detail.initiator)}</span>
+          <span class="shadow-field">Category: ${escHtml(info.detail.category)}</span>
+        </div>
+      </li>`;
+    }
+
+    // Locked items — blurred, click opens upgrade
+    return `
+      <li class="shadow-item shadow-locked" data-idx="${i}" tabindex="0" role="button"
+          title="Upgrade to Pro to see this site">
+        <div class="shadow-row">
+          <div>
+            <span class="shadow-site shadow-blur">${escHtml(displayName)}</span>
+            <span class="shadow-risk shadow-blur ${escHtml(riskClass)}">${escHtml(riskClass)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="shadow-meta shadow-blur">
+              ${info.count} call${info.count > 1 ? 's' : ''} · ${formatDate(info.lastSeen)}
+            </span>
+            <span class="shadow-lock-badge">🔒 Pro</span>
+          </div>
+        </div>
+      </li>`;
+  }).join('');
+
+  // ── Attach listeners ──────────────────────────────────────────────────────
+  listEl.querySelectorAll<HTMLLIElement>('.shadow-item:not(.shadow-locked)').forEach(li => {
     const toggle = (): void => {
       li.querySelector('.shadow-detail')?.classList.toggle('expanded');
     };
@@ -483,6 +548,31 @@ async function renderShadowAi(): Promise<void> {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     });
   });
+
+  // Locked items → open upgrade on click
+  listEl.querySelectorAll<HTMLLIElement>('.shadow-locked').forEach(li => {
+    li.addEventListener('click', openUpgrade);
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUpgrade(); }
+    });
+  });
+
+  // ── 3.4 — Upgrade CTA (Free only, when detections exist) ─────────────────
+  const ctaEl  = document.getElementById('shadow-upgrade-cta');
+  const ctaCnt = document.getElementById('shadow-cta-count');
+  if (!isPro && totalSites > 0 && ctaEl) {
+    if (ctaCnt) ctaCnt.textContent = String(totalSites);
+    ctaEl.classList.add('show');
+
+    // Wire button once — guard against double-wiring on re-render
+    const btn = document.getElementById('shadow-upgrade-btn');
+    if (btn && !btn.dataset['wired']) {
+      btn.dataset['wired'] = '1';
+      btn.addEventListener('click', openUpgrade);
+    }
+  } else if (ctaEl) {
+    ctaEl.classList.remove('show');
+  }
 }
 
 // ─── Agent tab ─────────────────────────────────────────────────────────────────
