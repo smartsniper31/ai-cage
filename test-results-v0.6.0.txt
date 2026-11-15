@@ -1,5 +1,5 @@
 AI CAGE v0.6.0 - Test Results
-Date: 2026-11-15 20:03:41
+Date: 2026-11-15 20:15:52
 ================================
 
 TOTAL: 202/202 PASS
@@ -11,8 +11,8 @@ BUILD SIZES (extension dist/):
 
 ZIPS (dist/):
   chrome.zip   51.4 KB
-  firefox.zip  51.4 KB
+  firefox.zip  51.5 KB
 
 SHA256:
-  9d6b5a020db59763049a6cbc93c8f84a13ba769b8e884c85c3be2fcf43f93f35  chrome
-  f104339330f8c228c04a56fa25db5890db9df5116b4cabf6bae6d801c103f115  firefox
+  22679f3759c06f9a05c0e11ce863941b1c250a24fbe8ea284f7167df8a9658a5  chrome
+  7f171eca4c899de275d48cd3d1c776854d8fc3b2e1095a7d1660d6c460783b9f  firefox
