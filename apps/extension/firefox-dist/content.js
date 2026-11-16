@@ -449,6 +449,12 @@
   }
   void refreshLimitFlag();
   setInterval(() => void refreshLimitFlag(), 3e4);
+  chrome.runtime.onMessage.addListener((message) => {
+    const msg = message;
+    if ((msg == null ? void 0 : msg.type) === "UPGRADE_ACTIVATED") {
+      void refreshLimitFlag();
+    }
+  });
   let shadowRoot = null;
   function getShadowRoot() {
     if (shadowRoot) return shadowRoot;
@@ -860,10 +866,28 @@
       el.focus();
       document.execCommand("selectAll", false);
       document.execCommand("insertText", false, text);
-      if (readText(el) !== text) {
-        el.innerText = text;
-        el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
+      if (readText(el) === text) return;
+      try {
+        el.focus();
+        const sel = window.getSelection();
+        if (sel) {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        el.dispatchEvent(new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt
+        }));
+        if (readText(el) === text) return;
+      } catch {
       }
+      el.innerText = text;
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
     }
   }
   function showLimitModal(monthly) {
@@ -1018,7 +1042,8 @@
       })();
       return;
     }
-    void handlePrompt(target);
+    const promptEl = findPrompt() ?? target;
+    void handlePrompt(promptEl);
   }, true);
   function hookButtons() {
     SEND_SELECTORS.forEach((sel) => {

@@ -250,7 +250,7 @@
     if (wm) wm.style.display = monthly >= FREE_LIMIT ? "block" : "none";
   }
   async function renderOverview() {
-    var _a;
+    var _a, _b, _c;
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const tabId = (tab == null ? void 0 : tab.id) ?? 0;
     const [resp, licInfo] = await Promise.all([
@@ -259,14 +259,19 @@
       ),
       checkLicense(chromeStorageAdapter, 0)
     ]);
-    const monthly = Math.min((resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0, FREE_LIMIT);
+    const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
+    const monthly = isPro ? (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0 : Math.min((resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0, FREE_LIMIT);
     const session = (resp == null ? void 0 : resp.sessionCageCount) ?? 0;
     const shadow = (resp == null ? void 0 : resp.sessionShadowCount) ?? 0;
     const tabCnt = (resp == null ? void 0 : resp.tabCount) ?? 0;
-    const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
     setText("monthly-caged", monthly);
     setText("monthly-shadow", (resp == null ? void 0 : resp.monthlyShadowAi) ?? 0);
-    setText("session-count", session);
+    const sessionDisplay = session > 0 ? session : monthly;
+    const sessionLabel = (_b = (_a = document.querySelector("#session-count")) == null ? void 0 : _a.closest(".stat-card")) == null ? void 0 : _b.querySelector(".stat-label");
+    if (sessionLabel) {
+      sessionLabel.textContent = session > 0 ? "This session" : "This month ↺";
+    }
+    setText("session-count", sessionDisplay);
     setText("tab-count", tabCnt);
     const tabBadgeOv = document.getElementById("shadow-tab-badge");
     if (tabBadgeOv) {
@@ -317,7 +322,7 @@
     }
     const sitesEl = document.getElementById("top-sites");
     if (sitesEl) {
-      if ((_a = resp == null ? void 0 : resp.topSites) == null ? void 0 : _a.length) {
+      if ((_c = resp == null ? void 0 : resp.topSites) == null ? void 0 : _c.length) {
         sitesEl.innerHTML = resp.topSites.slice(0, 5).map((s) => `
           <li>
             <span class="site-name">${escHtml(s.site)}</span>
@@ -867,6 +872,11 @@
         if (shadowBadgeEl) {
           shadowBadgeEl.textContent = "";
           shadowBadgeEl.classList.remove("show");
+        }
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab == null ? void 0 : activeTab.id) {
+          chrome.tabs.sendMessage(activeTab.id, { type: "UPGRADE_ACTIVATED" }).catch(() => {
+          });
         }
       } else {
         input == null ? void 0 : input.classList.add("error");
