@@ -837,17 +837,29 @@
     'button[class*="Submit"]'
   ];
   function findPrompt() {
+    const candidates = [];
     for (const sel of PROMPT_SELECTORS) {
       try {
-        const el = document.querySelector(sel);
-        if (el) {
+        document.querySelectorAll(sel).forEach((el) => {
           const r = el.getBoundingClientRect();
-          if (r.width > 50 && r.height > 20) return el;
-        }
+          if (r.width < 50 || r.height < 20) return;
+          if (r.bottom < 0 || r.top > window.innerHeight) return;
+          let score = 0;
+          if (document.activeElement === el || el.contains(document.activeElement)) score += 3;
+          if (r.width > 200 && r.height > 40) score += 2;
+          if (r.top > window.innerHeight * 0.4) score += 1;
+          const label = (el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? el.getAttribute("data-placeholder") ?? "").toLowerCase();
+          if (/message|ask|prompt|chat|type here/i.test(label)) score += 1;
+          if (/search/i.test(label) && !/message/i.test(label)) score -= 5;
+          if (el.closest('nav, header, [role="toolbar"], [role="search"]')) score -= 3;
+          candidates.push({ el, score });
+        });
       } catch {
       }
     }
-    return null;
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].score >= -2 ? candidates[0].el : null;
   }
   function readText(el) {
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
@@ -1118,7 +1130,8 @@
       hookDebounce = setTimeout(() => {
         hookButtons();
         hookDebounce = null;
-      }, 500);
+        setTimeout(() => hookButtons(), 1200);
+      }, 800);
     }
   });
   function boot() {
