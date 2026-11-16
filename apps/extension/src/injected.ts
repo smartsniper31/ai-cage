@@ -97,18 +97,6 @@
     return result;
   }
 
-  function restoreBody(text: string, items: Array<{ value: string; label: string }>): string {
-    let result = text;
-    let counter = 1;
-    for (const item of [...items].sort((a, b) => b.value.length - a.value.length)) {
-      const placeholder = `[CAGED_${item.label}_${counter}]`;
-      const escaped = placeholder.replace(/[[\]_]/g, '\\$&');
-      result = result.replace(new RegExp(escaped.replace(/\\/g, '\\\\'), 'g'), item.value);
-      counter++;
-    }
-    return result;
-  }
-
   // ── AI endpoint detection ────────────────────────────────────────────────
   // IMPORTANT: This list must cover ALL AI chat platforms, not just the obvious ones.
   // When isAI(url) returns false, the request bypasses the cage entirely.

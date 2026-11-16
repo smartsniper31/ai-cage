@@ -526,16 +526,63 @@ const SEND_SELECTORS = [
 ];
 
 function findPrompt(): HTMLElement | null {
+  // Fix 3: on SPA sites (Gemini, Perplexity) there can be multiple
+  // contenteditable divs in the page — menus, inline editors, search boxes.
+  // The old code returned the first visible match regardless of which one is
+  // the real prompt. This version scores every candidate and returns the best.
+  //
+  // Scoring rules (higher = more likely to be the real prompt):
+  //   +3  element has explicit focus right now
+  //   +2  large area (width > 200 && height > 40) — typical textarea
+  //   +1  positioned in bottom half of viewport — where prompts live
+  //   +1  aria-label or placeholder contains "message", "ask", "prompt"
+  //   −5  aria-label contains "search" without "message" (search box, not prompt)
+  //   −3  element is inside a nav, header, or toolbar
+
+  interface Candidate { el: HTMLElement; score: number; }
+  const candidates: Candidate[] = [];
+
   for (const sel of PROMPT_SELECTORS) {
     try {
-      const el = document.querySelector<HTMLElement>(sel);
-      if (el) {
+      document.querySelectorAll<HTMLElement>(sel).forEach(el => {
         const r = el.getBoundingClientRect();
-        if (r.width > 50 && r.height > 20) return el;
-      }
-    } catch { /* skip */ }
+        // Must be minimally visible
+        if (r.width < 50 || r.height < 20) return;
+        if (r.bottom < 0 || r.top > window.innerHeight) return;
+
+        let score = 0;
+
+        // Focused element is almost certainly the prompt
+        if (document.activeElement === el || el.contains(document.activeElement)) score += 3;
+
+        // Large area → real input
+        if (r.width > 200 && r.height > 40) score += 2;
+
+        // Bottom-half position → prompt input (not a header search)
+        if (r.top > window.innerHeight * 0.4) score += 1;
+
+        // Semantic hints
+        const label = (
+          el.getAttribute('aria-label') ??
+          el.getAttribute('placeholder') ??
+          el.getAttribute('data-placeholder') ?? ''
+        ).toLowerCase();
+        if (/message|ask|prompt|chat|type here/i.test(label)) score += 1;
+        if (/search/i.test(label) && !/message/i.test(label))  score -= 5;
+
+        // Penalise elements inside nav/header/toolbar
+        if (el.closest('nav, header, [role="toolbar"], [role="search"]')) score -= 3;
+
+        candidates.push({ el, score });
+      });
+    } catch { /* skip bad selector */ }
   }
-  return null;
+
+  if (candidates.length === 0) return null;
+
+  // Return the highest-scoring candidate (stable sort: first occurrence wins ties)
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0]!.score >= -2 ? candidates[0]!.el : null;
 }
 
 function readText(el: HTMLElement): string {
@@ -888,12 +935,18 @@ window.addEventListener('message', (event) => {
 let hookDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const domObserver = new MutationObserver(() => {
-  // Throttle hookButtons — max 1x per 500ms to avoid CPU spikes on streaming
+  // Fix 4: two-pass hook strategy for slow SPA frameworks (Claude, Gemini).
+  // Pass 1 at 800ms catches elements that load quickly after navigation.
+  // Pass 2 at 2000ms catches elements that load in a second render wave
+  // (Angular lazy components, React Suspense boundaries, etc.).
+  // The CAGED_ATTR guard on hookButtons() ensures no double-binding.
   if (!hookDebounce) {
     hookDebounce = setTimeout(() => {
       hookButtons();
       hookDebounce = null;
-    }, 500);
+      // Second pass for slow SPA frameworks
+      setTimeout(() => hookButtons(), 1200);
+    }, 800);
   }
 });
 
