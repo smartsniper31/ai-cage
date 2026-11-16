@@ -393,15 +393,26 @@ const PROMPT_SELECTORS = [
   'div[contenteditable="true"][data-id]',
   'div.ProseMirror[contenteditable="true"]',
 
-  // ── Claude (Anthropic) ────────────────────────────────────────────────
+  // ── Claude (Anthropic) — verified May 2026 ───────────────────────────
+  // ProseMirror is the most stable selector (ArcRift + MonkeyScript consensus)
+  'div[data-placeholder][contenteditable="true"]',
+  '[data-testid="composer-input"]',
+  '[aria-label="Message Claude"][contenteditable]',
   'div[contenteditable="true"][aria-multiline="true"]',
   'div.ProseMirror',
 
-  // ── Gemini / Google AI Studio ─────────────────────────────────────────
+  // ── Gemini / Google AI Studio — verified May 2026 ────────────────────
+  // .ql-editor confirmed most stable (ArcRift + MonkeyScript)
+  '.ql-editor[contenteditable="true"]',
+  'rich-textarea [contenteditable="true"]',
   'rich-textarea .ql-editor',
-  'div.ql-editor[contenteditable="true"]',
+  '[aria-label*="message"][contenteditable]',
+  '[aria-label*="prompt"][contenteditable]',
+  'div[contenteditable="true"][aria-label*="Enter a prompt"]',
   'ms-text-chunk[contenteditable]',
   'div[contenteditable="true"].input-area',
+  // Google AI Mode (Search with AI)
+  'textarea[aria-label="Ask anything"]',
 
   // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
   'div[contenteditable="true"][role="textbox"]',
@@ -414,28 +425,38 @@ const PROMPT_SELECTORS = [
   'div[placeholder][contenteditable]',
   'div[data-placeholder][contenteditable]',
 
-  // ── Bing Copilot / Microsoft ──────────────────────────────────────────
+  // ── Bing Copilot / Microsoft — verified May 2026 ─────────────────────
+  'textarea#userInput',
+  'textarea[data-testid="composer-input"]',
+  'textarea[placeholder*="Message"]',
   'textarea#searchbox',
   'cib-text-input textarea',
   'div.user-message-input[contenteditable]',
   'textarea[name="userMessage"]',
 
-  // ── DeepSeek ──────────────────────────────────────────────────────────
+  // ── DeepSeek — verified May 2026 (#chat-input most stable) ───────────
   'textarea#chat-input',
+  'textarea[placeholder*="Send a message"]',
+  'textarea[data-testid="chat-input"]',
 
-  // ── Perplexity ────────────────────────────────────────────────────────
+  // ── Perplexity — verified 2025 ────────────────────────────────────────
   'textarea[placeholder*="Ask"]',
   'textarea[placeholder*="ask"]',
   'textarea[placeholder*="Search"]',
+  'textarea[placeholder*="Follow"]',
 
-  // ── Mistral / Le Chat ─────────────────────────────────────────────────
+  // ── Mistral / Le Chat — verified May 2026 (ProseMirror, NOT textarea) ─
+  // Mistral uses ProseMirror div[contenteditable] — textarea never matches
   'textarea[data-testid*="chat"]',
   'textarea[data-testid*="message"]',
   'div[data-testid*="message"][contenteditable]',
+  'div[contenteditable="true"][data-testid*="input"]',
 
-  // ── Grok (X.com) ──────────────────────────────────────────────────────
+  // ── Grok (x.com + grok.com) — verified May 2026 ──────────────────────
+  "textarea[data-testid='grok-input']",
   'div[data-testid="tweetTextarea_0"][contenteditable]',
   'div[aria-label*="Grok"][contenteditable]',
+  'textarea[placeholder*="Ask"]',
 
   // ── Generic fallbacks — ordered from most specific to most general ────
   'textarea[rows]',
@@ -448,13 +469,23 @@ const SEND_SELECTORS = [
   'button[data-testid*="send"]',
   'button[data-testid*="submit"]',
   'button[data-testid*="Send"]',
+  // Claude + DeepSeek + Grok confirmed May 2026
+  'button[data-testid="send-button"]',
 
-  // ── ARIA labels ───────────────────────────────────────────────────────
+  // ── ARIA labels — covers Claude, Gemini, Copilot, Mistral, Grok ──────
   'button[aria-label*="Send"]',
   'button[aria-label*="send"]',
   'button[aria-label*="Submit"]',
   'button[aria-label*="Envoyer"]',
   'button[aria-label*="envoyer"]',
+  // Claude specific confirmed May 2026
+  'button[aria-label="Send Message"]',
+  'button[aria-label="Send message"]',
+  // Gemini confirmed May 2026
+  'button[aria-label*="Send message"]',
+  'button[mattooltip*="Send"]',
+  '.send-button',
+  'button.send-button',
 
   // ── Form submit ───────────────────────────────────────────────────────
   'button[type="submit"]',
@@ -467,9 +498,15 @@ const SEND_SELECTORS = [
   // ── Bing Copilot ──────────────────────────────────────────────────────
   'button#search-button',
   'cib-icon-button[aria-label*="Submit"]',
+  // Copilot confirmed May 2026
+  'button[aria-label*="Submit" i]',
 
   // ── Grok ──────────────────────────────────────────────────────────────
   'div[data-testid="tweetButtonInline"]',
+
+  // ── Perplexity ────────────────────────────────────────────────────────
+  'button[aria-label*="Ask"]',
+  'button[type="submit"][aria-label]',
 
   // ── Generic icon buttons that are send actions ────────────────────────
   'button[class*="send"]',
