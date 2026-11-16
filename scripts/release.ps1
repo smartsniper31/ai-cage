@@ -119,6 +119,89 @@ $deskSize = [math]::Round((Get-Item $desktopHtml).Length / 1KB, 1)
 OK "desktop dist/index.html ${deskSize}kB — version check passed"
 Set-Location $ROOT
 
+# ── STEP 2.5: Icon integrity check — verify all PNG icons have correct dimensions ──
+# This guard prevents the Firefox blurry-icon bug caused by icon96.png being a
+# copy of icon128.png (128x128 instead of 96x96). Firefox uses icon96.png for
+# its toolbar — a wrong-size icon renders as a blurry transparent circle.
+# Rule: iconNNN.png MUST have real dimensions N×N. Chrome ignores this silently;
+# Firefox does not. This check runs every pipeline and auto-corrects if needed.
+Write-Host "    🔍 Verifying icon dimensions..." -ForegroundColor DarkGray
+
+$iconDir = Join-Path $EXT_DIST "icons"
+$iconSizes = @(16, 32, 48, 96, 128)
+$anyIconFixed = $false
+
+foreach ($size in $iconSizes) {
+    $iconPath = Join-Path $iconDir "icon${size}.png"
+    if (!(Test-Path $iconPath)) {
+        FAIL "Missing icon: icons/icon${size}.png — regenerate icons before releasing"
+    }
+
+    # Read PNG dimensions from header bytes 16-23 (big-endian uint32)
+    $bytes = [System.IO.File]::ReadAllBytes($iconPath)
+    $w = ([int]$bytes[16] -shl 24) -bor ([int]$bytes[17] -shl 16) -bor ([int]$bytes[18] -shl 8) -bor [int]$bytes[19]
+    $h = ([int]$bytes[20] -shl 24) -bor ([int]$bytes[21] -shl 16) -bor ([int]$bytes[22] -shl 8) -bor [int]$bytes[23]
+
+    if ($w -ne $size -or $h -ne $size) {
+        Write-Host "    ⚠️  icon${size}.png is ${w}x${h} — expected ${size}x${size}. Auto-correcting..." -ForegroundColor Yellow
+
+        # Find the nearest larger correct icon to use as source for rescaling
+        $srcPath = $null
+        foreach ($candidate in @(128, 96, 48, 32, 16)) {
+            if ($candidate -gt $size) {
+                $candidatePath = Join-Path $iconDir "icon${candidate}.png"
+                if (Test-Path $candidatePath) {
+                    $cb = [System.IO.File]::ReadAllBytes($candidatePath)
+                    $cw = ([int]$cb[16] -shl 24) -bor ([int]$cb[17] -shl 16) -bor ([int]$cb[18] -shl 8) -bor [int]$cb[19]
+                    if ($cw -eq $candidate) { $srcPath = $candidatePath; break }
+                }
+            }
+        }
+        if (-not $srcPath) { $srcPath = Join-Path $iconDir "icon128.png" }
+
+        # Rescale using Node.js (always available in this project)
+        $nodeScript = @"
+const fs = require('fs');
+const zlib = require('zlib');
+const src = fs.readFileSync('$($srcPath.Replace('\','\\'))');
+const W = src.readUInt32BE(16), H = src.readUInt32BE(20);
+const idat = zlib.inflateSync(src.slice(src.indexOf(Buffer.from('IDAT'))+4+4,
+    src.lastIndexOf(Buffer.from('IEND'))-4));
+const pixels = [];
+for (let y=0;y<H;y++){const row=[];for(let x=0;x<W;x++){const b=y*(W*4+1)+1+x*4;row.push([idat[b],idat[b+1],idat[b+2],idat[b+3]]);}pixels.push(row);}
+const TW=$size,TH=$size;
+const out=[];
+for(let ty=0;ty<TH;ty++){const row=[];for(let tx=0;tx<TW;tx++){const sx=tx*(W-1)/(TW-1),sy=ty*(H-1)/(TH-1);const x0=Math.floor(sx),x1=Math.min(x0+1,W-1),y0=Math.floor(sy),y1=Math.min(y0+1,H-1),fx=sx-x0,fy=sy-y0;const rgba=[0,0,0,0];for(let c=0;c<4;c++){rgba[c]=Math.round(pixels[y0][x0][c]*(1-fx)*(1-fy)+pixels[y0][x1][c]*fx*(1-fy)+pixels[y1][x0][c]*(1-fx)*fy+pixels[y1][x1][c]*fx*fy);}row.push(rgba);}out.push(row);}
+const rawRows=[];for(let y=0;y<TH;y++){const r=Buffer.alloc(1+TW*4);r[0]=0;for(let x=0;x<TW;x++){const b=1+x*4;r[b]=out[y][x][0];r[b+1]=out[y][x][1];r[b+2]=out[y][x][2];r[b+3]=out[y][x][3];}rawRows.push(r);}
+const raw=Buffer.concat(rawRows);const comp=zlib.deflateSync(raw,{level:9});
+function crc(b){let c=0xFFFFFFFF;const t=[];for(let i=0;i<256;i++){let v=i;for(let j=0;j<8;j++)v=(v&1)?0xEDB88320^(v>>>1):v>>>1;t[i]=v;}for(let i=0;i<b.length;i++)c=t[(c^b[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0;}
+function chunk(type,data){const tb=Buffer.from(type,'ascii');const lb=Buffer.alloc(4);lb.writeUInt32BE(data.length);const cb=Buffer.alloc(4);cb.writeUInt32BE(crc(Buffer.concat([tb,data])));return Buffer.concat([lb,tb,data,cb]);}
+const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(TW,0);ihdr.writeUInt32BE(TH,4);ihdr[8]=8;ihdr[9]=6;
+const png=Buffer.concat([Buffer.from([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]),chunk('IHDR',ihdr),chunk('IDAT',comp),chunk('IEND',Buffer.alloc(0))]);
+fs.writeFileSync('$($iconPath.Replace('\','\\'))',png);
+console.log('Fixed icon${size}.png: '+TW+'x'+TH);
+"@
+        $tmpScript = Join-Path $env:TEMP "fix-icon-${size}.mjs"
+        [System.IO.File]::WriteAllText($tmpScript, $nodeScript)
+        node $tmpScript
+        if ($LASTEXITCODE -ne 0) { FAIL "Failed to auto-correct icon${size}.png" }
+        Remove-Item $tmpScript -ErrorAction SilentlyContinue
+        $anyIconFixed = $true
+    }
+}
+
+if ($anyIconFixed) {
+    # Also update src/ icons so the fix persists for next builds
+    foreach ($size in $iconSizes) {
+        $distIcon = Join-Path $iconDir "icon${size}.png"
+        $srcIcon  = Join-Path $EXT_SRC "icons\icon${size}.png"
+        if (Test-Path $srcIcon) { Copy-Item $distIcon $srcIcon -Force }
+    }
+    Write-Host "    ✅ Icon corrections saved to src/icons/ (will persist across builds)" -ForegroundColor Green
+}
+
+OK "All $($iconSizes.Count) icons verified — dimensions correct"
+
 # ── STEP 3: Build Firefox dist ───────────────────────────────────────────────
 Step "3/11" "Build Firefox dist (build-firefox.mjs)"
 Set-Location $EXT_DIR
