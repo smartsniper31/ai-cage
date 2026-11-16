@@ -65,6 +65,16 @@ async function refreshLimitFlag(): Promise<void> {
 void refreshLimitFlag();
 setInterval(() => void refreshLimitFlag(), 30_000);
 
+// Fix B: listen for immediate Pro activation signal from popup.ts
+// When the user activates a Pro licence, popup sends UPGRADE_ACTIVATED
+// to all content scripts so the 30s sync flag is refreshed instantly.
+chrome.runtime.onMessage.addListener((message: unknown) => {
+  const msg = message as { type?: string };
+  if (msg?.type === 'UPGRADE_ACTIVATED') {
+    void refreshLimitFlag();
+  }
+});
+
 // ─── Shadow DOM host (toast + decision panel only — NO bubble, NO mini-popup) ──
 let shadowRoot: ShadowRoot | null = null;
 
@@ -543,13 +553,46 @@ function writeText(el: HTMLElement, text: string): void {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
+    // Fix D: ProseMirror contenteditable (Claude, Gemini, Mistral).
+    // document.execCommand('insertText') is deprecated and silently fails on
+    // Chrome 118+ inside ProseMirror. Strategy:
+    //   1. Try execCommand first (still works on some older sites)
+    //   2. If the content didn't change → fall back to DataTransfer + paste event
+    //      which ProseMirror's input handler intercepts correctly.
+    //   3. Last resort: direct innerText + InputEvent.
     el.focus();
+
+    // Attempt 1: execCommand (works on ChatGPT textarea-based editors)
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, text);
-    if (readText(el) !== text) {
-      el.innerText = text;
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
-    }
+
+    if (readText(el) === text) return; // success — stop here
+
+    // Attempt 2: DataTransfer / paste event (ProseMirror-aware)
+    // ProseMirror listens to 'paste' and reads clipboardData.getData('text/plain')
+    try {
+      el.focus();
+      // Select all existing content
+      const sel = window.getSelection();
+      if (sel) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const dt = new DataTransfer();
+      dt.setData('text/plain', text);
+      el.dispatchEvent(new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      }));
+      if (readText(el) === text) return; // success
+    } catch { /* DataTransfer not available in this context */ }
+
+    // Attempt 3: direct innerText + InputEvent (last resort)
+    el.innerText = text;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
   }
 }
 
@@ -734,14 +777,10 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (!isPrompt) return;
 
   // P1 FIX: Check the synchronous flag BEFORE any await.
-  // If the limit is reached, preventDefault() blocks the form submission
-  // in 0ms — before the browser can send the request.
-  // Then show the modal async (UI only, no security implication).
   if (limitReachedSync) {
     e.preventDefault();
     e.stopImmediatePropagation();
     void (async () => {
-      // Refresh the flag to get the exact monthly count for the modal
       await refreshLimitFlag();
       const resp = await chrome.runtime.sendMessage<
         { type: string },
@@ -752,8 +791,12 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     return;
   }
 
-  // Limit not reached — proceed with async caging
-  void handlePrompt(target);
+  // Fix E: use findPrompt() to get the real top-level prompt container.
+  // On ProseMirror sites (Claude, Gemini, Mistral) the keydown target is an
+  // inner node (<p>, <span>) — readText() on it returns only a fragment.
+  // findPrompt() walks PROMPT_SELECTORS and returns the outermost editor div.
+  const promptEl = findPrompt() ?? target;
+  void handlePrompt(promptEl);
 }, true);
 
 function hookButtons(): void {

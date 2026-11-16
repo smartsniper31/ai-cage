@@ -413,7 +413,39 @@
       return _fetch(input, init);
     }
 
-    if (typeof body === 'string' && body.length > 2) {
+    // Fix A: some AI platforms (Claude, Gemini) send prompts as ReadableStream
+    // or Uint8Array instead of plain strings. Read the stream to a string first
+    // so PII detection can run on it. Fall back to pass-through on any error.
+    if (body instanceof ReadableStream) {
+      try {
+        const reader = (body as ReadableStream<Uint8Array>).getReader();
+        const chunks: Uint8Array[] = [];
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) chunks.push(value);
+        }
+        const dec = new TextDecoder();
+        const bodyStr = chunks.map(c => dec.decode(c, { stream: true })).join('') + dec.decode();
+        if (bodyStr.length > 2) {
+          const processed = await processRequestBody(bodyStr);
+          body = processed;
+        }
+      } catch {
+        // If reading the stream fails, pass through uncaged — never block the request
+      }
+    } else if (body instanceof Uint8Array || body instanceof ArrayBuffer) {
+      // Uint8Array / ArrayBuffer text body (some Gemini requests)
+      try {
+        const dec = new TextDecoder();
+        const bodyStr = dec.decode(body instanceof Uint8Array ? body : new Uint8Array(body));
+        if (bodyStr.length > 2) {
+          const processed = await processRequestBody(bodyStr);
+          body = processed;
+        }
+      } catch { /* pass through */ }
+    } else if (typeof body === 'string' && body.length > 2) {
       body = await processRequestBody(body);
     }
 

@@ -283,7 +283,34 @@
         window2.postMessage({ type: "AI_CAGE_FILE_UPLOAD_WARNING", url }, "*");
         return _fetch(input, init);
       }
-      if (typeof body === "string" && body.length > 2) {
+      if (body instanceof ReadableStream) {
+        try {
+          const reader = body.getReader();
+          const chunks = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) chunks.push(value);
+          }
+          const dec = new TextDecoder();
+          const bodyStr = chunks.map((c) => dec.decode(c, { stream: true })).join("") + dec.decode();
+          if (bodyStr.length > 2) {
+            const processed = await processRequestBody(bodyStr);
+            body = processed;
+          }
+        } catch {
+        }
+      } else if (body instanceof Uint8Array || body instanceof ArrayBuffer) {
+        try {
+          const dec = new TextDecoder();
+          const bodyStr = dec.decode(body instanceof Uint8Array ? body : new Uint8Array(body));
+          if (bodyStr.length > 2) {
+            const processed = await processRequestBody(bodyStr);
+            body = processed;
+          }
+        } catch {
+        }
+      } else if (typeof body === "string" && body.length > 2) {
         body = await processRequestBody(body);
       }
       const newInit = body !== (init == null ? void 0 : init.body) && body !== void 0 ? { ...init, body } : init;

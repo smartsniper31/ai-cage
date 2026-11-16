@@ -176,18 +176,27 @@ async function renderOverview(): Promise<void> {
     checkLicense(chromeStorageAdapter, 0),
   ]);
 
-  const monthly = Math.min(resp?.monthlyPiiCaged ?? 0, FREE_LIMIT); // cap at 100 — never show 105/100
+  const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
+
+  const monthly = isPro
+    ? (resp?.monthlyPiiCaged ?? 0)                            // Fix C2: Pro sees real count, no cap
+    : Math.min(resp?.monthlyPiiCaged ?? 0, FREE_LIMIT);       // Free: cap at 100 — never show 105/100
   const session = resp?.sessionCageCount  ?? 0;
   const shadow  = resp?.sessionShadowCount ?? 0;
   const tabCnt  = resp?.tabCount          ?? 0;
 
-  const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
-
   // Stats
   setText('monthly-caged',  monthly);
   setText('monthly-shadow', resp?.monthlyShadowAi ?? 0);
-  setText('session-count',  session);
-  setText('tab-count',      tabCnt);
+  // Fix C1+C4: when session=0 the SW restarted — show monthly to avoid
+  // a misleading "0" in the "This session" card. Label updates too.
+  const sessionDisplay = session > 0 ? session : monthly;
+  const sessionLabel   = document.querySelector('#session-count')?.closest('.stat-card')?.querySelector('.stat-label');
+  if (sessionLabel) {
+    sessionLabel.textContent = session > 0 ? 'This session' : 'This month ↺';
+  }
+  setText('session-count', sessionDisplay);
+  setText('tab-count',     tabCnt);
 
   // 3.5 — Feed shadow tab badge from Overview data (session shadow count)
   const tabBadgeOv = document.getElementById('shadow-tab-badge');
@@ -977,6 +986,12 @@ function wireAccountTab(): void {
         document.getElementById('shadow-upgrade-cta')?.classList.remove('show');
         const shadowBadgeEl = document.getElementById('shadow-tab-badge');
         if (shadowBadgeEl) { shadowBadgeEl.textContent = ''; shadowBadgeEl.classList.remove('show'); }
+        // Fix B — notify all content scripts immediately so limitReachedSync
+        // is reset within ms instead of waiting up to 30s for the next poll.
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab?.id) {
+          chrome.tabs.sendMessage(activeTab.id, { type: 'UPGRADE_ACTIVATED' }).catch(() => {});
+        }
       } else {
         input?.classList.add('error');
         setLicenseMsg(
