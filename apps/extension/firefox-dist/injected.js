@@ -68,11 +68,18 @@
       /api\.anthropic\.com/,
       /claude\.ai\/api/,
       /claude\.ai\/chat/,
+      // Claude web app real endpoints (SPA — requests go to /api/organizations/*)
+      /claude\.ai\/api\/organizations/,
+      /claude\.ai\/api\/auth/,
       // ── Google ────────────────────────────────────────────────────────────
       /generativelanguage\.googleapis\.com/,
       /gemini\.google\.com/,
       /bard\.google\.com/,
       /aistudio\.google\.com/,
+      // Gemini web app real backend endpoints (2025)
+      /alkalimajordomo\.googleapis\.com/,
+      /gemini\.google\.com\/_\/BardChatUi/,
+      /notebooklm\.google\.com/,
       // ── Meta AI ───────────────────────────────────────────────────────────
       /meta\.ai/,
       /www\.meta\.ai/,
@@ -80,6 +87,10 @@
       /graph\.facebook\.com\/.*\/ai/,
       // Meta AI via Facebook Graph
       /\/api\/chat.*meta/,
+      // Meta AI real web endpoints (2025) — GraphQL on facebook.com
+      /www\.facebook\.com\/api\/graphql/,
+      /www\.facebook\.com\/ajax\/mercury/,
+      /facebook\.com\/api\/graphql/,
       // ── Microsoft Copilot / Bing ──────────────────────────────────────────
       /copilot\.microsoft\.com/,
       /bing\.com\/chat/,
@@ -89,20 +100,33 @@
       // ── DeepSeek ──────────────────────────────────────────────────────────
       /chat\.deepseek\.com/,
       /api\.deepseek\.com/,
+      // DeepSeek web app real endpoints (2025)
+      /chat\.deepseek\.com\/api\/v0\//,
+      /chat\.deepseek\.com\/api\/v1\//,
       // ── Mistral ───────────────────────────────────────────────────────────
       /api\.mistral\.ai/,
       /chat\.mistral\.ai/,
       /mistral\.ai\/api/,
+      // Mistral Le Chat real web endpoints (2025)
+      /chat\.mistral\.ai\/api\//,
+      /chat\.mistral\.ai\/conversation/,
       // ── Groq ──────────────────────────────────────────────────────────────
       /api\.groq\.com/,
       // ── Perplexity ────────────────────────────────────────────────────────
       /api\.perplexity\.ai/,
       /perplexity\.ai\/api/,
       /www\.perplexity\.ai\/api/,
+      // Perplexity web app real endpoints (2025) — SSE + REST
+      /www\.perplexity\.ai\/rest\//,
+      /perplexity\.ai\/rest\//,
+      /www\.perplexity\.ai\/socket\.io/,
       // ── Grok / xAI ───────────────────────────────────────────────────────
       /grok\.x\.ai/,
       /api\.x\.ai/,
       /grok\.com/,
+      // Grok web app real endpoints (2025) — confirmed from network inspection
+      /grok\.com\/rest\/app-chat\//,
+      /grok\.com\/api\//,
       // ── Cohere ────────────────────────────────────────────────────────────
       /api\.cohere\.ai/,
       /api\.cohere\.com/,
