@@ -119,6 +119,17 @@ interface CheckLimitMessage {
   type: 'CHECK_LIMIT';
 }
 
+interface AgentEventMessage {
+  type: 'AGENT_EVENT';
+  site: string;
+  detail: string;
+  blocked: boolean;
+}
+
+interface OpenUpgradeMessage {
+  type: 'OPEN_UPGRADE';
+}
+
 type IncomingMessage =
   | CageReportMessage
   | GetStatsMessage
@@ -126,7 +137,9 @@ type IncomingMessage =
   | GetAuditLogMessage
   | ExportAuditCSVMessage
   | GetPlainReportMessage
-  | CheckLimitMessage;
+  | CheckLimitMessage
+  | AgentEventMessage
+  | OpenUpgradeMessage;
 
 // ---------------------------------------------------------------------------
 // Cage 1: Handle PII cage reports from content.ts
@@ -211,8 +224,6 @@ function registerShadowAiObserver(): void {
         const matches = matchAiEndpoint(url);
         if (matches.length === 0) return;
 
-        sessionShadowCount += 1;
-
         const counts: Record<string, number> = {};
         for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
 
@@ -224,15 +235,30 @@ function registerShadowAiObserver(): void {
           return;
         }
 
-        const initiator = details.initiator ?? 'unknown';
+        sessionShadowCount += 1;
 
+        const rawInitiator = details.initiator ?? '';
+        let initiator: string;
+        try {
+          initiator = new URL(rawInitiator).hostname;
+        } catch {
+          initiator = rawInitiator || 'browser background';
+        }
+
+        const match0 = matches[0];
         void logEvent(
           {
             type: 'SHADOW_AI_DETECTED',
             site: hostname,
             counts,
             totalCount: matches.length,
-            detail: `Initiator: ${initiator} | Risk: ${matches[0]?.riskLevel ?? 'unknown'} | Product: ${matches[0]?.name ?? url}`,
+            detail: JSON.stringify({
+              initiator,
+              riskLevel:  match0?.riskLevel  ?? 'unknown',
+              product:    match0?.name       ?? url,
+              category:   match0?.category   ?? 'unknown',
+              endpointId: match0?.id         ?? 'unknown',
+            }),
           },
           chromeStorageAdapter,
         );
@@ -284,14 +310,13 @@ chrome.runtime.onMessage.addListener(
     const msg = message as IncomingMessage;
 
     if (msg.type === 'AGENT_EVENT') {
-      const agentMsg = msg as { type: string; site: string; detail: string; blocked: boolean };
       void logEvent(
         {
           type: 'AGENT_TOOL_CALL' as never,
-          site: agentMsg.site,
-          counts: { blocked: agentMsg.blocked ? 1 : 0 },
+          site: msg.site,
+          counts: { blocked: msg.blocked ? 1 : 0 },
           totalCount: 1,
-          detail: agentMsg.detail,
+          detail: msg.detail,
         },
         chromeStorageAdapter,
       );
@@ -325,9 +350,10 @@ chrome.runtime.onMessage.addListener(
 
     if (msg.type === 'GET_SHADOW_LOG') {
       void getAuditLog(chromeStorageAdapter).then((entries) => {
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
         const shadowEntries = entries
-          .filter((e: AuditEntry) => e.type === 'SHADOW_AI_DETECTED')
-          .slice(-100); // last 100
+          .filter((e: AuditEntry) => e.type === 'SHADOW_AI_DETECTED' && new Date(e.timestamp).getTime() >= cutoff)
+          .slice(-500); // last 500 within window
         sendResponse({ entries: shadowEntries });
       });
       return true;

@@ -334,10 +334,11 @@ function showNetworkPanel(
   root.appendChild(panel);
 
   let sent = false;
+  const rootRef = root; // capture non-null reference for use inside closures
   function decide(mode: 'cage' | 'pass', cageItems: typeof items): void {
     if (sent) return;
     sent = true;
-    root.getElementById('cage-panel')?.remove();
+    rootRef.getElementById('cage-panel')?.remove();
     sendGateDecision(gateId, mode, cageItems);
 
     if (mode === 'cage') {
@@ -395,10 +396,13 @@ const PROMPT_SELECTORS = [
   // ── Claude (Anthropic) ────────────────────────────────────────────────
   'div[contenteditable="true"][aria-multiline="true"]',
   'div.ProseMirror',
+  'div[contenteditable="true"].ProseMirror',         // Claude exact combo
+  '[data-placeholder][contenteditable="true"]',      // Claude data-placeholder attr
 
   // ── Gemini / Google AI Studio ─────────────────────────────────────────
   'rich-textarea .ql-editor',
   'div.ql-editor[contenteditable="true"]',
+  'div.ql-editor',                                   // Gemini views that drop CE attr
   'ms-text-chunk[contenteditable]',
   'div[contenteditable="true"].input-area',
 
@@ -421,20 +425,28 @@ const PROMPT_SELECTORS = [
 
   // ── DeepSeek ──────────────────────────────────────────────────────────
   'textarea#chat-input',
+  '#chat-input',                                           // future-proof: tag-agnostic
+  'textarea[placeholder*="Send a message"]',              // DeepSeek alt placeholder
 
   // ── Perplexity ────────────────────────────────────────────────────────
   'textarea[placeholder*="Ask"]',
   'textarea[placeholder*="ask"]',
   'textarea[placeholder*="Search"]',
+  'textarea[placeholder*="Follow"]',                      // Perplexity follow-up box
+  'div[contenteditable="true"][class*="ProseMirror"]',   // Perplexity new editor (2025)
 
   // ── Mistral / Le Chat ─────────────────────────────────────────────────
   'textarea[data-testid*="chat"]',
   'textarea[data-testid*="message"]',
   'div[data-testid*="message"][contenteditable]',
+  'textarea[placeholder*="Aa"]',                          // Mistral Le Chat "Aa" placeholder
+  'div[contenteditable="true"][data-testid="chat-input"]', // Mistral CE input
 
-  // ── Grok (X.com) ──────────────────────────────────────────────────────
+  // ── Grok (X.com + grok.com) ───────────────────────────────────────────
   'div[data-testid="tweetTextarea_0"][contenteditable]',
   'div[aria-label*="Grok"][contenteditable]',
+  'div[aria-label*="Ask"][contenteditable]',              // grok.com "Ask anything"
+  'div[aria-label="Ask Grok anything"][contenteditable]', // grok.com exact label
 
   // ── Generic fallbacks — ordered from most specific to most general ────
   'textarea[rows]',
@@ -492,10 +504,44 @@ function findPrompt(): HTMLElement | null {
 
 function readText(el: HTMLElement): string {
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
+  // ProseMirror / Quill: the editable root may contain a placeholder <p> that
+  // innerText picks up even when the user hasn't typed anything, producing false
+  // positives. Read from the first real paragraph child instead; fall back to
+  // the full innerText if no paragraph is found (plain contenteditable).
+  if (isProseMirrorEditor(el)) {
+    const para = el.querySelector<HTMLElement>('p, [data-contents]');
+    if (para) {
+      const t = (para.innerText ?? para.textContent ?? '').trim();
+      // If the paragraph only contains the placeholder text (empty editor),
+      // the placeholder is rendered as a BR or via CSS — treat empty-looking
+      // content as empty.
+      if (t === '\n' || t === '\u200B') return '';
+      return t;
+    }
+  }
   return (el.innerText ?? el.textContent ?? '').trim();
 }
 
+/**
+ * Detect whether a contenteditable element is managed by ProseMirror.
+ * ProseMirror (Claude), Quill (.ql-editor — Gemini/Mistral), and similar
+ * framework editors ignore execCommand and require a dispatched beforeinput
+ * event to update their internal document model.
+ *
+ * ChatGPT's #prompt-textarea is NOT ProseMirror — execCommand works fine there.
+ */
+function isProseMirrorEditor(el: HTMLElement): boolean {
+  return (
+    el.classList.contains('ProseMirror') ||
+    el.classList.contains('ql-editor') ||
+    el.hasAttribute('data-pm-slice') ||
+    !!el.closest('.ProseMirror') ||
+    !!el.closest('.ql-editor')
+  );
+}
+
 function writeText(el: HTMLElement, text: string): void {
+  // ── textarea / input — React-compatible native setter ─────────────────
   if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
     const proto = el instanceof HTMLTextAreaElement
       ? window.HTMLTextAreaElement.prototype
@@ -504,14 +550,67 @@ function writeText(el: HTMLElement, text: string): void {
     if (setter) setter.call(el, text); else el.value = text;
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
-  } else {
+    return;
+  }
+
+  // ── ProseMirror / Quill / framework contenteditable ───────────────────
+  // execCommand('insertText') is unreliable in ProseMirror-based editors
+  // (Claude, Gemini AI Studio, Mistral Le Chat). These editors listen for
+  // the 'beforeinput' event with inputType 'insertText' to update their
+  // internal model. We must:
+  //   1. Focus the element
+  //   2. Select all existing content via Selection API (not execCommand)
+  //   3. Dispatch a 'beforeinput' event with the new text as data
+  //   4. If the editor didn't handle it, fall back to direct innerText + input event
+  if (isProseMirrorEditor(el)) {
     el.focus();
-    document.execCommand('selectAll', false);
-    document.execCommand('insertText', false, text);
+
+    // Select all content via Selection API
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    // Dispatch beforeinput with insertReplacementText so ProseMirror/Quill
+    // replaces the selection with our caged text
+    const beforeInput = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text,
+    });
+    el.dispatchEvent(beforeInput);
+
+    // Verify the editor accepted it; if not, write directly and fire input
     if (readText(el) !== text) {
+      // Direct write — last resort for editors that don't handle beforeinput
       el.innerText = text;
+      // Move cursor to end
+      const sel2 = window.getSelection();
+      if (sel2 && el.lastChild) {
+        const range2 = document.createRange();
+        range2.selectNodeContents(el);
+        range2.collapse(false);
+        sel2.removeAllRanges();
+        sel2.addRange(range2);
+      }
       el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
     }
+    return;
+  }
+
+  // ── Plain contenteditable (ChatGPT #prompt-textarea, etc.) ────────────
+  // execCommand still works here and is the most compatible approach for
+  // React-controlled contenteditable divs that listen to execCommand mutations.
+  el.focus();
+  document.execCommand('selectAll', false);
+  document.execCommand('insertText', false, text);
+  if (readText(el) !== text) {
+    el.innerText = text;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
   }
 }
 

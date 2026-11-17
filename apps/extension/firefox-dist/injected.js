@@ -67,6 +67,8 @@
       // ── Anthropic / Claude ────────────────────────────────────────────────
       /api\.anthropic\.com/,
       /claude\.ai\/api/,
+      /claude\.ai\/api\/organizations/,
+      // real chat endpoint: /api/organizations/{id}/...
       /claude\.ai\/chat/,
       // ── Google ────────────────────────────────────────────────────────────
       /generativelanguage\.googleapis\.com/,
@@ -89,6 +91,8 @@
       // ── DeepSeek ──────────────────────────────────────────────────────────
       /chat\.deepseek\.com/,
       /api\.deepseek\.com/,
+      /deepseek\.com\/api\/v0/,
+      // frontend internal: /api/v0/chat/completions
       // ── Mistral ───────────────────────────────────────────────────────────
       /api\.mistral\.ai/,
       /chat\.mistral\.ai/,
@@ -99,10 +103,16 @@
       /api\.perplexity\.ai/,
       /perplexity\.ai\/api/,
       /www\.perplexity\.ai\/api/,
+      /perplexity\.ai\/rest/,
+      // real SSE endpoint: /rest/sse
       // ── Grok / xAI ───────────────────────────────────────────────────────
       /grok\.x\.ai/,
       /api\.x\.ai/,
       /grok\.com/,
+      /grok\.com\/rest/,
+      // grok.com/rest/app-chat endpoint
+      /x\.com\/i\/grok/,
+      // X.com embedded Grok at /i/grok
       // ── Cohere ────────────────────────────────────────────────────────────
       /api\.cohere\.ai/,
       /api\.cohere\.com/,
@@ -235,7 +245,7 @@
       if ((d == null ? void 0 : d.type) === "AI_CAGE_ENTITIES" && d.entities) {
         d.entities.forEach((e) => {
           const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-          if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+          if (match == null ? void 0 : match[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
         });
       }
     });
@@ -262,7 +272,7 @@
       if (typeof body === "string" && body.length > 2) {
         body = await processRequestBody(body);
       }
-      const newInit = body !== (init == null ? void 0 : init.body) ? { ...init, body } : init;
+      const newInit = body !== (init == null ? void 0 : init.body) ? { ...init, body: body ?? null } : init;
       const response = await _fetch(input, newInit);
       const ct = response.headers.get("content-type") ?? "";
       if (ct.includes("text/event-stream")) {
