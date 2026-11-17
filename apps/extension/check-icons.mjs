@@ -232,16 +232,31 @@ for (const size of ICON_SIZES) {
   anyFixed = true;
 }
 
-// Persist fixes back to src/icons/ so they survive the next build
-if (anyFixed) {
-  for (const size of ICON_SIZES) {
-    const distIcon = resolve(DIST_ICONS, `icon${size}.png`);
-    const srcIcon  = resolve(SRC_ICONS,  `icon${size}.png`);
-    if (existsSync(srcIcon)) {
-      writeFileSync(srcIcon, readFileSync(distIcon));
+// ALWAYS sync src/icons/ from dist/icons/ — not only when a fix was needed.
+// Reason: vite.config.ts copies src/icons/* → dist/icons/* on every build.
+// If src/ still contains a wrong-size icon (e.g. icon96.png 128×128) it will
+// overwrite the corrected dist/ icon on the NEXT pnpm build, causing the
+// blurry-icon bug to silently reappear.  Keeping src/ identical to dist/ after
+// every verification run permanently breaks this cycle.
+let srcSyncCount = 0;
+for (const size of ICON_SIZES) {
+  const distIcon = resolve(DIST_ICONS, `icon${size}.png`);
+  const srcIcon  = resolve(SRC_ICONS,  `icon${size}.png`);
+  if (existsSync(srcIcon)) {
+    const distBuf = readFileSync(distIcon);
+    const srcBuf  = readFileSync(srcIcon);
+    // Only write if different (avoid unnecessary disk writes + git noise)
+    if (!distBuf.equals(srcBuf)) {
+      writeFileSync(srcIcon, distBuf);
+      srcSyncCount++;
+      console.log(`[AI CAGE] ✅ src/icons/icon${size}.png synced from dist/ (was different)`);
     }
   }
-  console.log('[AI CAGE] ✅ Icon corrections saved to src/icons/ (will persist across builds)');
+}
+if (srcSyncCount === 0) {
+  console.log('[AI CAGE]    src/icons/ already in sync with dist/icons/ — no changes needed');
+} else {
+  console.log(`[AI CAGE] ✅ ${srcSyncCount} src/icons/ file(s) synced — will persist across builds`);
 }
 
 console.log(`[AI CAGE] ✅ All ${ICON_SIZES.length} icons verified — dimensions correct`);
