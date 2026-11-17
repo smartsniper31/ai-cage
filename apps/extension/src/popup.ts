@@ -164,17 +164,72 @@ function renderProgress(monthly: number): void {
 
 // ─── Overview tab ──────────────────────────────────────────────────────────────
 
+/**
+ * BUG-02 — Called immediately when renderOverview() starts.
+ * Shows "..." in every Overview stat-card and "Loading…" in the status pill
+ * so the user sees activity while the MV3 service-worker wakes up.
+ * Cards start empty in the HTML, so this only runs when the popup is already
+ * open and the data fetch is in-flight.
+ */
+function setOverviewLoading(): void {
+  setText('monthly-caged',  '...');
+  setText('monthly-shadow', '...');
+  setText('session-count',  '...');
+  setText('tab-count',      '...');
+
+  const statusEl = document.getElementById('status-text');
+  if (statusEl) {
+    statusEl.textContent   = 'Loading…';
+    statusEl.style.background  = '';
+    statusEl.style.color       = '';
+    statusEl.style.borderColor = '';
+  }
+}
+
 async function renderOverview(): Promise<void> {
+  // BUG-02 — immediately show "..." so the user sees activity, not blank cards
+  setOverviewLoading();
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const tabId = tab?.id ?? 0;
 
-  // Check license first — both calls run in parallel for speed
-  const [resp, licInfo] = await Promise.all([
-    chrome.runtime.sendMessage<{ type: string; tabId: number }, StatsResponse>(
-      { type: 'GET_STATS', tabId },
-    ),
-    checkLicense(chromeStorageAdapter, 0),
+  // BUG-02 — race the data fetch against a 3-second timeout.
+  // The MV3 SW can take up to ~1-2 s to wake; 3 s is a safe upper bound.
+  const TIMEOUT_MS = 3000;
+  const timeoutPromise = new Promise<null>(resolve =>
+    setTimeout(() => resolve(null), TIMEOUT_MS),
+  );
+
+  type FetchResult = [StatsResponse, Awaited<ReturnType<typeof checkLicense>>];
+
+  const raceResult = await Promise.race<FetchResult | null>([
+    Promise.all([
+      chrome.runtime.sendMessage<{ type: string; tabId: number }, StatsResponse>(
+        { type: 'GET_STATS', tabId },
+      ),
+      checkLicense(chromeStorageAdapter, 0),
+    ]) as Promise<FetchResult>,
+    timeoutPromise,
   ]);
+
+  // Timeout branch — restore "—" and show Reconnecting notice, then bail
+  if (raceResult === null) {
+    setText('monthly-caged',  '—');
+    setText('monthly-shadow', '—');
+    setText('session-count',  '—');
+    setText('tab-count',      '—');
+
+    const statusEl = document.getElementById('status-text');
+    if (statusEl) {
+      statusEl.textContent   = '⏳ Reconnecting…';
+      statusEl.style.background  = '#f8fafc';
+      statusEl.style.color       = '#64748b';
+      statusEl.style.borderColor = '#e2e8f0';
+    }
+    return;
+  }
+
+  const [resp, licInfo] = raceResult;
 
   const isPro = licInfo.tier === 'PRO' || licInfo.tier === 'ENTERPRISE';
 

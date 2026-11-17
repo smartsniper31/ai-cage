@@ -159,6 +159,8 @@ Step "6/11" "Generate Chrome zip — v$VERSION"
 New-Item -ItemType Directory -Force -Path $DIST | Out-Null
 if (Test-Path $CHROME_ZIP) { Remove-Item $CHROME_ZIP -Force }
 Compress-Archive -Path "$EXT_DIST\*" -DestinationPath $CHROME_ZIP -CompressionLevel Optimal
+if ($LASTEXITCODE -ne 0) { FAIL "Compress-Archive failed for Chrome zip" }
+if (!(Test-Path $CHROME_ZIP)) { FAIL "Chrome zip not found after compression" }
 $chromeKB = [math]::Round((Get-Item $CHROME_ZIP).Length / 1KB, 1)
 OK "ai-cage-extension-v$VERSION-chrome.zip — ${chromeKB}KB"
 
@@ -166,15 +168,20 @@ OK "ai-cage-extension-v$VERSION-chrome.zip — ${chromeKB}KB"
 Step "7/11" "Generate Firefox zip — v$VERSION"
 if (Test-Path $FF_ZIP) { Remove-Item $FF_ZIP -Force }
 Compress-Archive -Path "$FF_DIST\*" -DestinationPath $FF_ZIP -CompressionLevel Optimal
+if ($LASTEXITCODE -ne 0) { FAIL "Compress-Archive failed for Firefox zip" }
+if (!(Test-Path $FF_ZIP)) { FAIL "Firefox zip not found after compression" }
 $ffKB = [math]::Round((Get-Item $FF_ZIP).Length / 1KB, 1)
 OK "ai-cage-extension-v$VERSION-firefox.zip — ${ffKB}KB"
 
 # ── STEP 8: SHA256 checksums ─────────────────────────────────────────────────
 Step "8/11" "Regenerate SHA256 checksums"
+if (!(Test-Path $CHROME_ZIP)) { FAIL "Chrome zip missing — cannot compute checksum" }
+if (!(Test-Path $FF_ZIP))     { FAIL "Firefox zip missing — cannot compute checksum" }
 $h1 = (Get-FileHash -LiteralPath $CHROME_ZIP  -Algorithm SHA256).Hash.ToLower()
 $h2 = (Get-FileHash -LiteralPath $FF_ZIP      -Algorithm SHA256).Hash.ToLower()
 $checksumContent = "$h1  ai-cage-extension-v$VERSION-chrome.zip`r`n$h2  ai-cage-extension-v$VERSION-firefox.zip"
 [System.IO.File]::WriteAllText($CHECKSUM, $checksumContent)
+if (!(Test-Path $CHECKSUM)) { FAIL "checksum file not written" }
 OK "checksums-v$VERSION.txt written"
 Write-Host "    Chrome  SHA256: $h1" -ForegroundColor DarkGray
 Write-Host "    Firefox SHA256: $h2" -ForegroundColor DarkGray
@@ -270,6 +277,9 @@ foreach ($asset in @(
 }
 
 # Upload fresh assets
+foreach ($uploadFile in @($CHROME_ZIP, $FF_ZIP, $CHECKSUM, $TEST_FILE)) {
+    if (!(Test-Path $uploadFile)) { FAIL "Upload asset not found: $uploadFile" }
+}
 gh release upload v$VERSION $CHROME_ZIP $FF_ZIP $CHECKSUM $TEST_FILE
 if ($LASTEXITCODE -ne 0) { FAIL "gh release upload failed" }
 OK "4 assets uploaded to GitHub Release v$VERSION"
