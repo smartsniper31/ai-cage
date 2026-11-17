@@ -68,18 +68,11 @@
       /api\.anthropic\.com/,
       /claude\.ai\/api/,
       /claude\.ai\/chat/,
-      // Claude web app real endpoints (SPA — requests go to /api/organizations/*)
-      /claude\.ai\/api\/organizations/,
-      /claude\.ai\/api\/auth/,
       // ── Google ────────────────────────────────────────────────────────────
       /generativelanguage\.googleapis\.com/,
       /gemini\.google\.com/,
       /bard\.google\.com/,
       /aistudio\.google\.com/,
-      // Gemini web app real backend endpoints (2025)
-      /alkalimajordomo\.googleapis\.com/,
-      /gemini\.google\.com\/_\/BardChatUi/,
-      /notebooklm\.google\.com/,
       // ── Meta AI ───────────────────────────────────────────────────────────
       /meta\.ai/,
       /www\.meta\.ai/,
@@ -87,10 +80,6 @@
       /graph\.facebook\.com\/.*\/ai/,
       // Meta AI via Facebook Graph
       /\/api\/chat.*meta/,
-      // Meta AI real web endpoints (2025) — GraphQL on facebook.com
-      /www\.facebook\.com\/api\/graphql/,
-      /www\.facebook\.com\/ajax\/mercury/,
-      /facebook\.com\/api\/graphql/,
       // ── Microsoft Copilot / Bing ──────────────────────────────────────────
       /copilot\.microsoft\.com/,
       /bing\.com\/chat/,
@@ -100,33 +89,20 @@
       // ── DeepSeek ──────────────────────────────────────────────────────────
       /chat\.deepseek\.com/,
       /api\.deepseek\.com/,
-      // DeepSeek web app real endpoints (2025)
-      /chat\.deepseek\.com\/api\/v0\//,
-      /chat\.deepseek\.com\/api\/v1\//,
       // ── Mistral ───────────────────────────────────────────────────────────
       /api\.mistral\.ai/,
       /chat\.mistral\.ai/,
       /mistral\.ai\/api/,
-      // Mistral Le Chat real web endpoints (2025)
-      /chat\.mistral\.ai\/api\//,
-      /chat\.mistral\.ai\/conversation/,
       // ── Groq ──────────────────────────────────────────────────────────────
       /api\.groq\.com/,
       // ── Perplexity ────────────────────────────────────────────────────────
       /api\.perplexity\.ai/,
       /perplexity\.ai\/api/,
       /www\.perplexity\.ai\/api/,
-      // Perplexity web app real endpoints (2025) — SSE + REST
-      /www\.perplexity\.ai\/rest\//,
-      /perplexity\.ai\/rest\//,
-      /www\.perplexity\.ai\/socket\.io/,
       // ── Grok / xAI ───────────────────────────────────────────────────────
       /grok\.x\.ai/,
       /api\.x\.ai/,
       /grok\.com/,
-      // Grok web app real endpoints (2025) — confirmed from network inspection
-      /grok\.com\/rest\/app-chat\//,
-      /grok\.com\/api\//,
       // ── Cohere ────────────────────────────────────────────────────────────
       /api\.cohere\.ai/,
       /api\.cohere\.com/,
@@ -259,7 +235,7 @@
       if ((d == null ? void 0 : d.type) === "AI_CAGE_ENTITIES" && d.entities) {
         d.entities.forEach((e) => {
           const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-          if (match == null ? void 0 : match[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+          if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
         });
       }
     });
@@ -283,37 +259,10 @@
         window2.postMessage({ type: "AI_CAGE_FILE_UPLOAD_WARNING", url }, "*");
         return _fetch(input, init);
       }
-      if (body instanceof ReadableStream) {
-        try {
-          const reader = body.getReader();
-          const chunks = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value) chunks.push(value);
-          }
-          const dec = new TextDecoder();
-          const bodyStr = chunks.map((c) => dec.decode(c, { stream: true })).join("") + dec.decode();
-          if (bodyStr.length > 2) {
-            const processed = await processRequestBody(bodyStr);
-            body = processed;
-          }
-        } catch {
-        }
-      } else if (body instanceof Uint8Array || body instanceof ArrayBuffer) {
-        try {
-          const dec = new TextDecoder();
-          const bodyStr = dec.decode(body instanceof Uint8Array ? body : new Uint8Array(body));
-          if (bodyStr.length > 2) {
-            const processed = await processRequestBody(bodyStr);
-            body = processed;
-          }
-        } catch {
-        }
-      } else if (typeof body === "string" && body.length > 2) {
+      if (typeof body === "string" && body.length > 2) {
         body = await processRequestBody(body);
       }
-      const newInit = body !== (init == null ? void 0 : init.body) && body !== void 0 ? { ...init, body } : init;
+      const newInit = body !== (init == null ? void 0 : init.body) ? { ...init, body } : init;
       const response = await _fetch(input, newInit);
       const ct = response.headers.get("content-type") ?? "";
       if (ct.includes("text/event-stream")) {

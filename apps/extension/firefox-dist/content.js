@@ -449,12 +449,6 @@
   }
   void refreshLimitFlag();
   setInterval(() => void refreshLimitFlag(), 3e4);
-  chrome.runtime.onMessage.addListener((message) => {
-    const msg = message;
-    if ((msg == null ? void 0 : msg.type) === "UPGRADE_ACTIVATED") {
-      void refreshLimitFlag();
-    }
-  });
   let shadowRoot = null;
   function getShadowRoot() {
     if (shadowRoot) return shadowRoot;
@@ -731,25 +725,14 @@
     "div#prompt-textarea[contenteditable]",
     'div[contenteditable="true"][data-id]',
     'div.ProseMirror[contenteditable="true"]',
-    // ── Claude (Anthropic) — verified May 2026 ───────────────────────────
-    // ProseMirror is the most stable selector (ArcRift + MonkeyScript consensus)
-    'div[data-placeholder][contenteditable="true"]',
-    '[data-testid="composer-input"]',
-    '[aria-label="Message Claude"][contenteditable]',
+    // ── Claude (Anthropic) ────────────────────────────────────────────────
     'div[contenteditable="true"][aria-multiline="true"]',
     "div.ProseMirror",
-    // ── Gemini / Google AI Studio — verified May 2026 ────────────────────
-    // .ql-editor confirmed most stable (ArcRift + MonkeyScript)
-    '.ql-editor[contenteditable="true"]',
-    'rich-textarea [contenteditable="true"]',
+    // ── Gemini / Google AI Studio ─────────────────────────────────────────
     "rich-textarea .ql-editor",
-    '[aria-label*="message"][contenteditable]',
-    '[aria-label*="prompt"][contenteditable]',
-    'div[contenteditable="true"][aria-label*="Enter a prompt"]',
+    'div.ql-editor[contenteditable="true"]',
     "ms-text-chunk[contenteditable]",
     'div[contenteditable="true"].input-area',
-    // Google AI Mode (Search with AI)
-    'textarea[aria-label="Ask anything"]',
     // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
     'div[contenteditable="true"][role="textbox"]',
     'div[contenteditable="true"][aria-label]',
@@ -760,34 +743,24 @@
     'div[aria-label*="Prompt"][contenteditable]',
     "div[placeholder][contenteditable]",
     "div[data-placeholder][contenteditable]",
-    // ── Bing Copilot / Microsoft — verified May 2026 ─────────────────────
-    "textarea#userInput",
-    'textarea[data-testid="composer-input"]',
-    'textarea[placeholder*="Message"]',
+    // ── Bing Copilot / Microsoft ──────────────────────────────────────────
     "textarea#searchbox",
     "cib-text-input textarea",
     "div.user-message-input[contenteditable]",
     'textarea[name="userMessage"]',
-    // ── DeepSeek — verified May 2026 (#chat-input most stable) ───────────
+    // ── DeepSeek ──────────────────────────────────────────────────────────
     "textarea#chat-input",
-    'textarea[placeholder*="Send a message"]',
-    'textarea[data-testid="chat-input"]',
-    // ── Perplexity — verified 2025 ────────────────────────────────────────
+    // ── Perplexity ────────────────────────────────────────────────────────
     'textarea[placeholder*="Ask"]',
     'textarea[placeholder*="ask"]',
     'textarea[placeholder*="Search"]',
-    'textarea[placeholder*="Follow"]',
-    // ── Mistral / Le Chat — verified May 2026 (ProseMirror, NOT textarea) ─
-    // Mistral uses ProseMirror div[contenteditable] — textarea never matches
+    // ── Mistral / Le Chat ─────────────────────────────────────────────────
     'textarea[data-testid*="chat"]',
     'textarea[data-testid*="message"]',
     'div[data-testid*="message"][contenteditable]',
-    'div[contenteditable="true"][data-testid*="input"]',
-    // ── Grok (x.com + grok.com) — verified May 2026 ──────────────────────
-    "textarea[data-testid='grok-input']",
+    // ── Grok (X.com) ──────────────────────────────────────────────────────
     'div[data-testid="tweetTextarea_0"][contenteditable]',
     'div[aria-label*="Grok"][contenteditable]',
-    'textarea[placeholder*="Ask"]',
     // ── Generic fallbacks — ordered from most specific to most general ────
     "textarea[rows]",
     "textarea",
@@ -798,22 +771,12 @@
     'button[data-testid*="send"]',
     'button[data-testid*="submit"]',
     'button[data-testid*="Send"]',
-    // Claude + DeepSeek + Grok confirmed May 2026
-    'button[data-testid="send-button"]',
-    // ── ARIA labels — covers Claude, Gemini, Copilot, Mistral, Grok ──────
+    // ── ARIA labels ───────────────────────────────────────────────────────
     'button[aria-label*="Send"]',
     'button[aria-label*="send"]',
     'button[aria-label*="Submit"]',
     'button[aria-label*="Envoyer"]',
     'button[aria-label*="envoyer"]',
-    // Claude specific confirmed May 2026
-    'button[aria-label="Send Message"]',
-    'button[aria-label="Send message"]',
-    // Gemini confirmed May 2026
-    'button[aria-label*="Send message"]',
-    'button[mattooltip*="Send"]',
-    ".send-button",
-    "button.send-button",
     // ── Form submit ───────────────────────────────────────────────────────
     'button[type="submit"]',
     // ── Meta AI ───────────────────────────────────────────────────────────
@@ -823,13 +786,8 @@
     // ── Bing Copilot ──────────────────────────────────────────────────────
     "button#search-button",
     'cib-icon-button[aria-label*="Submit"]',
-    // Copilot confirmed May 2026
-    'button[aria-label*="Submit" i]',
     // ── Grok ──────────────────────────────────────────────────────────────
     'div[data-testid="tweetButtonInline"]',
-    // ── Perplexity ────────────────────────────────────────────────────────
-    'button[aria-label*="Ask"]',
-    'button[type="submit"][aria-label]',
     // ── Generic icon buttons that are send actions ────────────────────────
     'button[class*="send"]',
     'button[class*="Send"]',
@@ -837,29 +795,17 @@
     'button[class*="Submit"]'
   ];
   function findPrompt() {
-    const candidates = [];
     for (const sel of PROMPT_SELECTORS) {
       try {
-        document.querySelectorAll(sel).forEach((el) => {
+        const el = document.querySelector(sel);
+        if (el) {
           const r = el.getBoundingClientRect();
-          if (r.width < 50 || r.height < 20) return;
-          if (r.bottom < 0 || r.top > window.innerHeight) return;
-          let score = 0;
-          if (document.activeElement === el || el.contains(document.activeElement)) score += 3;
-          if (r.width > 200 && r.height > 40) score += 2;
-          if (r.top > window.innerHeight * 0.4) score += 1;
-          const label = (el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? el.getAttribute("data-placeholder") ?? "").toLowerCase();
-          if (/message|ask|prompt|chat|type here/i.test(label)) score += 1;
-          if (/search/i.test(label) && !/message/i.test(label)) score -= 5;
-          if (el.closest('nav, header, [role="toolbar"], [role="search"]')) score -= 3;
-          candidates.push({ el, score });
-        });
+          if (r.width > 50 && r.height > 20) return el;
+        }
       } catch {
       }
     }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].score >= -2 ? candidates[0].el : null;
+    return null;
   }
   function readText(el) {
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
@@ -878,28 +824,10 @@
       el.focus();
       document.execCommand("selectAll", false);
       document.execCommand("insertText", false, text);
-      if (readText(el) === text) return;
-      try {
-        el.focus();
-        const sel = window.getSelection();
-        if (sel) {
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-        const dt = new DataTransfer();
-        dt.setData("text/plain", text);
-        el.dispatchEvent(new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: dt
-        }));
-        if (readText(el) === text) return;
-      } catch {
+      if (readText(el) !== text) {
+        el.innerText = text;
+        el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
       }
-      el.innerText = text;
-      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
     }
   }
   function showLimitModal(monthly) {
@@ -1054,8 +982,7 @@
       })();
       return;
     }
-    const promptEl = findPrompt() ?? target;
-    void handlePrompt(promptEl);
+    void handlePrompt(target);
   }, true);
   function hookButtons() {
     SEND_SELECTORS.forEach((sel) => {
@@ -1130,8 +1057,7 @@
       hookDebounce = setTimeout(() => {
         hookButtons();
         hookDebounce = null;
-        setTimeout(() => hookButtons(), 1200);
-      }, 800);
+      }, 500);
     }
   });
   function boot() {

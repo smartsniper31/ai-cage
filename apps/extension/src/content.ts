@@ -65,16 +65,6 @@ async function refreshLimitFlag(): Promise<void> {
 void refreshLimitFlag();
 setInterval(() => void refreshLimitFlag(), 30_000);
 
-// Fix B: listen for immediate Pro activation signal from popup.ts
-// When the user activates a Pro licence, popup sends UPGRADE_ACTIVATED
-// to all content scripts so the 30s sync flag is refreshed instantly.
-chrome.runtime.onMessage.addListener((message: unknown) => {
-  const msg = message as { type?: string };
-  if (msg?.type === 'UPGRADE_ACTIVATED') {
-    void refreshLimitFlag();
-  }
-});
-
 // ─── Shadow DOM host (toast + decision panel only — NO bubble, NO mini-popup) ──
 let shadowRoot: ShadowRoot | null = null;
 
@@ -347,8 +337,7 @@ function showNetworkPanel(
   function decide(mode: 'cage' | 'pass', cageItems: typeof items): void {
     if (sent) return;
     sent = true;
-    // root is guaranteed non-null here: showGate() returns early if root is null (line 302)
-    root!.getElementById('cage-panel')?.remove();
+    root.getElementById('cage-panel')?.remove();
     sendGateDecision(gateId, mode, cageItems);
 
     if (mode === 'cage') {
@@ -403,26 +392,15 @@ const PROMPT_SELECTORS = [
   'div[contenteditable="true"][data-id]',
   'div.ProseMirror[contenteditable="true"]',
 
-  // ── Claude (Anthropic) — verified May 2026 ───────────────────────────
-  // ProseMirror is the most stable selector (ArcRift + MonkeyScript consensus)
-  'div[data-placeholder][contenteditable="true"]',
-  '[data-testid="composer-input"]',
-  '[aria-label="Message Claude"][contenteditable]',
+  // ── Claude (Anthropic) ────────────────────────────────────────────────
   'div[contenteditable="true"][aria-multiline="true"]',
   'div.ProseMirror',
 
-  // ── Gemini / Google AI Studio — verified May 2026 ────────────────────
-  // .ql-editor confirmed most stable (ArcRift + MonkeyScript)
-  '.ql-editor[contenteditable="true"]',
-  'rich-textarea [contenteditable="true"]',
+  // ── Gemini / Google AI Studio ─────────────────────────────────────────
   'rich-textarea .ql-editor',
-  '[aria-label*="message"][contenteditable]',
-  '[aria-label*="prompt"][contenteditable]',
-  'div[contenteditable="true"][aria-label*="Enter a prompt"]',
+  'div.ql-editor[contenteditable="true"]',
   'ms-text-chunk[contenteditable]',
   'div[contenteditable="true"].input-area',
-  // Google AI Mode (Search with AI)
-  'textarea[aria-label="Ask anything"]',
 
   // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
   'div[contenteditable="true"][role="textbox"]',
@@ -435,38 +413,28 @@ const PROMPT_SELECTORS = [
   'div[placeholder][contenteditable]',
   'div[data-placeholder][contenteditable]',
 
-  // ── Bing Copilot / Microsoft — verified May 2026 ─────────────────────
-  'textarea#userInput',
-  'textarea[data-testid="composer-input"]',
-  'textarea[placeholder*="Message"]',
+  // ── Bing Copilot / Microsoft ──────────────────────────────────────────
   'textarea#searchbox',
   'cib-text-input textarea',
   'div.user-message-input[contenteditable]',
   'textarea[name="userMessage"]',
 
-  // ── DeepSeek — verified May 2026 (#chat-input most stable) ───────────
+  // ── DeepSeek ──────────────────────────────────────────────────────────
   'textarea#chat-input',
-  'textarea[placeholder*="Send a message"]',
-  'textarea[data-testid="chat-input"]',
 
-  // ── Perplexity — verified 2025 ────────────────────────────────────────
+  // ── Perplexity ────────────────────────────────────────────────────────
   'textarea[placeholder*="Ask"]',
   'textarea[placeholder*="ask"]',
   'textarea[placeholder*="Search"]',
-  'textarea[placeholder*="Follow"]',
 
-  // ── Mistral / Le Chat — verified May 2026 (ProseMirror, NOT textarea) ─
-  // Mistral uses ProseMirror div[contenteditable] — textarea never matches
+  // ── Mistral / Le Chat ─────────────────────────────────────────────────
   'textarea[data-testid*="chat"]',
   'textarea[data-testid*="message"]',
   'div[data-testid*="message"][contenteditable]',
-  'div[contenteditable="true"][data-testid*="input"]',
 
-  // ── Grok (x.com + grok.com) — verified May 2026 ──────────────────────
-  "textarea[data-testid='grok-input']",
+  // ── Grok (X.com) ──────────────────────────────────────────────────────
   'div[data-testid="tweetTextarea_0"][contenteditable]',
   'div[aria-label*="Grok"][contenteditable]',
-  'textarea[placeholder*="Ask"]',
 
   // ── Generic fallbacks — ordered from most specific to most general ────
   'textarea[rows]',
@@ -479,23 +447,13 @@ const SEND_SELECTORS = [
   'button[data-testid*="send"]',
   'button[data-testid*="submit"]',
   'button[data-testid*="Send"]',
-  // Claude + DeepSeek + Grok confirmed May 2026
-  'button[data-testid="send-button"]',
 
-  // ── ARIA labels — covers Claude, Gemini, Copilot, Mistral, Grok ──────
+  // ── ARIA labels ───────────────────────────────────────────────────────
   'button[aria-label*="Send"]',
   'button[aria-label*="send"]',
   'button[aria-label*="Submit"]',
   'button[aria-label*="Envoyer"]',
   'button[aria-label*="envoyer"]',
-  // Claude specific confirmed May 2026
-  'button[aria-label="Send Message"]',
-  'button[aria-label="Send message"]',
-  // Gemini confirmed May 2026
-  'button[aria-label*="Send message"]',
-  'button[mattooltip*="Send"]',
-  '.send-button',
-  'button.send-button',
 
   // ── Form submit ───────────────────────────────────────────────────────
   'button[type="submit"]',
@@ -508,15 +466,9 @@ const SEND_SELECTORS = [
   // ── Bing Copilot ──────────────────────────────────────────────────────
   'button#search-button',
   'cib-icon-button[aria-label*="Submit"]',
-  // Copilot confirmed May 2026
-  'button[aria-label*="Submit" i]',
 
   // ── Grok ──────────────────────────────────────────────────────────────
   'div[data-testid="tweetButtonInline"]',
-
-  // ── Perplexity ────────────────────────────────────────────────────────
-  'button[aria-label*="Ask"]',
-  'button[type="submit"][aria-label]',
 
   // ── Generic icon buttons that are send actions ────────────────────────
   'button[class*="send"]',
@@ -526,63 +478,16 @@ const SEND_SELECTORS = [
 ];
 
 function findPrompt(): HTMLElement | null {
-  // Fix 3: on SPA sites (Gemini, Perplexity) there can be multiple
-  // contenteditable divs in the page — menus, inline editors, search boxes.
-  // The old code returned the first visible match regardless of which one is
-  // the real prompt. This version scores every candidate and returns the best.
-  //
-  // Scoring rules (higher = more likely to be the real prompt):
-  //   +3  element has explicit focus right now
-  //   +2  large area (width > 200 && height > 40) — typical textarea
-  //   +1  positioned in bottom half of viewport — where prompts live
-  //   +1  aria-label or placeholder contains "message", "ask", "prompt"
-  //   −5  aria-label contains "search" without "message" (search box, not prompt)
-  //   −3  element is inside a nav, header, or toolbar
-
-  interface Candidate { el: HTMLElement; score: number; }
-  const candidates: Candidate[] = [];
-
   for (const sel of PROMPT_SELECTORS) {
     try {
-      document.querySelectorAll<HTMLElement>(sel).forEach(el => {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) {
         const r = el.getBoundingClientRect();
-        // Must be minimally visible
-        if (r.width < 50 || r.height < 20) return;
-        if (r.bottom < 0 || r.top > window.innerHeight) return;
-
-        let score = 0;
-
-        // Focused element is almost certainly the prompt
-        if (document.activeElement === el || el.contains(document.activeElement)) score += 3;
-
-        // Large area → real input
-        if (r.width > 200 && r.height > 40) score += 2;
-
-        // Bottom-half position → prompt input (not a header search)
-        if (r.top > window.innerHeight * 0.4) score += 1;
-
-        // Semantic hints
-        const label = (
-          el.getAttribute('aria-label') ??
-          el.getAttribute('placeholder') ??
-          el.getAttribute('data-placeholder') ?? ''
-        ).toLowerCase();
-        if (/message|ask|prompt|chat|type here/i.test(label)) score += 1;
-        if (/search/i.test(label) && !/message/i.test(label))  score -= 5;
-
-        // Penalise elements inside nav/header/toolbar
-        if (el.closest('nav, header, [role="toolbar"], [role="search"]')) score -= 3;
-
-        candidates.push({ el, score });
-      });
-    } catch { /* skip bad selector */ }
+        if (r.width > 50 && r.height > 20) return el;
+      }
+    } catch { /* skip */ }
   }
-
-  if (candidates.length === 0) return null;
-
-  // Return the highest-scoring candidate (stable sort: first occurrence wins ties)
-  candidates.sort((a, b) => b.score - a.score);
-  return candidates[0]!.score >= -2 ? candidates[0]!.el : null;
+  return null;
 }
 
 function readText(el: HTMLElement): string {
@@ -600,46 +505,13 @@ function writeText(el: HTMLElement, text: string): void {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
-    // Fix D: ProseMirror contenteditable (Claude, Gemini, Mistral).
-    // document.execCommand('insertText') is deprecated and silently fails on
-    // Chrome 118+ inside ProseMirror. Strategy:
-    //   1. Try execCommand first (still works on some older sites)
-    //   2. If the content didn't change → fall back to DataTransfer + paste event
-    //      which ProseMirror's input handler intercepts correctly.
-    //   3. Last resort: direct innerText + InputEvent.
     el.focus();
-
-    // Attempt 1: execCommand (works on ChatGPT textarea-based editors)
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, text);
-
-    if (readText(el) === text) return; // success — stop here
-
-    // Attempt 2: DataTransfer / paste event (ProseMirror-aware)
-    // ProseMirror listens to 'paste' and reads clipboardData.getData('text/plain')
-    try {
-      el.focus();
-      // Select all existing content
-      const sel = window.getSelection();
-      if (sel) {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      const dt = new DataTransfer();
-      dt.setData('text/plain', text);
-      el.dispatchEvent(new ClipboardEvent('paste', {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      }));
-      if (readText(el) === text) return; // success
-    } catch { /* DataTransfer not available in this context */ }
-
-    // Attempt 3: direct innerText + InputEvent (last resort)
-    el.innerText = text;
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
+    if (readText(el) !== text) {
+      el.innerText = text;
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
+    }
   }
 }
 
@@ -824,10 +696,14 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (!isPrompt) return;
 
   // P1 FIX: Check the synchronous flag BEFORE any await.
+  // If the limit is reached, preventDefault() blocks the form submission
+  // in 0ms — before the browser can send the request.
+  // Then show the modal async (UI only, no security implication).
   if (limitReachedSync) {
     e.preventDefault();
     e.stopImmediatePropagation();
     void (async () => {
+      // Refresh the flag to get the exact monthly count for the modal
       await refreshLimitFlag();
       const resp = await chrome.runtime.sendMessage<
         { type: string },
@@ -838,12 +714,8 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     return;
   }
 
-  // Fix E: use findPrompt() to get the real top-level prompt container.
-  // On ProseMirror sites (Claude, Gemini, Mistral) the keydown target is an
-  // inner node (<p>, <span>) — readText() on it returns only a fragment.
-  // findPrompt() walks PROMPT_SELECTORS and returns the outermost editor div.
-  const promptEl = findPrompt() ?? target;
-  void handlePrompt(promptEl);
+  // Limit not reached — proceed with async caging
+  void handlePrompt(target);
 }, true);
 
 function hookButtons(): void {
@@ -935,18 +807,12 @@ window.addEventListener('message', (event) => {
 let hookDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const domObserver = new MutationObserver(() => {
-  // Fix 4: two-pass hook strategy for slow SPA frameworks (Claude, Gemini).
-  // Pass 1 at 800ms catches elements that load quickly after navigation.
-  // Pass 2 at 2000ms catches elements that load in a second render wave
-  // (Angular lazy components, React Suspense boundaries, etc.).
-  // The CAGED_ATTR guard on hookButtons() ensures no double-binding.
+  // Throttle hookButtons — max 1x per 500ms to avoid CPU spikes on streaming
   if (!hookDebounce) {
     hookDebounce = setTimeout(() => {
       hookButtons();
       hookDebounce = null;
-      // Second pass for slow SPA frameworks
-      setTimeout(() => hookButtons(), 1200);
-    }, 800);
+    }, 500);
   }
 });
 
