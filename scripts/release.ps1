@@ -139,6 +139,26 @@ if ($LASTEXITCODE -ne 0) { FAIL "build-firefox.mjs failed" }
 OK "firefox-dist/ regenerated"
 Set-Location $ROOT
 
+# ── STEP 3.1: Verify firefox-dist/icons/ dimensions ─────────────────────────
+# Guard: confirm that build-firefox.mjs (which copies dist/ → firefox-dist/)
+# received the corrected icons from step 2.5. Specifically checks icon96.png
+# which is the Firefox toolbar icon — wrong size causes blurry rendering.
+Write-Host "    🔍 Verifying firefox-dist/icons/ dimensions..." -ForegroundColor DarkGray
+$ffIconSizes = @(16, 32, 48, 96, 128)
+foreach ($size in $ffIconSizes) {
+    $ffIconPath = Join-Path $FF_DIST "icons\icon${size}.png"
+    if (!(Test-Path $ffIconPath)) {
+        FAIL "firefox-dist/icons/icon${size}.png missing after build-firefox.mjs"
+    }
+    $b = [System.IO.File]::ReadAllBytes($ffIconPath)
+    $w = ([int]$b[16] -shl 24) -bor ([int]$b[17] -shl 16) -bor ([int]$b[18] -shl 8) -bor [int]$b[19]
+    $h = ([int]$b[20] -shl 24) -bor ([int]$b[21] -shl 16) -bor ([int]$b[22] -shl 8) -bor [int]$b[23]
+    if ($w -ne $size -or $h -ne $size) {
+        FAIL "firefox-dist/icons/icon${size}.png is ${w}x${h} — expected ${size}x${size}. Re-run check-icons.mjs and rebuild."
+    }
+}
+OK "firefox-dist/icons/ verified — all $($ffIconSizes.Count) icons correct dimensions"
+
 # ── STEP 4: Build landing ─────────────────────────────────────────────────────
 Step "4/11" "Build landing (dist/index.html + install.html)"
 Set-Location $LANDING
