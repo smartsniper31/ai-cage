@@ -123,6 +123,7 @@
     // ── Anthropic / Claude ────────────────────────────────────────────────
     /api\.anthropic\.com/,
     /claude\.ai\/api/,
+    /claude\.ai\/api\/organizations/,   // real chat endpoint: /api/organizations/{id}/...
     /claude\.ai\/chat/,
 
     // ── Google ────────────────────────────────────────────────────────────
@@ -148,6 +149,7 @@
     // ── DeepSeek ──────────────────────────────────────────────────────────
     /chat\.deepseek\.com/,
     /api\.deepseek\.com/,
+    /deepseek\.com\/api\/v0/,           // frontend internal: /api/v0/chat/completions
 
     // ── Mistral ───────────────────────────────────────────────────────────
     /api\.mistral\.ai/,
@@ -161,11 +163,14 @@
     /api\.perplexity\.ai/,
     /perplexity\.ai\/api/,
     /www\.perplexity\.ai\/api/,
+    /perplexity\.ai\/rest/,             // real SSE endpoint: /rest/sse
 
     // ── Grok / xAI ───────────────────────────────────────────────────────
     /grok\.x\.ai/,
     /api\.x\.ai/,
     /grok\.com/,
+    /grok\.com\/rest/,                  // grok.com/rest/app-chat endpoint
+    /x\.com\/i\/grok/,                  // X.com embedded Grok at /i/grok
 
     // ── Cohere ────────────────────────────────────────────────────────────
     /api\.cohere\.ai/,
@@ -348,7 +353,7 @@
       // Map to label-based store for restoring
       d.entities.forEach(e => {
         const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-        if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+        if (match?.[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
       });
     }
   });
@@ -392,7 +397,9 @@
       body = await processRequestBody(body);
     }
 
-    const newInit = body !== init?.body ? { ...init, body } : init;
+    const newInit: RequestInit | undefined = body !== init?.body
+      ? { ...init, body: body ?? null }
+      : init;
     const response = await _fetch(input, newInit);
 
     const ct = response.headers.get('content-type') ?? '';
@@ -421,7 +428,7 @@
     const xhr = new _XHR();
     let _url = '';
     const _open = xhr.open.bind(xhr);
-    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a = true, us?: string | null, pw?: string | null) {
+    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a: boolean = true, us?: string | null, pw?: string | null) {
       _url = String(u); return _open(m, u, a, us, pw);
     };
     const _send = xhr.send.bind(xhr);

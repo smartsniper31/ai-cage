@@ -676,11 +676,12 @@
     <div class="cw">⚠️ "Send Without Protection" sends your real data to the AI.</div>`;
     root.appendChild(panel);
     let sent = false;
+    const rootRef = root;
     function decide(mode, cageItems) {
       var _a2;
       if (sent) return;
       sent = true;
-      (_a2 = root.getElementById("cage-panel")) == null ? void 0 : _a2.remove();
+      (_a2 = rootRef.getElementById("cage-panel")) == null ? void 0 : _a2.remove();
       sendGateDecision(gateId, mode, cageItems);
       if (mode === "cage") {
         sessionTotal += cageItems.length;
@@ -728,9 +729,15 @@
     // ── Claude (Anthropic) ────────────────────────────────────────────────
     'div[contenteditable="true"][aria-multiline="true"]',
     "div.ProseMirror",
+    'div[contenteditable="true"].ProseMirror',
+    // Claude exact combo
+    '[data-placeholder][contenteditable="true"]',
+    // Claude data-placeholder attr
     // ── Gemini / Google AI Studio ─────────────────────────────────────────
     "rich-textarea .ql-editor",
     'div.ql-editor[contenteditable="true"]',
+    "div.ql-editor",
+    // Gemini views that drop CE attr
     "ms-text-chunk[contenteditable]",
     'div[contenteditable="true"].input-area',
     // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
@@ -750,17 +757,33 @@
     'textarea[name="userMessage"]',
     // ── DeepSeek ──────────────────────────────────────────────────────────
     "textarea#chat-input",
+    "#chat-input",
+    // future-proof: tag-agnostic
+    'textarea[placeholder*="Send a message"]',
+    // DeepSeek alt placeholder
     // ── Perplexity ────────────────────────────────────────────────────────
     'textarea[placeholder*="Ask"]',
     'textarea[placeholder*="ask"]',
     'textarea[placeholder*="Search"]',
+    'textarea[placeholder*="Follow"]',
+    // Perplexity follow-up box
+    'div[contenteditable="true"][class*="ProseMirror"]',
+    // Perplexity new editor (2025)
     // ── Mistral / Le Chat ─────────────────────────────────────────────────
     'textarea[data-testid*="chat"]',
     'textarea[data-testid*="message"]',
     'div[data-testid*="message"][contenteditable]',
-    // ── Grok (X.com) ──────────────────────────────────────────────────────
+    'textarea[placeholder*="Aa"]',
+    // Mistral Le Chat "Aa" placeholder
+    'div[contenteditable="true"][data-testid="chat-input"]',
+    // Mistral CE input
+    // ── Grok (X.com + grok.com) ───────────────────────────────────────────
     'div[data-testid="tweetTextarea_0"][contenteditable]',
     'div[aria-label*="Grok"][contenteditable]',
+    'div[aria-label*="Ask"][contenteditable]',
+    // grok.com "Ask anything"
+    'div[aria-label="Ask Grok anything"][contenteditable]',
+    // grok.com exact label
     // ── Generic fallbacks — ordered from most specific to most general ────
     "textarea[rows]",
     "textarea",
@@ -809,7 +832,18 @@
   }
   function readText(el) {
     if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return el.value;
+    if (isProseMirrorEditor(el)) {
+      const para = el.querySelector("p, [data-contents]");
+      if (para) {
+        const t = (para.innerText ?? para.textContent ?? "").trim();
+        if (t === "\n" || t === "​") return "";
+        return t;
+      }
+    }
     return (el.innerText ?? el.textContent ?? "").trim();
+  }
+  function isProseMirrorEditor(el) {
+    return el.classList.contains("ProseMirror") || el.classList.contains("ql-editor") || el.hasAttribute("data-pm-slice") || !!el.closest(".ProseMirror") || !!el.closest(".ql-editor");
   }
   function writeText(el, text) {
     var _a;
@@ -820,14 +854,44 @@
       else el.value = text;
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
-    } else {
+      return;
+    }
+    if (isProseMirrorEditor(el)) {
       el.focus();
-      document.execCommand("selectAll", false);
-      document.execCommand("insertText", false, text);
+      const sel = window.getSelection();
+      if (sel) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const beforeInput = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertText",
+        data: text
+      });
+      el.dispatchEvent(beforeInput);
       if (readText(el) !== text) {
         el.innerText = text;
+        const sel2 = window.getSelection();
+        if (sel2 && el.lastChild) {
+          const range2 = document.createRange();
+          range2.selectNodeContents(el);
+          range2.collapse(false);
+          sel2.removeAllRanges();
+          sel2.addRange(range2);
+        }
         el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
       }
+      return;
+    }
+    el.focus();
+    document.execCommand("selectAll", false);
+    document.execCommand("insertText", false, text);
+    if (readText(el) !== text) {
+      el.innerText = text;
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
     }
   }
   function showLimitModal(monthly) {

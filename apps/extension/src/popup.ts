@@ -338,6 +338,7 @@ const SHADOW_SITE_FRIENDLY: Record<string, string> = {
   'api.together.xyz':                    'Together AI',
   'api.replicate.com':                   'Replicate',
   'openrouter.ai':                       'OpenRouter',
+  'api.deepseek.com':                    'DeepSeek API',
 };
 
 /** Returns the friendly product name for a hostname, or the hostname itself. */

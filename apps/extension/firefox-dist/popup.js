@@ -385,7 +385,8 @@
     "huggingface.co": "Hugging Face",
     "api.together.xyz": "Together AI",
     "api.replicate.com": "Replicate",
-    "openrouter.ai": "OpenRouter"
+    "openrouter.ai": "OpenRouter",
+    "api.deepseek.com": "DeepSeek API"
   };
   function friendlyShadowSite(hostname) {
     return SHADOW_SITE_FRIENDLY[hostname] ?? hostname;
