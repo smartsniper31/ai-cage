@@ -177,6 +177,8 @@ const META_AI: AiEndpoint = {
     /api\.llama-api\.com/,
     /llama\.developer\.facebook\.com/,
     /graph\.meta\.com\/ai/,
+    /www\.facebook\.com\/api\/graphql/,
+    /api\.instagram\.com\/v\d+\/ai/,
   ],
 };
 
@@ -190,6 +192,9 @@ const XAI_GROK: AiEndpoint = {
     /api\.x\.ai/,
     /grok\.x\.ai/,
     /x\.ai\/api/,
+    /grok\.com\/rest\//,
+    /grok\.com\/api\//,
+    /grok\.com\/_next\/data\//,
   ],
 };
 
