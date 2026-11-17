@@ -126,7 +126,9 @@
       /llama\.meta\.com/,
       /api\.llama-api\.com/,
       /llama\.developer\.facebook\.com/,
-      /graph\.meta\.com\/ai/
+      /graph\.meta\.com\/ai/,
+      /www\.facebook\.com\/api\/graphql/,
+      /api\.instagram\.com\/v\d+\/ai/
     ]
   };
   const XAI_GROK = {
@@ -138,7 +140,10 @@
       /api\.x\.ai\/v\d+\/(chat\/completions|completions)/,
       /api\.x\.ai/,
       /grok\.x\.ai/,
-      /x\.ai\/api/
+      /x\.ai\/api/,
+      /grok\.com\/rest\//,
+      /grok\.com\/api\//,
+      /grok\.com\/_next\/data\//
     ]
   };
   const DEEPSEEK = {
