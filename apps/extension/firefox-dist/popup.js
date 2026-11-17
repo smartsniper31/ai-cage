@@ -249,16 +249,52 @@
     const wm = document.getElementById("watermark");
     if (wm) wm.style.display = monthly >= FREE_LIMIT ? "block" : "none";
   }
+  function setOverviewLoading() {
+    setText("monthly-caged", "...");
+    setText("monthly-shadow", "...");
+    setText("session-count", "...");
+    setText("tab-count", "...");
+    const statusEl = document.getElementById("status-text");
+    if (statusEl) {
+      statusEl.textContent = "Loading…";
+      statusEl.style.background = "";
+      statusEl.style.color = "";
+      statusEl.style.borderColor = "";
+    }
+  }
   async function renderOverview() {
     var _a, _b, _c;
+    setOverviewLoading();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const tabId = (tab == null ? void 0 : tab.id) ?? 0;
-    const [resp, licInfo] = await Promise.all([
-      chrome.runtime.sendMessage(
-        { type: "GET_STATS", tabId }
-      ),
-      checkLicense(chromeStorageAdapter, 0)
+    const TIMEOUT_MS = 3e3;
+    const timeoutPromise = new Promise(
+      (resolve) => setTimeout(() => resolve(null), TIMEOUT_MS)
+    );
+    const raceResult = await Promise.race([
+      Promise.all([
+        chrome.runtime.sendMessage(
+          { type: "GET_STATS", tabId }
+        ),
+        checkLicense(chromeStorageAdapter, 0)
+      ]),
+      timeoutPromise
     ]);
+    if (raceResult === null) {
+      setText("monthly-caged", "—");
+      setText("monthly-shadow", "—");
+      setText("session-count", "—");
+      setText("tab-count", "—");
+      const statusEl2 = document.getElementById("status-text");
+      if (statusEl2) {
+        statusEl2.textContent = "⏳ Reconnecting…";
+        statusEl2.style.background = "#f8fafc";
+        statusEl2.style.color = "#64748b";
+        statusEl2.style.borderColor = "#e2e8f0";
+      }
+      return;
+    }
+    const [resp, licInfo] = raceResult;
     const isPro = licInfo.tier === "PRO" || licInfo.tier === "ENTERPRISE";
     const monthly = isPro ? (resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0 : Math.min((resp == null ? void 0 : resp.monthlyPiiCaged) ?? 0, FREE_LIMIT);
     const session = (resp == null ? void 0 : resp.sessionCageCount) ?? 0;

@@ -781,9 +781,11 @@
     'div[data-testid="tweetTextarea_0"][contenteditable]',
     'div[aria-label*="Grok"][contenteditable]',
     'div[aria-label*="Ask"][contenteditable]',
-    // grok.com "Ask anything"
+    // grok.com "Ask anything" (fuzzy)
     'div[aria-label="Ask Grok anything"][contenteditable]',
     // grok.com exact label
+    'textarea[placeholder*="Ask anything"]',
+    // BUG-03: fallback if aria-label changes
     // ── Generic fallbacks — ordered from most specific to most general ────
     "textarea[rows]",
     "textarea",
@@ -872,18 +874,8 @@
         data: text
       });
       el.dispatchEvent(beforeInput);
-      if (readText(el) !== text) {
-        el.innerText = text;
-        const sel2 = window.getSelection();
-        if (sel2 && el.lastChild) {
-          const range2 = document.createRange();
-          range2.selectNodeContents(el);
-          range2.collapse(false);
-          sel2.removeAllRanges();
-          sel2.addRange(range2);
-        }
-        el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
-      }
+      document.execCommand("selectAll", false);
+      document.execCommand("insertText", false, text);
       return;
     }
     el.focus();

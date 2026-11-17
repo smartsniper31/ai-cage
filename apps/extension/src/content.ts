@@ -445,8 +445,9 @@ const PROMPT_SELECTORS = [
   // ── Grok (X.com + grok.com) ───────────────────────────────────────────
   'div[data-testid="tweetTextarea_0"][contenteditable]',
   'div[aria-label*="Grok"][contenteditable]',
-  'div[aria-label*="Ask"][contenteditable]',              // grok.com "Ask anything"
+  'div[aria-label*="Ask"][contenteditable]',              // grok.com "Ask anything" (fuzzy)
   'div[aria-label="Ask Grok anything"][contenteditable]', // grok.com exact label
+  'textarea[placeholder*="Ask anything"]',                // BUG-03: fallback if aria-label changes
 
   // ── Generic fallbacks — ordered from most specific to most general ────
   'textarea[rows]',
@@ -554,18 +555,24 @@ function writeText(el: HTMLElement, text: string): void {
   }
 
   // ── ProseMirror / Quill / framework contenteditable ───────────────────
-  // execCommand('insertText') is unreliable in ProseMirror-based editors
-  // (Claude, Gemini AI Studio, Mistral Le Chat). These editors listen for
-  // the 'beforeinput' event with inputType 'insertText' to update their
-  // internal model. We must:
-  //   1. Focus the element
-  //   2. Select all existing content via Selection API (not execCommand)
-  //   3. Dispatch a 'beforeinput' event with the new text as data
-  //   4. If the editor didn't handle it, fall back to direct innerText + input event
+  // execCommand('insertText') is unreliable as the PRIMARY approach in
+  // ProseMirror-based editors (Claude, Gemini AI Studio, Mistral Le Chat).
+  // However, ProseMirror ALSO intercepts execCommand — so it is the correct
+  // FALLBACK when beforeinput alone is insufficient.
+  //
+  // Strategy:
+  //   1. Focus + select all via Selection API
+  //   2. Dispatch beforeinput (ProseMirror's preferred path)
+  //   3. Always follow with execCommand as belt-and-suspenders
+  //      (ProseMirror handles both; execCommand does not break its state)
+  //
+  // NEVER use el.innerText = text as a fallback on ProseMirror — it
+  // bypasses the framework's internal document model and corrupts editor state.
+  // execCommand is the safe fallback because ProseMirror intercepts it too.
   if (isProseMirrorEditor(el)) {
     el.focus();
 
-    // Select all content via Selection API
+    // Select all existing content via Selection API
     const sel = window.getSelection();
     if (sel) {
       const range = document.createRange();
@@ -574,8 +581,7 @@ function writeText(el: HTMLElement, text: string): void {
       sel.addRange(range);
     }
 
-    // Dispatch beforeinput with insertReplacementText so ProseMirror/Quill
-    // replaces the selection with our caged text
+    // Primary path: beforeinput event — ProseMirror / Quill listen to this
     const beforeInput = new InputEvent('beforeinput', {
       bubbles: true,
       cancelable: true,
@@ -584,21 +590,13 @@ function writeText(el: HTMLElement, text: string): void {
     });
     el.dispatchEvent(beforeInput);
 
-    // Verify the editor accepted it; if not, write directly and fire input
-    if (readText(el) !== text) {
-      // Direct write — last resort for editors that don't handle beforeinput
-      el.innerText = text;
-      // Move cursor to end
-      const sel2 = window.getSelection();
-      if (sel2 && el.lastChild) {
-        const range2 = document.createRange();
-        range2.selectNodeContents(el);
-        range2.collapse(false);
-        sel2.removeAllRanges();
-        sel2.addRange(range2);
-      }
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
-    }
+    // Safe fallback: execCommand — ProseMirror intercepts this too.
+    // Do NOT check readText(el) synchronously here: ProseMirror may process
+    // the beforeinput asynchronously, so the check would read stale content
+    // and trigger the fallback unnecessarily. execCommand is always safe to
+    // call on ProseMirror and is a no-op if the editor already handled the event.
+    document.execCommand('selectAll', false);
+    document.execCommand('insertText', false, text);
     return;
   }
 
