@@ -114,6 +114,44 @@
       /api\.replicate\.com\/v\d+\/predictions/
     ]
   };
+  const META_AI = {
+    id: "meta-ai",
+    name: "Meta AI (Llama)",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /www\.meta\.ai/,
+      /meta\.ai\/api/,
+      /llama-api\.meta\.com/,
+      /llama\.meta\.com/,
+      /api\.llama-api\.com/,
+      /llama\.developer\.facebook\.com/,
+      /graph\.meta\.com\/ai/
+    ]
+  };
+  const XAI_GROK = {
+    id: "xai-grok",
+    name: "Grok (xAI)",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.x\.ai\/v\d+\/(chat\/completions|completions)/,
+      /api\.x\.ai/,
+      /grok\.x\.ai/,
+      /x\.ai\/api/
+    ]
+  };
+  const DEEPSEEK = {
+    id: "deepseek",
+    name: "DeepSeek",
+    category: "llm-api",
+    riskLevel: "critical",
+    patterns: [
+      /api\.deepseek\.com\/v\d+\/(chat\/completions|completions)/,
+      /api\.deepseek\.com/,
+      /chat\.deepseek\.com\/api/
+    ]
+  };
   const GITHUB_COPILOT = {
     id: "github-copilot",
     name: "GitHub Copilot",
@@ -509,6 +547,9 @@
     PERPLEXITY,
     TOGETHER_AI,
     REPLICATE,
+    META_AI,
+    XAI_GROK,
+    DEEPSEEK,
     // Developer tools
     GITHUB_COPILOT,
     CURSOR,
