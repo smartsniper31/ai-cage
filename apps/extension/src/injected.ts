@@ -97,6 +97,18 @@
     return result;
   }
 
+  function restoreBody(text: string, items: Array<{ value: string; label: string }>): string {
+    let result = text;
+    let counter = 1;
+    for (const item of [...items].sort((a, b) => b.value.length - a.value.length)) {
+      const placeholder = `[CAGED_${item.label}_${counter}]`;
+      const escaped = placeholder.replace(/[[\]_]/g, '\\$&');
+      result = result.replace(new RegExp(escaped.replace(/\\/g, '\\\\'), 'g'), item.value);
+      counter++;
+    }
+    return result;
+  }
+
   // ── AI endpoint detection ────────────────────────────────────────────────
   // IMPORTANT: This list must cover ALL AI chat platforms, not just the obvious ones.
   // When isAI(url) returns false, the request bypasses the cage entirely.
@@ -112,19 +124,12 @@
     /api\.anthropic\.com/,
     /claude\.ai\/api/,
     /claude\.ai\/chat/,
-    // Claude web app real endpoints (SPA — requests go to /api/organizations/*)
-    /claude\.ai\/api\/organizations/,
-    /claude\.ai\/api\/auth/,
 
     // ── Google ────────────────────────────────────────────────────────────
     /generativelanguage\.googleapis\.com/,
     /gemini\.google\.com/,
     /bard\.google\.com/,
     /aistudio\.google\.com/,
-    // Gemini web app real backend endpoints (2025)
-    /alkalimajordomo\.googleapis\.com/,
-    /gemini\.google\.com\/_\/BardChatUi/,
-    /notebooklm\.google\.com/,
 
     // ── Meta AI ───────────────────────────────────────────────────────────
     /meta\.ai/,
@@ -132,10 +137,6 @@
     /ai\.meta\.com/,
     /graph\.facebook\.com\/.*\/ai/,   // Meta AI via Facebook Graph
     /\/api\/chat.*meta/,
-    // Meta AI real web endpoints (2025) — GraphQL on facebook.com
-    /www\.facebook\.com\/api\/graphql/,
-    /www\.facebook\.com\/ajax\/mercury/,
-    /facebook\.com\/api\/graphql/,
 
     // ── Microsoft Copilot / Bing ──────────────────────────────────────────
     /copilot\.microsoft\.com/,
@@ -147,17 +148,11 @@
     // ── DeepSeek ──────────────────────────────────────────────────────────
     /chat\.deepseek\.com/,
     /api\.deepseek\.com/,
-    // DeepSeek web app real endpoints (2025)
-    /chat\.deepseek\.com\/api\/v0\//,
-    /chat\.deepseek\.com\/api\/v1\//,
 
     // ── Mistral ───────────────────────────────────────────────────────────
     /api\.mistral\.ai/,
     /chat\.mistral\.ai/,
     /mistral\.ai\/api/,
-    // Mistral Le Chat real web endpoints (2025)
-    /chat\.mistral\.ai\/api\//,
-    /chat\.mistral\.ai\/conversation/,
 
     // ── Groq ──────────────────────────────────────────────────────────────
     /api\.groq\.com/,
@@ -166,18 +161,11 @@
     /api\.perplexity\.ai/,
     /perplexity\.ai\/api/,
     /www\.perplexity\.ai\/api/,
-    // Perplexity web app real endpoints (2025) — SSE + REST
-    /www\.perplexity\.ai\/rest\//,
-    /perplexity\.ai\/rest\//,
-    /www\.perplexity\.ai\/socket\.io/,
 
     // ── Grok / xAI ───────────────────────────────────────────────────────
     /grok\.x\.ai/,
     /api\.x\.ai/,
     /grok\.com/,
-    // Grok web app real endpoints (2025) — confirmed from network inspection
-    /grok\.com\/rest\/app-chat\//,
-    /grok\.com\/api\//,
 
     // ── Cohere ────────────────────────────────────────────────────────────
     /api\.cohere\.ai/,
@@ -360,8 +348,7 @@
       // Map to label-based store for restoring
       d.entities.forEach(e => {
         const match = /\[CAGED_(\w+)_\d+\]/.exec(e.placeholder);
-        // match[1] is guaranteed by the capture group — non-null assertion is safe
-        if (match?.[1]) tabEntityStore.push({ value: e.originalValue, label: match[1] });
+        if (match) tabEntityStore.push({ value: e.originalValue, label: match[1] });
       });
     }
   });
@@ -401,48 +388,11 @@
       return _fetch(input, init);
     }
 
-    // Fix A: some AI platforms (Claude, Gemini) send prompts as ReadableStream
-    // or Uint8Array instead of plain strings. Read the stream to a string first
-    // so PII detection can run on it. Fall back to pass-through on any error.
-    if (body instanceof ReadableStream) {
-      try {
-        const reader = (body as ReadableStream<Uint8Array>).getReader();
-        const chunks: Uint8Array[] = [];
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value) chunks.push(value);
-        }
-        const dec = new TextDecoder();
-        const bodyStr = chunks.map(c => dec.decode(c, { stream: true })).join('') + dec.decode();
-        if (bodyStr.length > 2) {
-          const processed = await processRequestBody(bodyStr);
-          body = processed;
-        }
-      } catch {
-        // If reading the stream fails, pass through uncaged — never block the request
-      }
-    } else if (body instanceof Uint8Array || body instanceof ArrayBuffer) {
-      // Uint8Array / ArrayBuffer text body (some Gemini requests)
-      try {
-        const dec = new TextDecoder();
-        const bodyStr = dec.decode(body instanceof Uint8Array ? body : new Uint8Array(body));
-        if (bodyStr.length > 2) {
-          const processed = await processRequestBody(bodyStr);
-          body = processed;
-        }
-      } catch { /* pass through */ }
-    } else if (typeof body === 'string' && body.length > 2) {
+    if (typeof body === 'string' && body.length > 2) {
       body = await processRequestBody(body);
     }
 
-    // FIX: exactOptionalPropertyTypes — only spread body into newInit when it
-    // is defined, otherwise pass init as-is to avoid body:undefined mismatch.
-    const newInit: RequestInit | undefined =
-      body !== init?.body && body !== undefined
-        ? { ...init, body }
-        : init;
+    const newInit = body !== init?.body ? { ...init, body } : init;
     const response = await _fetch(input, newInit);
 
     const ct = response.headers.get('content-type') ?? '';
@@ -471,7 +421,7 @@
     const xhr = new _XHR();
     let _url = '';
     const _open = xhr.open.bind(xhr);
-    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a: boolean = true, us?: string | null, pw?: string | null) {
+    (xhr as { open: typeof xhr.open }).open = function (m: string, u: string | URL, a = true, us?: string | null, pw?: string | null) {
       _url = String(u); return _open(m, u, a, us, pw);
     };
     const _send = xhr.send.bind(xhr);

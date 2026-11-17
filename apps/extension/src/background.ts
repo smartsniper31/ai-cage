@@ -119,17 +119,6 @@ interface CheckLimitMessage {
   type: 'CHECK_LIMIT';
 }
 
-interface AgentEventMessage {
-  type: 'AGENT_EVENT';
-  site: string;
-  detail: string;
-  blocked: boolean;
-}
-
-interface OpenUpgradeMessage {
-  type: 'OPEN_UPGRADE';
-}
-
 type IncomingMessage =
   | CageReportMessage
   | GetStatsMessage
@@ -137,9 +126,7 @@ type IncomingMessage =
   | GetAuditLogMessage
   | ExportAuditCSVMessage
   | GetPlainReportMessage
-  | CheckLimitMessage
-  | AgentEventMessage
-  | OpenUpgradeMessage;
+  | CheckLimitMessage;
 
 // ---------------------------------------------------------------------------
 // Cage 1: Handle PII cage reports from content.ts
@@ -224,6 +211,8 @@ function registerShadowAiObserver(): void {
         const matches = matchAiEndpoint(url);
         if (matches.length === 0) return;
 
+        sessionShadowCount += 1;
+
         const counts: Record<string, number> = {};
         for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
 
@@ -235,30 +224,7 @@ function registerShadowAiObserver(): void {
           return;
         }
 
-        // FIX 1.1: increment AFTER cooldown check — counter must match logged entries
-        sessionShadowCount += 1;
-
-        // FIX 1.2a: normalise initiator — extract hostname, never expose raw undefined/null
-        const rawInitiator = details.initiator ?? '';
-        let initiatorLabel = 'browser background';
-        if (rawInitiator) {
-          try {
-            initiatorLabel = new URL(rawInitiator).hostname || rawInitiator;
-          } catch {
-            initiatorLabel = rawInitiator;
-          }
-        }
-
-        // FIX 1.2b: store structured JSON instead of pipe-separated string so
-        // renderShadowAi() can consume each field individually (risk badge,
-        // product name, category) without fragile string splitting.
-        const detailPayload = JSON.stringify({
-          initiator:  initiatorLabel,
-          riskLevel:  matches[0]?.riskLevel  ?? 'unknown',
-          product:    matches[0]?.name        ?? url,
-          category:   matches[0]?.category    ?? 'unknown',
-          endpointId: matches[0]?.id          ?? '',
-        });
+        const initiator = details.initiator ?? 'unknown';
 
         void logEvent(
           {
@@ -266,7 +232,7 @@ function registerShadowAiObserver(): void {
             site: hostname,
             counts,
             totalCount: matches.length,
-            detail: detailPayload,
+            detail: `Initiator: ${initiator} | Risk: ${matches[0]?.riskLevel ?? 'unknown'} | Product: ${matches[0]?.name ?? url}`,
           },
           chromeStorageAdapter,
         );
@@ -318,13 +284,14 @@ chrome.runtime.onMessage.addListener(
     const msg = message as IncomingMessage;
 
     if (msg.type === 'AGENT_EVENT') {
+      const agentMsg = msg as { type: string; site: string; detail: string; blocked: boolean };
       void logEvent(
         {
           type: 'AGENT_TOOL_CALL' as never,
-          site: msg.site,
-          counts: { blocked: msg.blocked ? 1 : 0 },
+          site: agentMsg.site,
+          counts: { blocked: agentMsg.blocked ? 1 : 0 },
           totalCount: 1,
-          detail: msg.detail,
+          detail: agentMsg.detail,
         },
         chromeStorageAdapter,
       );
@@ -358,22 +325,9 @@ chrome.runtime.onMessage.addListener(
 
     if (msg.type === 'GET_SHADOW_LOG') {
       void getAuditLog(chromeStorageAdapter).then((entries) => {
-        // FIX 1.3: replace arbitrary slice(-100) with a 30-day rolling window
-        // + hard cap of 500 entries to prevent memory issues on heavy usage.
-        // A fixed tail of 100 could cover only hours on an active machine;
-        // 30 days gives meaningful history while keeping the payload bounded.
-        const thirtyDaysAgo = new Date(
-          Date.now() - 30 * 24 * 60 * 60 * 1000,
-        ).toISOString();
-
         const shadowEntries = entries
-          .filter(
-            (e: AuditEntry) =>
-              e.type === 'SHADOW_AI_DETECTED' &&
-              e.timestamp >= thirtyDaysAgo,
-          )
-          .slice(-500); // hard cap — safety net only, not the primary filter
-
+          .filter((e: AuditEntry) => e.type === 'SHADOW_AI_DETECTED')
+          .slice(-100); // last 100
         sendResponse({ entries: shadowEntries });
       });
       return true;

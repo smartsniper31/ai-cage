@@ -1277,10 +1277,11 @@
     try {
       chrome.webRequest.onBeforeRequest.addListener(
         (details) => {
-          var _a, _b, _c, _d, _e, _f;
+          var _a, _b, _c, _d;
           const url = details.url;
           const matches = matchAiEndpoint(url);
           if (matches.length === 0) return;
+          sessionShadowCount += 1;
           const counts = {};
           for (const m of matches) counts[m.id] = (counts[m.id] ?? 0) + 1;
           const hostnameMatch = /^https?:\/\/([^/:?#]+)/i.exec(url);
@@ -1288,34 +1289,18 @@
           if (isShadowCoolingDown(hostname)) {
             return;
           }
-          sessionShadowCount += 1;
-          const rawInitiator = details.initiator ?? "";
-          let initiatorLabel = "browser background";
-          if (rawInitiator) {
-            try {
-              initiatorLabel = new URL(rawInitiator).hostname || rawInitiator;
-            } catch {
-              initiatorLabel = rawInitiator;
-            }
-          }
-          const detailPayload = JSON.stringify({
-            initiator: initiatorLabel,
-            riskLevel: ((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown",
-            product: ((_b = matches[0]) == null ? void 0 : _b.name) ?? url,
-            category: ((_c = matches[0]) == null ? void 0 : _c.category) ?? "unknown",
-            endpointId: ((_d = matches[0]) == null ? void 0 : _d.id) ?? ""
-          });
+          const initiator = details.initiator ?? "unknown";
           void logEvent(
             {
               type: "SHADOW_AI_DETECTED",
               site: hostname,
               counts,
               totalCount: matches.length,
-              detail: detailPayload
+              detail: `Initiator: ${initiator} | Risk: ${((_a = matches[0]) == null ? void 0 : _a.riskLevel) ?? "unknown"} | Product: ${((_b = matches[0]) == null ? void 0 : _b.name) ?? url}`
             },
             chromeStorageAdapter
           );
-          console.warn(`[AI CAGE] ⚠️ Shadow AI: ${((_e = matches[0]) == null ? void 0 : _e.name) ?? url} (${((_f = matches[0]) == null ? void 0 : _f.riskLevel) ?? "unknown"})`);
+          console.warn(`[AI CAGE] ⚠️ Shadow AI: ${((_c = matches[0]) == null ? void 0 : _c.name) ?? url} (${((_d = matches[0]) == null ? void 0 : _d.riskLevel) ?? "unknown"})`);
           void updateGlobalBadge();
         },
         { urls: ["<all_urls>"] }
@@ -1349,13 +1334,14 @@
       var _a;
       const msg = message;
       if (msg.type === "AGENT_EVENT") {
+        const agentMsg = msg;
         void logEvent(
           {
             type: "AGENT_TOOL_CALL",
-            site: msg.site,
-            counts: { blocked: msg.blocked ? 1 : 0 },
+            site: agentMsg.site,
+            counts: { blocked: agentMsg.blocked ? 1 : 0 },
             totalCount: 1,
-            detail: msg.detail
+            detail: agentMsg.detail
           },
           chromeStorageAdapter
         );
@@ -1386,12 +1372,7 @@
       }
       if (msg.type === "GET_SHADOW_LOG") {
         void getAuditLog(chromeStorageAdapter).then((entries) => {
-          const thirtyDaysAgo = new Date(
-            Date.now() - 30 * 24 * 60 * 60 * 1e3
-          ).toISOString();
-          const shadowEntries = entries.filter(
-            (e) => e.type === "SHADOW_AI_DETECTED" && e.timestamp >= thirtyDaysAgo
-          ).slice(-500);
+          const shadowEntries = entries.filter((e) => e.type === "SHADOW_AI_DETECTED").slice(-100);
           sendResponse({ entries: shadowEntries });
         });
         return true;
