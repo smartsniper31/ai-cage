@@ -181,14 +181,80 @@ function getShadowRoot(): ShadowRoot | null {
 }
 
 // ─── PAGE SCRIPT INJECTION ─────────────────────────────────────────────────────
+/**
+ * Injects injected.js into the page's MAIN world so it can intercept
+ * fetch / XHR before the page's own scripts run.
+ *
+ * Two-method strategy — no double injection:
+ *
+ *   Method 1 (Chrome / Edge): <script src="chrome-extension://...">
+ *     Chrome bypasses the page CSP for extension resources. This path
+ *     sets `injected = true` in onload and is the fast, synchronous path.
+ *
+ *   Method 2 (Firefox CSP fallback): fetch() + Blob URL
+ *     Firefox enforces the page CSP against moz-extension:// script tags
+ *     (e.g. claude.ai blocks them). fetch() runs in the content-script
+ *     context — outside the page CSP — and produces a blob URL that
+ *     passes the page CSP check. Triggered only when Method 1 fires onerror
+ *     AND injected is still false.
+ *
+ * Guard: `injected` flag prevents Method 2 from running if Method 1 succeeded.
+ */
 function injectPageScript(): void {
+  const scriptUrl = chrome.runtime.getURL('injected.js');
+  let injected = false;
+
+  // ── Method 1: script tag (Chrome / Edge) ──────────────────────────────
+  const s = document.createElement('script');
+  s.src   = scriptUrl;
+  s.async = false;
+
+  s.onload = function () {
+    injected = true;
+    (this as HTMLScriptElement).remove();
+  };
+
+  s.onerror = function () {
+    (this as HTMLScriptElement).remove();
+    if (injected) return; // Method 1 already succeeded — do not inject again
+
+    // ── Method 2: fetch + Blob URL (Firefox, CSP-restricted pages) ───────
+    // fetch() runs in the content-script origin, not the page origin,
+    // so the page CSP does not apply. The resulting blob: URL is treated
+    // as same-origin to the extension and executes in MAIN world.
+    fetch(scriptUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`[AI CAGE] fetch injected.js failed: ${r.status}`);
+        return r.text();
+      })
+      .then(code => {
+        if (injected) return; // race: Method 1 may have succeeded in the meantime
+        const blob    = new Blob([code], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        const bs      = document.createElement('script');
+        bs.src        = blobUrl;
+        bs.onload = function () {
+          injected = true;
+          (this as HTMLScriptElement).remove();
+          URL.revokeObjectURL(blobUrl);
+        };
+        bs.onerror = function () {
+          (this as HTMLScriptElement).remove();
+          URL.revokeObjectURL(blobUrl);
+          console.warn('[AI CAGE] inject failed (both methods exhausted)');
+        };
+        (document.head || document.documentElement).appendChild(bs);
+      })
+      .catch((err: unknown) => {
+        console.warn('[AI CAGE] Firefox fallback fetch failed:', err);
+      });
+  };
+
   try {
-    const s = document.createElement('script');
-    s.src = chrome.runtime.getURL('injected.js');
-    s.async = false;
-    s.onload = function () { (this as HTMLScriptElement).remove(); };
     (document.head || document.documentElement).prepend(s);
-  } catch (e) { console.warn('[AI CAGE] inject failed:', e); }
+  } catch (e) {
+    console.warn('[AI CAGE] inject failed (prepend error):', e);
+  }
 }
 
 function shareEntitiesWithPage(entities: CagedEntity[]): void {

@@ -560,16 +560,46 @@
     return shadowRoot;
   }
   function injectPageScript() {
+    const scriptUrl = chrome.runtime.getURL("injected.js");
+    let injected = false;
+    const s = document.createElement("script");
+    s.src = scriptUrl;
+    s.async = false;
+    s.onload = function() {
+      injected = true;
+      this.remove();
+    };
+    s.onerror = function() {
+      this.remove();
+      if (injected) return;
+      fetch(scriptUrl).then((r) => {
+        if (!r.ok) throw new Error(`[AI CAGE] fetch injected.js failed: ${r.status}`);
+        return r.text();
+      }).then((code) => {
+        if (injected) return;
+        const blob = new Blob([code], { type: "application/javascript" });
+        const blobUrl = URL.createObjectURL(blob);
+        const bs = document.createElement("script");
+        bs.src = blobUrl;
+        bs.onload = function() {
+          injected = true;
+          this.remove();
+          URL.revokeObjectURL(blobUrl);
+        };
+        bs.onerror = function() {
+          this.remove();
+          URL.revokeObjectURL(blobUrl);
+          console.warn("[AI CAGE] inject failed (both methods exhausted)");
+        };
+        (document.head || document.documentElement).appendChild(bs);
+      }).catch((err) => {
+        console.warn("[AI CAGE] Firefox fallback fetch failed:", err);
+      });
+    };
     try {
-      const s = document.createElement("script");
-      s.src = chrome.runtime.getURL("injected.js");
-      s.async = false;
-      s.onload = function() {
-        this.remove();
-      };
       (document.head || document.documentElement).prepend(s);
     } catch (e) {
-      console.warn("[AI CAGE] inject failed:", e);
+      console.warn("[AI CAGE] inject failed (prepend error):", e);
     }
   }
   function shareEntitiesWithPage(entities) {
