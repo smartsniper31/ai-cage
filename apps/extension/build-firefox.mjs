@@ -57,11 +57,14 @@ manifest['browser_specific_settings'] = {
   },
 };
 
-// Firefox MV3 uses background.scripts instead of service_worker
-// (Firefox 121+ supports service_worker, but scripts is more compatible)
+// Firefox MV3: replace service_worker with scripts.
+// Having both simultaneously causes background.js to fail to start on some
+// Firefox versions — service_worker must be deleted, not kept alongside scripts.
+// Chrome is unaffected: it reads dist/manifest.json (source), not firefox-dist/.
 if (manifest['background']?.['service_worker']) {
-  manifest['background']['scripts'] = [manifest['background']['service_worker']];
-  // Keep service_worker for Firefox 121+ but also add scripts for older versions
+  const swFile = manifest['background']['service_worker'];
+  delete manifest['background']['service_worker'];
+  manifest['background']['scripts'] = [swFile];
 }
 
 // Firefox icon fix: Firefox recommends 48px and 96px as primary toolbar sizes.
