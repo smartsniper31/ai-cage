@@ -414,7 +414,17 @@ function showNetworkPanel(
       const types = [...new Set(cageItems.map(i => i.type.replace(/_/g, ' ').toLowerCase()))].slice(0, 2).join(', ');
       showToast(`🔒 ${cageItems.length} item${cageItems.length > 1 ? 's' : ''} protected (${types})`);
       try {
-        void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
+        // Build real CagedEntity list from cageItems so handleCageReport()
+        // receives a non-empty entities array and the monthly counter increments.
+        // item.type originates from injected.ts which only produces EntityType
+        // values — the cast is safe.
+        const reportEntities: CagedEntity[] = cageItems.map((item, idx) => ({
+          type:          item.type as CagedEntity['type'],
+          originalValue: item.value,
+          placeholder:   `[CAGED_${item.label}_${idx + 1}]`,
+          score:         0.9,
+        }));
+        void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: reportEntities });
       } catch { /* ignore */ }
     }
   }
