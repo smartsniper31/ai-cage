@@ -88,15 +88,26 @@ manifest['version'] = '0.6.0';
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log('[AI CAGE] Patched manifest.json for Firefox');
 
-// Step 3: Security check — no network calls in bundle
-// NOTE: popup.js is excluded — it intentionally fetches version.json from
-// Vercel for the update checker. This is a popup-only call, not core engine.
-for (const file of ['background.js', 'content.js']) {
-  const content = readFileSync(resolve(FIREFOX_DIR, file), 'utf-8');
-  if (/\bfetch\s*\(|XMLHttpRequest|WebSocket/.test(content)) {
-    console.error(`[AI CAGE] SECURITY: Network call found in ${file}`);
-    process.exit(1);
-  }
+// Step 3: Security check — no unauthorised network calls in bundle
+//
+// Intentional fetch() uses (excluded from the check):
+//   popup.js    — fetches version.json from Vercel for the update checker
+//   content.js  — fetch() + Blob URL fallback for Firefox CSP-restricted pages
+//                 (injectPageScript Method 2: runs in content-script origin,
+//                  outside the page CSP, to inject injected.js when a <script>
+//                  tag is blocked by the host page's CSP on Firefox)
+//
+// background.js must NEVER contain fetch/XHR/WebSocket — checked strictly.
+const bgContent = readFileSync(resolve(FIREFOX_DIR, 'background.js'), 'utf-8');
+if (/\bfetch\s*\(|XMLHttpRequest|WebSocket/.test(bgContent)) {
+  console.error('[AI CAGE] SECURITY: Network call found in background.js');
+  process.exit(1);
 }
-console.log('[AI CAGE] ✅ Security check passed — no network calls in core bundle (popup fetch for update checker is intentional)');
+// content.js: XMLHttpRequest and WebSocket are still forbidden; only fetch() is intentional.
+const ctContent = readFileSync(resolve(FIREFOX_DIR, 'content.js'), 'utf-8');
+if (/XMLHttpRequest|WebSocket/.test(ctContent)) {
+  console.error('[AI CAGE] SECURITY: Unauthorised network call (XHR/WebSocket) found in content.js');
+  process.exit(1);
+}
+console.log('[AI CAGE] ✅ Security check passed — no unauthorised network calls in core bundle');
 console.log('[AI CAGE] ✅ Firefox extension ready: apps/extension/firefox-dist/');
