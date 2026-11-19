@@ -796,7 +796,10 @@ async function exportCSV(): Promise<void> {
   const a    = document.createElement('a');
   a.href     = url;
   a.download = `ai-cage-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+  // BUG P1-A — Firefox 98+ silently blocks a.click() on detached elements.
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
@@ -822,7 +825,10 @@ async function exportPlainReport(): Promise<void> {
     const a    = document.createElement('a');
     a.href     = url;
     a.download = `ai-cage-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    // BUG P1-B — Firefox 98+ silently blocks a.click() on detached elements.
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     // Visual confirmation
@@ -1061,18 +1067,77 @@ function wireAccountTab(): void {
 
   // ── Deactivate button ──────────────────────────────────────────────────────
   document.getElementById('license-deactivate-btn')
-    ?.addEventListener('click', async () => {
-      const confirmed = confirm(
-        'Remove your Pro license key? You will revert to the Free tier (100 cages/month).',
-      );
-      if (!confirmed) return;
+    ?.addEventListener('click', () => {
+      // BUG P2 — Firefox 115+ returns true from window.confirm() without
+      // showing a dialog in extension popups. Use an inline modal instead.
 
-      await deactivateLicense(chromeStorageAdapter);
-      setLicenseMsg('License removed. You are now on the Free tier.', 'warn');
+      // Guard: only one modal at a time
+      if (document.getElementById('deactivate-modal')) return;
 
-      // Refresh
-      await renderAccountTab();
-      await renderOverview();
+      const modal = document.createElement('div');
+      modal.id = 'deactivate-modal';
+      modal.style.cssText = [
+        'position:fixed', 'inset:0',
+        'background:rgba(15,23,42,0.45)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'z-index:9999',
+      ].join(';');
+
+      modal.innerHTML = `
+        <div style="
+          background:#fff;
+          border:1px solid var(--border,#e2e8f0);
+          border-radius:12px;
+          padding:20px 18px;
+          width:272px;
+          font-family:system-ui,-apple-system,sans-serif;
+          box-shadow:0 8px 24px rgba(15,23,42,.18);
+        ">
+          <div style="font-size:13px;font-weight:800;color:var(--text,#0f172a);margin-bottom:8px">
+            Remove Pro license?
+          </div>
+          <div style="font-size:11px;color:var(--muted,#64748b);line-height:1.6;margin-bottom:16px">
+            You will revert to the Free tier (100&nbsp;cages/month).
+            Your license key will be deleted from this device.
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="deactivate-cancel-btn" style="
+              flex:1;padding:8px;border:1px solid var(--border,#e2e8f0);
+              border-radius:7px;background:#fff;
+              color:var(--text,#0f172a);font-size:12px;font-weight:700;
+              cursor:pointer;
+            ">Cancel</button>
+            <button id="deactivate-confirm-btn" style="
+              flex:1;padding:8px;border:none;
+              border-radius:7px;background:var(--red,#dc2626);
+              color:#fff;font-size:12px;font-weight:700;
+              cursor:pointer;
+            ">Remove license</button>
+          </div>
+        </div>`;
+
+      document.body.appendChild(modal);
+
+      const removeModal = (): void => {
+        modal.remove();
+      };
+
+      document.getElementById('deactivate-cancel-btn')
+        ?.addEventListener('click', removeModal);
+
+      document.getElementById('deactivate-confirm-btn')
+        ?.addEventListener('click', async () => {
+          removeModal();
+          await deactivateLicense(chromeStorageAdapter);
+          setLicenseMsg('License removed. You are now on the Free tier.', 'warn');
+          await renderAccountTab();
+          await renderOverview();
+        });
+
+      // Clicking the backdrop also cancels
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) removeModal();
+      });
     });
 
   // ── Buy Pro button ─────────────────────────────────────────────────────────
