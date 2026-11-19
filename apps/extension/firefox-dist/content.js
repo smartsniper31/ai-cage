@@ -1117,7 +1117,18 @@
       updateBadge();
       updateStatus("caged");
       try {
-        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: [] });
+        const networkEntities = d.items && d.items.length > 0 ? d.items.map((item, idx) => ({
+          type: item.type,
+          originalValue: item.value,
+          placeholder: `[CAGED_${item.label}_${idx + 1}]`,
+          score: 0.9
+        })) : Array.from({ length: d.count }, (_, i) => ({
+          type: "GENERIC_SECRET",
+          originalValue: "redacted",
+          placeholder: `[CAGED_GENERIC_${i + 1}]`,
+          score: 0.9
+        }));
+        void chrome.runtime.sendMessage({ type: "CAGE_REPORT", tabId: 0, site: window.location.hostname, entities: networkEntities });
       } catch {
       }
     }
