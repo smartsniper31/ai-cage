@@ -947,7 +947,25 @@ window.addEventListener('message', (event) => {
     updateBadge();
     updateStatus('caged');  // FIX 2
     try {
-      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: [] });
+      // Build real entities from d.items so handleCageReport() receives a
+      // non-empty array and the monthly counter increments correctly.
+      // d.items carries { type, label, value, preview } from injected.ts —
+      // same structure used in decide(). Fall back to N generic sentinels
+      // when d.items is absent (older injected.js versions).
+      const networkEntities: CagedEntity[] = (d.items && d.items.length > 0)
+        ? d.items.map((item, idx) => ({
+            type:          item.type as CagedEntity['type'],
+            originalValue: item.value,
+            placeholder:   `[CAGED_${item.label}_${idx + 1}]`,
+            score:         0.9,
+          }))
+        : Array.from({ length: d.count }, (_, i) => ({
+            type:          'GENERIC_SECRET' as CagedEntity['type'],
+            originalValue: 'redacted',
+            placeholder:   `[CAGED_GENERIC_${i + 1}]`,
+            score:         0.9,
+          }));
+      void chrome.runtime.sendMessage({ type: 'CAGE_REPORT', tabId: 0, site: window.location.hostname, entities: networkEntities });
     } catch { /* ignore */ }
   }
 
