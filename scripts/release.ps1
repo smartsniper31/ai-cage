@@ -175,21 +175,32 @@ if ($LASTEXITCODE -ne 0) { FAIL "tests failed — fix before releasing" }
 OK "202/202 tests pass"
 
 # ── STEP 6: Chrome ZIP ───────────────────────────────────────────────────────
-Step "6/11" "Generate Chrome zip — v$VERSION"
+# Uses build-zip.mjs (Node.js) instead of Compress-Archive.
+# Compress-Archive -CompressionLevel Optimal has a reproducible Windows bug
+# where large PNG files (e.g. icon128.png 49 KB) are compressed to ~1275 bytes
+# (ratio 97%) — physically impossible for an already-compressed PNG. The entry
+# is corrupt and AMO rejects it with "Invalid file name in archive".
+# build-zip.mjs stores PNG/binary files (method=0) and deflates JS/JSON/text,
+# producing a valid ZIP that passes both Chrome Web Store and AMO validation.
+Step "6/11" "Generate Chrome zip — v$VERSION (via build-zip.mjs)"
 New-Item -ItemType Directory -Force -Path $DIST | Out-Null
 if (Test-Path $CHROME_ZIP) { Remove-Item $CHROME_ZIP -Force }
-Compress-Archive -Path "$EXT_DIST\*" -DestinationPath $CHROME_ZIP -CompressionLevel Optimal
-if ($LASTEXITCODE -ne 0) { FAIL "Compress-Archive failed for Chrome zip" }
-if (!(Test-Path $CHROME_ZIP)) { FAIL "Chrome zip not found after compression" }
+Set-Location $EXT_DIR
+node build-zip.mjs dist $CHROME_ZIP.Replace('\','/')
+if ($LASTEXITCODE -ne 0) { FAIL "build-zip.mjs failed for Chrome zip" }
+Set-Location $ROOT
+if (!(Test-Path $CHROME_ZIP)) { FAIL "Chrome zip not found after build-zip.mjs" }
 $chromeKB = [math]::Round((Get-Item $CHROME_ZIP).Length / 1KB, 1)
 OK "ai-cage-extension-v$VERSION-chrome.zip — ${chromeKB}KB"
 
 # ── STEP 7: Firefox ZIP ──────────────────────────────────────────────────────
-Step "7/11" "Generate Firefox zip — v$VERSION"
+Step "7/11" "Generate Firefox zip — v$VERSION (via build-zip.mjs)"
 if (Test-Path $FF_ZIP) { Remove-Item $FF_ZIP -Force }
-Compress-Archive -Path "$FF_DIST\*" -DestinationPath $FF_ZIP -CompressionLevel Optimal
-if ($LASTEXITCODE -ne 0) { FAIL "Compress-Archive failed for Firefox zip" }
-if (!(Test-Path $FF_ZIP)) { FAIL "Firefox zip not found after compression" }
+Set-Location $EXT_DIR
+node build-zip.mjs firefox-dist $FF_ZIP.Replace('\','/')
+if ($LASTEXITCODE -ne 0) { FAIL "build-zip.mjs failed for Firefox zip" }
+Set-Location $ROOT
+if (!(Test-Path $FF_ZIP)) { FAIL "Firefox zip not found after build-zip.mjs" }
 $ffKB = [math]::Round((Get-Item $FF_ZIP).Length / 1KB, 1)
 OK "ai-cage-extension-v$VERSION-firefox.zip — ${ffKB}KB"
 
