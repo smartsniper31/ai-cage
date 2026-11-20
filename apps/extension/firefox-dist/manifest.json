@@ -92,12 +92,12 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "ai-cage@ai-cage.io",
-      "strict_min_version": "115.0"
-    }
-  },
-  "data_collection_permissions": {
-    "none": {
-      "description": "AI CAGE does not collect, transmit, or share any user data. All processing is performed locally on the user's device. No data ever leaves the browser."
+      "strict_min_version": "115.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
     }
   }
 }

@@ -54,6 +54,12 @@ manifest['browser_specific_settings'] = {
   gecko: {
     id: 'ai-cage@ai-cage.io',
     strict_min_version: '115.0',
+    // AMO requires data_collection_permissions inside gecko since Nov 3, 2025.
+    // AI CAGE collects no data, so we declare "none" as required.
+    // Reference: https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/
+    data_collection_permissions: {
+      required: ['none'],
+    },
   },
 };
 
@@ -84,18 +90,6 @@ if (manifest['action']) {
 
 // Bump version for Firefox (match main version)
 manifest['version'] = '0.6.0';
-
-// AMO (Firefox Add-on Marketplace) requires data_collection_permissions since 2026.
-// This field is Firefox-only — Chrome does not recognise it and must not receive it.
-// Source: dist/manifest.json (Chrome) is never modified by this script.
-manifest['data_collection_permissions'] = {
-  none: {
-    description:
-      'AI CAGE does not collect, transmit, or share any user data. ' +
-      'All processing is performed locally on the user\'s device. ' +
-      'No data ever leaves the browser.',
-  },
-};
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log('[AI CAGE] Patched manifest.json for Firefox');
