@@ -305,7 +305,8 @@
         <span>about:debugging#/runtime/this-firefox</span>
         <button class="copy-btn" onclick="navigator.clipboard.writeText('about:debugging#/runtime/this-firefox').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='📋 Copy',1500)})">📋 Copy</button>
       </div>
-      <p class="step-body">On the page that opens, click <strong>"Load Temporary Add-on…"</strong> and select the <strong>ZIP file</strong> you just downloaded.</p>
+      <p class="step-body">On the page that opens, click <strong>"Load Temporary Add-on…"</strong> then navigate to your <strong>Downloads folder</strong> and select the <strong>ai-cage-extension-v0.6.0-firefox.zip file directly</strong> — no need to unzip it first.</p>
+      <div class="tip"><span>💡</span><span>Firefox loads extensions directly from the <strong>.zip file</strong> — unlike Chrome, you do <strong>not</strong> need to extract it first.</span></div>
       <div class="nav-btns">
         <button class="btn-back" onclick="prevStep('ff',2)">← Back</button>
         <button class="btn-next" onclick="nextStep('ff',2,3)">Loaded ✓ Next →</button>
