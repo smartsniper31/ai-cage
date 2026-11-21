@@ -1,41 +1,47 @@
-# AI CAGE — Description Chrome Web Store (Français)
+# AI CAGE — Chrome Web Store Description (English)
 
-## Description courte (132 caractères max)
+## Short description (132 characters max)
 
-🔒 Cagez l'IA. Remplace les données sensibles avant qu'elles atteignent ChatGPT. Détecte le Shadow AI. 100% local, zéro donnée sort.
+🔒 Cage the AI. Replaces sensitive data before it reaches ChatGPT. Detects Shadow AI. 100% local — zero data leaves your device.
 
-## Description détaillée
+## Detailed description
 
-**AI CAGE — Protection Données IA Entreprise**
+**AI CAGE — Enterprise AI Data Protection**
 
-Utilisez l'IA. Fuyez zéro donnée.
+Use AI. Leak zero data.
 
-Vos employés utilisent ChatGPT, Claude, Gemini, Copilot chaque jour. Chaque prompt envoyé est une fuite de données potentielle — noms, emails, IBAN, clés API, code source, contrats.
+Your employees use ChatGPT, Claude, Gemini, and Copilot every day. Every prompt they send is a potential data breach — names, emails, IBANs, API keys, source code, contracts.
 
-**AI CAGE est le premier antivirus pour l'IA.** Il intercepte chaque prompt, supprime toutes les données sensibles localement avant qu'elles n'atteignent le fournisseur d'IA, et les restaure dans la réponse. L'IA fait le travail. Vos données restent chez vous.
+**AI CAGE is the first antivirus for AI.** It intercepts every prompt, strips all sensitive data locally before it reaches the AI provider, then restores it in the response. The AI does its job. Your data never leaves your device.
 
-### Ce que AI CAGE fait
+### What AI CAGE does
 
-**🔒 Cage 1 — Protection Chat Leak**
-Remplace les données personnelles dans vos prompts par des jetons sûrs comme [CAGED_EMAIL_1] avant l'envoi à ChatGPT, Claude ou Gemini. L'IA ne voit jamais vos vraies données. Vous voyez la réponse complète restaurée localement.
+**🔒 Cage 1 — Chat Leak Protection**
+Replaces personal data in your prompts with safe tokens like [CAGED_EMAIL_1] before sending to ChatGPT, Claude, or Gemini. The AI never sees your real data. You see the full response, restored locally on your device.
 
-**👁️ Cage 2 — Détection Shadow AI**
-Surveille 47 endpoints IA. Découvrez quels outils SaaS (Notion, Slack, Grammarly, HubSpot, Salesforce) appellent des API IA en cachette. 88% du trafic IA est invisible pour la plupart des entreprises.
+**👁️ Cage 2 — Shadow AI Detection**
+Monitors 47 AI endpoints. Discover which SaaS tools (Notion, Slack, Grammarly, HubSpot, Salesforce) are secretly calling AI APIs behind your back. 88% of AI traffic is invisible to most organizations.
 
-**🤖 Cage 3 — Protection Agent Rogue**
-Détecte 15 types d'attaques par injection de prompt. Bloque les agents IA d'exécuter des commandes dangereuses (rm -rf, exfiltration curl, vol de credentials). Validation humaine pour chaque appel d'outil dangereux.
+**🤖 Cage 3 — Agent Rogue Protection**
+Detects 15 types of prompt injection attacks. Blocks AI agents from executing dangerous commands (rm -rf, curl exfiltration, credential theft). Human-in-the-loop approval for every dangerous tool call.
 
-**📋 Cage 7 — Journal d'Audit Conformité**
-Journal d'audit local immuable. Exportez un CSV pour votre auditeur RGPD montrant exactement ce qui a été cageé, quand, et où. Zéro valeur PII stockée — uniquement des comptes et types. Historique anti-falsification.
+**📋 Cage 7 — Compliance Audit Log**
+Immutable local audit log. Export a CSV for your GDPR auditor showing exactly what was caged, when, and where. Zero PII values stored — only counts and entity types. Tamper-evident history.
 
-### Types de PII détectés (15)
+**🧠 Inference Cage™ — New in v0.6.0**
+You don't need to share your name to be identified. AI CAGE detects when 3 or more context clues in a single prompt can expose you — and warns you before you send.
 
-Adresses email, cartes de crédit, IBAN, RIB tunisien, CIN tunisien, Matricule Fiscal tunisien, passeport tunisien, carte de séjour, clés API, clés privées, adresses IP, numéros de téléphone, secrets génériques, noms de personnes (arabe/français/anglais), participants à des réunions.
+**🔄 Ephemeral Tokens™ — New in v0.6.0**
+Token IDs rotate every session. The AI sees a completely different set of codes each time — it cannot link your prompts across sessions.
 
-### Garantie de Confidentialité
+### PII types detected (18+)
 
-Aucune donnée n'est envoyée à un serveur, y compris le nôtre. Toute détection PII se fait localement sur votre appareil. Le code est open-source (MIT) et auditable par tout ingénieur de sécurité.
+Email addresses, credit cards, IBANs, Tunisian RIB, Tunisian CIN, Tunisian Matricule Fiscal, Tunisian passport, residence permit (carte de séjour), API keys, private keys, IP addresses, phone numbers, generic secrets, person names (Arabic / French / English), meeting participants, postal addresses, passwords, OAuth tokens.
 
-**Fait en Tunisie 🇹🇳 · 100% Hors Ligne · Open Source · Licence MIT**
+### Privacy Guarantee
 
-*Utilisez l'IA. Fuyez zéro donnée. Prouvez-le à votre auditeur.*
+No data is sent to any server — including ours. All PII detection runs locally on your device. The code is open-source (BSL 1.1) and auditable by any security engineer. 202 automated tests confirm zero network calls in the core engine.
+
+**Built for Privacy 🌍 · 100% Offline · Open Source · BSL 1.1 · v0.6.0**
+
+*Use AI. Leak zero data. Prove it to your auditor.*
