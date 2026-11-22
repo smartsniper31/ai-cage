@@ -661,7 +661,20 @@ function writeText(el: HTMLElement, text: string): void {
       sel.addRange(range);
     }
 
-    // Primary path: beforeinput event — ProseMirror / Quill listen to this
+    // Lexical fix: dispatch deleteContentBackward first so Lexical clears
+    // its internal state before the insertText. Without this step, Lexical
+    // appends the new text after the existing content instead of replacing it,
+    // producing doubled output. ProseMirror / Quill ignore this event safely.
+    const deleteEvent = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'deleteContentBackward',
+    });
+    el.dispatchEvent(deleteEvent);
+
+    // Primary path: beforeinput insertText — ProseMirror, Quill, Lexical all
+    // listen to this. With the selection active + delete dispatched above,
+    // Lexical replaces the content instead of appending.
     const beforeInput = new InputEvent('beforeinput', {
       bubbles: true,
       cancelable: true,
@@ -671,10 +684,7 @@ function writeText(el: HTMLElement, text: string): void {
     el.dispatchEvent(beforeInput);
 
     // Safe fallback: execCommand — ProseMirror intercepts this too.
-    // Do NOT check readText(el) synchronously here: ProseMirror may process
-    // the beforeinput asynchronously, so the check would read stale content
-    // and trigger the fallback unnecessarily. execCommand is always safe to
-    // call on ProseMirror and is a no-op if the editor already handled the event.
+    // Lexical ignores execCommand but ProseMirror/Quill use it as fallback.
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, text);
     return;

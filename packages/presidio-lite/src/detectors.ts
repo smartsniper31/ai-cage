@@ -64,7 +64,7 @@ const ibanDetector: Detector = {
   name: 'IBAN',
   type: 'IBAN',
   patterns: [
-    /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){4,7}[A-Z0-9]{0,4}\b/g,
+    /\b[A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){3,7}[A-Z0-9]{0,4}\b/g,
   ],
   defaultScore: 0.90,
 };
