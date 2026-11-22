@@ -483,6 +483,7 @@ const PROMPT_SELECTORS = [
   'div[contenteditable="true"].input-area',
 
   // ── Meta AI (meta.ai) ─────────────────────────────────────────────────
+  'div[data-testid="composer-input"]',              // Meta AI — data-testid confirmed DOM 2026
   'div[contenteditable="true"][role="textbox"]',
   'div[contenteditable="true"][aria-label]',
   'div[contenteditable="true"][aria-placeholder]',
@@ -519,6 +520,7 @@ const PROMPT_SELECTORS = [
   'div[contenteditable="true"][data-testid="chat-input"]', // Mistral CE input
 
   // ── Grok (X.com + grok.com) ───────────────────────────────────────────
+  'div.tiptap.ProseMirror[role="textbox"]',         // Grok — Tiptap editor confirmed DOM 2026
   'div[data-testid="tweetTextarea_0"][contenteditable]',
   'div[aria-label*="Grok"][contenteditable]',
   'div[aria-label*="Ask"][contenteditable]',              // grok.com "Ask anything" (fuzzy)
