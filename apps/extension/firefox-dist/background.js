@@ -1090,7 +1090,7 @@
       uniqueSites
     };
   }
-  const EMBEDDED_KEY = "ai-cage-verification-v1-7f3a9b2e8c1d4a6f";
+  const EMBEDDED_KEY = "ai-cage-verification-v2-22cafe78fd8974967ef0809a5b30d7a0";
   const FREE_FEATURES = {
     maxPiiTypes: 15,
     maxMonthlyCages: 100,
