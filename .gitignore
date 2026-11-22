@@ -34,3 +34,6 @@ pnpm-debug.log*
 # Test coverage
 coverage/
 .nyc_output/
+
+# Internal tools — never commit to GitHub (contains license key generator)
+tools/
