@@ -614,6 +614,8 @@ function isProseMirrorEditor(el: HTMLElement): boolean {
     el.classList.contains('ProseMirror') ||
     el.classList.contains('ql-editor') ||
     el.hasAttribute('data-pm-slice') ||
+    el.hasAttribute('data-lexical-editor') ||  // Meta AI (Lexical) — confirmed DOM 2026
+    !!el.closest('[data-lexical-editor]') ||   // Meta AI — parent detection
     !!el.closest('.ProseMirror') ||
     !!el.closest('.ql-editor')
   );
