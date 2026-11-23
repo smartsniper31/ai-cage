@@ -37,3 +37,15 @@ coverage/
 
 # Internal tools — never commit to GitHub (contains license key generator)
 tools/
+
+# Mobile (Expo / React Native / Android)
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/*.jks
+apps/mobile/*.keystore
+apps/mobile/eas-build-*.json

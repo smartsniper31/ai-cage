@@ -1,0 +1,22 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-native",
+    "baseUrl": ".",
+    "paths": {
+      "@ai-cage/core": ["../../packages/core/src/index.ts"],
+      "@ai-cage/presidio-lite": ["../../packages/presidio-lite/src/index.ts"]
+    },
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "types": ["react-native", "jest"]
+  },
+  "include": ["src", "App.tsx", "*.ts", "*.tsx"]
+}

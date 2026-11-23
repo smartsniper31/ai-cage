@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AI CAGE Mobile — Android string resources
+  App name and VPN service description used by the Android system.
+-->
+<resources>
+    <string name="app_name">AI CAGE</string>
+
+    <!-- Shown in Android VPN settings when the VPN is active -->
+    <string name="vpn_service_description">AI CAGE — On-device PII protection for AI prompts</string>
+
+    <!-- Notification channel description -->
+    <string name="vpn_notification_channel_name">AI CAGE VPN</string>
+    <string name="vpn_notification_channel_description">AI CAGE is running and protecting your AI prompts</string>
+
+    <!-- Notification content -->
+    <string name="vpn_notification_title">AI CAGE Active</string>
+    <string name="vpn_notification_text">Your AI prompts are protected</string>
+</resources>

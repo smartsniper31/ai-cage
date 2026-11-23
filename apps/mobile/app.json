@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "AI CAGE",
+    "slug": "ai-cage-mobile",
+    "version": "0.6.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0f"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "io.aicage.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0f"
+      },
+      "package": "io.aicage.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "BIND_VPN_SERVICE",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE",
+        "RECEIVE_BOOT_COMPLETED",
+        "INTERNET"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34,
+            "kotlinVersion": "1.9.24"
+          }
+        }
+      ],
+      "./src/native/withVpnPermissions"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ai-cage-mobile"
+      }
+    }
+  }
+}

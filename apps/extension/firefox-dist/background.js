@@ -141,6 +141,10 @@
       /api\.x\.ai/,
       /grok\.x\.ai/,
       /x\.ai\/api/,
+      // grok.com — web UI and all API surfaces on the consumer domain.
+      // Added 2026-11-23: grok.com was absent from the TypeScript list while
+      // already present in AiEndpointMatcher.kt (mobile). Both now in sync.
+      /grok\.com/,
       /grok\.com\/rest\//,
       /grok\.com\/api\//,
       /grok\.com\/_next\/data\//
