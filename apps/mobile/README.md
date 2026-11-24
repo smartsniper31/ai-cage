@@ -19,11 +19,11 @@ apps/mobile/
 │   │   └── CageVpn.ts          TypeScript bridge to Kotlin NativeModule
 │   ├── lib/
 │   │   └── mobileCage.ts       @ai-cage/core wired to AsyncStorage + SecureStore
-│   └── __tests__/              Unit tests (Jest + jest-expo)
+│   └── __tests__/              Unit tests (Jest + ts-jest)
 └── android/app/src/main/kotlin/io/aicage/mobile/vpn/
     ├── AiCageVpnService.kt     VpnService — TUN interface + foreground service
     ├── LocalMitmProxy.kt       Local HTTPS proxy (MITM with local CA)
-    ├── AiEndpointMatcher.kt    53 known AI endpoint hostnames
+    ├── AiEndpointMatcher.kt    56 known AI endpoint hostnames
     ├── LocalCertManager.kt     CA generation + KeyStore (BouncyCastle)
     ├── CageBridge.kt           Kotlin → JS engine bridge
     ├── CageVpnModule.kt        NativeModule: prepareVpn/start/stop/consent
