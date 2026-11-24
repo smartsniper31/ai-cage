@@ -50,7 +50,7 @@ import * as SecureStore from 'expo-secure-store';
  * Mirrors AiEndpointMatcher.kt exactHosts + suffixPatterns coverage.
  * Single source of truth for the UI — never hardcode this in screens.
  */
-export const AI_ENDPOINT_COUNT = 53;
+export const AI_ENDPOINT_COUNT = 56;
 
 // ── Storage adapters ──────────────────────────────────────────────────────────
 
