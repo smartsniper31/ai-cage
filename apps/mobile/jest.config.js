@@ -5,58 +5,62 @@
 /**
  * Jest config for apps/mobile.
  *
- * Uses jest-expo preset which handles:
- *   - Metro bundler transforms for React Native
- *   - Platform mocks (NativeModules, Platform.OS, etc.)
- *   - Expo module resolution
+ * Uses ts-jest for TypeScript compilation — no Babel, no Expo preset.
+ * Our tests are pure TypeScript logic (cage PII, endpoint matching,
+ * native module contract) — zero React Native rendering, zero DOM.
  *
- * Tests run in Node (jsdom not needed — no DOM, only RN).
- * Native modules (CageVpn, AiCageVpnService) are mocked in each test file.
+ * WHY NOT jest-expo / babel-preset-expo:
+ *   jest-expo v52+ pulls @react-native/jest-preset which ships ESM-only
+ *   setup files incompatible with Jest 30 CommonJS mode on Node 18/20.
+ *   ts-jest compiles TypeScript directly to CommonJS — no Babel chain needed.
  */
 
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'jest-expo',
+  testEnvironment: 'node',
 
-  // Only run tests in the mobile src — never leak into packages/core tests
-  testMatch: ['<rootDir>/src/__tests__/**/*.test.ts'],
-
-  // Transform workspace packages (not pre-compiled in this context)
-  transformIgnorePatterns: [
-    'node_modules/(?!(' +
-      'react-native|' +
-      '@react-native|' +
-      'expo|' +
-      '@expo|' +
-      'expo-modules-core|' +
-      'expo-secure-store|' +
-      '@react-native-async-storage|' +
-      '@react-navigation|' +
-      '@ai-cage' +   // workspace packages — must be transformed
-    ')/)',
-  ],
-
-  // Module name mapper for workspace path aliases
-  moduleNameMapper: {
-    '^@ai-cage/core$':           '<rootDir>/../../packages/core/src/index.ts',
-    '^@ai-cage/presidio-lite$':  '<rootDir>/../../packages/presidio-lite/src/index.ts',
+  // Transform TypeScript with ts-jest (no Babel, no Expo)
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: {
+        // Override tsconfig for Jest — module CommonJS for Node compat
+        module:            'CommonJS',
+        moduleResolution:  'node',
+        target:            'ES2022',
+        esModuleInterop:   true,
+        allowSyntheticDefaultImports: true,
+        strict:            true,
+        skipLibCheck:      true,
+        // Path aliases resolved by moduleNameMapper below
+        paths: {},
+      },
+    }],
   },
 
-  // Setup file — global mocks applied before every test
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  // Only run tests in the mobile src
+  testMatch: ['<rootDir>/src/__tests__/**/*.test.ts'],
 
-  // Coverage — only report on mobile src files
-  collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
-    '!src/**/__tests__/**',
-    '!src/**/index.ts',
+  // Map workspace packages to their source TypeScript
+  moduleNameMapper: {
+    '^@ai-cage/core$':          '<rootDir>/../../packages/core/src/index.ts',
+    '^@ai-cage/presidio-lite$': '<rootDir>/../../packages/presidio-lite/src/index.ts',
+    // Remap .js imports inside workspace packages to .ts (ts-jest + moduleResolution:node)
+    '^(\\.{1,2}/.*)\\.js$':     '$1',
+    // Map native/Expo modules to lightweight mocks
+    '^react-native$':           '<rootDir>/src/__mocks__/react-native.ts',
+    '^expo-secure-store$':      '<rootDir>/src/__mocks__/expo-secure-store.ts',
+    '^@react-native-async-storage/async-storage$': '<rootDir>/src/__mocks__/async-storage.ts',
+  },
+
+  // Do not transform node_modules except workspace packages
+  transformIgnorePatterns: [
+    'node_modules/(?!(@ai-cage)/)',
   ],
 
-  // Clear mocks between tests
-  clearMocks:   true,
-  resetMocks:   false,
-  restoreMocks: true,
+  // Setup file (CommonJS globals only — no ESM imports)
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
-  // Timeout generous for async VPN operations in tests
-  testTimeout: 10000,
+  clearMocks:   true,
+  restoreMocks: true,
+  testTimeout:  10000,
 };

@@ -6,45 +6,39 @@
  * @file jest.setup.ts
  * Global mocks applied before every test suite in apps/mobile.
  *
- * Mocks React Native internals that are unavailable in Node/Jest:
- *   - NativeModules
- *   - NativeEventEmitter
- *   - Platform
- *   - Linking
- *   - Alert
+ * Uses only CommonJS-compatible globals — no ESM imports.
+ * The jest-expo preset provides the React Native transform pipeline.
  */
-
-import { jest } from '@jest/globals';
 
 // ── React Native core mocks ───────────────────────────────────────────────────
 
-jest.mock('react-native', () => {
-  const rn = jest.requireActual('react-native') as object;
-  return {
-    ...rn,
-    Platform: { OS: 'android', Version: 33, select: (obj: Record<string, unknown>) => obj['android'] },
-    Alert:    { alert: jest.fn() },
-    Linking:  {
-      openSettings: jest.fn(() => Promise.resolve()),
-      openURL:      jest.fn(() => Promise.resolve()),
-      canOpenURL:   jest.fn(() => Promise.resolve(true)),
+jest.mock('react-native', () => ({
+  Platform: {
+    OS: 'android',
+    Version: 33,
+    select: (obj: Record<string, unknown>) => obj['android'],
+  },
+  Alert:   { alert: jest.fn() },
+  Linking: {
+    openSettings: jest.fn(() => Promise.resolve()),
+    openURL:      jest.fn(() => Promise.resolve()),
+    canOpenURL:   jest.fn(() => Promise.resolve(true)),
+  },
+  NativeModules: {
+    CageVpn: {
+      prepareVpn:    jest.fn(() => Promise.resolve(false)),
+      startVpn:      jest.fn(() => Promise.resolve()),
+      stopVpn:       jest.fn(() => Promise.resolve()),
+      getVpnStatus:  jest.fn(() => Promise.resolve(false)),
+      cageText:      jest.fn((t: string) => Promise.resolve(t)),
+      installCaCert: jest.fn(() => Promise.resolve(true)),
     },
-    NativeModules: {
-      CageVpn: {
-        prepareVpn:    jest.fn(() => Promise.resolve(false)),
-        startVpn:      jest.fn(() => Promise.resolve()),
-        stopVpn:       jest.fn(() => Promise.resolve()),
-        getVpnStatus:  jest.fn(() => Promise.resolve(false)),
-        cageText:      jest.fn((t: string) => Promise.resolve(t)),
-        installCaCert: jest.fn(() => Promise.resolve(true)),
-      },
-    },
-    NativeEventEmitter: jest.fn().mockImplementation(() => ({
-      addListener: jest.fn(() => ({ remove: jest.fn() })),
-      removeAllListeners: jest.fn(),
-    })),
-  };
-});
+  },
+  NativeEventEmitter: jest.fn().mockImplementation(() => ({
+    addListener:         jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners:  jest.fn(),
+  })),
+}));
 
 // ── Expo module mocks ─────────────────────────────────────────────────────────
 
@@ -68,16 +62,11 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
-// ── Silence expected warnings in test output ──────────────────────────────────
+// ── Silence known noisy warnings in test output ───────────────────────────────
 
-const originalConsoleWarn = console.warn.bind(console);
+const _warn = console.warn.bind(console);
 console.warn = (...args: unknown[]) => {
   const msg = String(args[0] ?? '');
-  // Suppress known RN test environment warnings
-  if (
-    msg.includes('Animated:') ||
-    msg.includes('ReactDOM.render') ||
-    msg.includes('act(')
-  ) return;
-  originalConsoleWarn(...args);
+  if (msg.includes('Animated:') || msg.includes('act(')) return;
+  _warn(...args);
 };

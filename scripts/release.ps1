@@ -25,6 +25,7 @@
 #   Step 3  — Build Firefox dist (build-firefox.mjs)
 #   Step 4  — Build landing (dist/index.html + dist/install.html)
 #   Step 5  — Run 202 tests (pre-commit will also run them, belt+suspenders)
+#   Step 5.1— Run mobile tests (Jest — separate from Vitest)
 #   Step 6  — Generate Chrome zip
 #   Step 7  — Generate Firefox zip
 #   Step 8  — Regenerate SHA256 checksums
@@ -173,6 +174,26 @@ Step "5/11" "Run 202 tests"
 pnpm test
 if ($LASTEXITCODE -ne 0) { FAIL "tests failed — fix before releasing" }
 OK "202/202 tests pass"
+
+# ── STEP 5.1: Run mobile tests (Jest — separate runner from Vitest) ───────────
+# apps/mobile uses Jest (via jest-expo preset) — different runner from the
+# Vitest suite above. Mobile tests cover: mobileCage, endpoint matching,
+# VPN native module contract. Skipped gracefully if jest-expo not installed.
+$MOBILE_DIR = Join-Path $ROOT "apps\mobile"
+$jestExpo = Join-Path $MOBILE_DIR "node_modules\jest-expo"
+if (Test-Path $jestExpo) {
+    Step "5.1/11" "Run mobile tests (Jest)"
+    Set-Location $MOBILE_DIR
+    $prevEAP2 = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    npx jest --testPathPatterns="src/__tests__" --passWithNoTests 2>&1 | Select-Object -Last 8
+    if ($LASTEXITCODE -ne 0) { FAIL "Mobile tests failed — fix before releasing" }
+    $ErrorActionPreference = $prevEAP2
+    Set-Location $ROOT
+    OK "Mobile tests pass"
+} else {
+    Write-Host "[5.1/11] Mobile tests — SKIPPED (jest-expo not installed; run: pnpm add -D jest-expo in apps/mobile)" -ForegroundColor DarkGray
+}
 
 # ── STEP 6: Chrome ZIP ───────────────────────────────────────────────────────
 # Uses build-zip.mjs (Node.js) instead of Compress-Archive.
