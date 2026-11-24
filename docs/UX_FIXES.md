@@ -89,9 +89,9 @@ const v = (() => { try { return chrome.runtime.getManifest().version; } catch { 
 </a>
 ```
 
-**Fix (étape 2 — Stripe) :**
-1. Créer un Stripe Payment Link sur https://dashboard.stripe.com/payment-links
-2. Remplacer par `href="https://buy.stripe.com/[link-id]"`
+**Fix (étape 2 — Lemon Squeezy) :**
+1. Créer un checkout sur https://app.lemonsqueezy.com
+2. Remplacer par `href="https://ai-cage.lemonsqueezy.com/checkout/buy/c19b48b0-477b-44b4-887c-7ebbfd457992"`
 
 **Fichier modifié :** `apps/landing/index.html`
 

@@ -599,7 +599,7 @@ const version = chrome.runtime.getManifest().version;
 
 ```html
 <!-- landing/index.html — Pro pricing card -->
-<a href="https://buy.stripe.com/[votre-lien]" 
+<a href="https://ai-cage.lemonsqueezy.com/checkout/buy/c19b48b0-477b-44b4-887c-7ebbfd457992" 
    class="block text-center bg-cage-green text-white py-2.5 rounded-lg ...">
   💳 Start Pro Trial — 5€/mois
 </a>
