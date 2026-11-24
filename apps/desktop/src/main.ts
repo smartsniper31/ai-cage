@@ -21,7 +21,7 @@ import type { CagedEntity, AuditEntry, AgentPolicy } from '@ai-cage/core';
 const store = localStorageAdapter;
 
 // ── Stripe / support constants ────────────────────────────────────────────────
-const STRIPE_URL   = 'https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00';
+const STRIPE_URL   = 'https://ai-cage.lemonsqueezy.com/checkout/buy/c19b48b0-477b-44b4-887c-7ebbfd457992';
 const SUPPORT_EMAIL = 'aicage.support@gmail.com';
 
 // ---------------------------------------------------------------------------

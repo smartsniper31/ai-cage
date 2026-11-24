@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -254,11 +255,17 @@ export function LicenseScreen({ navigation }: Props) {
         {/* Purchase link */}
         <View style={styles.purchaseBox}>
           <Text style={styles.purchaseText}>
-            Don't have a license yet?{'\n'}
-            Visit{' '}
-            <Text style={styles.purchaseLink}>ai-cage-gamma.vercel.app</Text>
-            {' '}to purchase.
+            Don't have a license yet?
           </Text>
+          <TouchableOpacity
+            onPress={() => Linking.openURL('https://ai-cage.lemonsqueezy.com/checkout/buy/c19b48b0-477b-44b4-887c-7ebbfd457992')}
+            accessibilityRole="link"
+            accessibilityLabel="Buy AI CAGE Pro"
+          >
+            <Text style={[styles.purchaseLink, { textDecorationLine: 'underline' }]}>
+              🔒 Get Pro — €5 / month →
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

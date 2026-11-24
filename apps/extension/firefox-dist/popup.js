@@ -168,7 +168,7 @@
   async function deactivateLicense(storage) {
     await storage.setItem(LICENSE_KEY, "");
   }
-  const STRIPE_URL = "https://buy.stripe.com/test_4gMeVe82mf3AaGacIs9AA00";
+  const STRIPE_URL = "https://ai-cage.lemonsqueezy.com/checkout/buy/c19b48b0-477b-44b4-887c-7ebbfd457992";
   const RELEASES_URL = "https://github.com/smartsniper31/ai-cage/releases";
   const VERSION_URL = "https://ai-cage-gamma.vercel.app/version.json";
   const FREE_LIMIT = 100;
