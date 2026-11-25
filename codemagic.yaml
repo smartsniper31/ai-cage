@@ -50,18 +50,34 @@ workflows:
         script: |
           set -e
           SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
-          PLUGIN="$CM_BUILD_DIR/node_modules/@react-native/gradle-plugin"
-          PATCH_SCRIPT="$CM_BUILD_DIR/apps/mobile/scripts/patch_settings.py"
-          echo "=== Diagnostics ==="
-          echo "CM_BUILD_DIR: $CM_BUILD_DIR"
-          echo "settings.gradle exists: $(test -f "$SETTINGS" && echo YES || echo NO)"
-          echo "plugin dir exists: $(test -d "$PLUGIN" && echo YES || echo NO)"
-          echo "node_modules/@react-native contents:"
-          ls "$CM_BUILD_DIR/node_modules/@react-native/" 2>/dev/null || echo "(dir missing)"
-          echo "mobile node_modules/@react-native contents:"
-          ls "$CM_BUILD_DIR/apps/mobile/node_modules/@react-native/" 2>/dev/null || echo "(dir missing)"
-          echo "=== Running patch ==="
-          python3 "$PATCH_SCRIPT" "$SETTINGS" "$PLUGIN" "ai-cage-mobile"
+
+          echo "=== settings.gradle BEFORE patch ==="
+          cat "$SETTINGS"
+
+          # Resolve the real path of @react-native/gradle-plugin using node
+          # from the workspace root — works with pnpm virtual store because
+          # node resolves through .pnpm symlinks from CM_BUILD_DIR correctly.
+          PLUGIN=$(cd "$CM_BUILD_DIR" && node -e "const p=require.resolve('@react-native/gradle-plugin/package.json');const path=require('path');process.stdout.write(path.dirname(p));")
+
+          echo "Resolved plugin path: $PLUGIN"
+
+          if [ -z "$PLUGIN" ] || [ ! -d "$PLUGIN" ]; then
+            echo "ERROR: could not resolve @react-native/gradle-plugin — aborting"
+            exit 1
+          fi
+
+          # Rewrite settings.gradle with a clean, static includeBuild.
+          # The expo-generated file uses a dynamic node --print shell-exec that
+          # returns 'null' in a pnpm monorepo (hoisted to .pnpm virtual store).
+          printf 'pluginManagement { repositories { google(); mavenCentral() } }\n' > "$SETTINGS"
+          printf 'dependencyResolutionManagement { repositories { google(); mavenCentral() } }\n' >> "$SETTINGS"
+          printf "rootProject.name = 'ai-cage-mobile'\n" >> "$SETTINGS"
+          printf 'apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)\n' >> "$SETTINGS"
+          printf "include ':app'\n" >> "$SETTINGS"
+          printf 'includeBuild("%s")\n' "$PLUGIN" >> "$SETTINGS"
+
+          echo "=== settings.gradle AFTER patch ==="
+          cat "$SETTINGS"
 
       - name: Build Android debug APK
         script: |
