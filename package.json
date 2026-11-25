@@ -2,6 +2,7 @@
   "name": "ai-cage",
   "version": "0.6.0",
   "private": true,
+  "packageManager": "pnpm@9.0.0",
   "description": "AI CAGE - Enterprise Grade AI Data Protection. Zero Data Leaves The Cage.",
   "scripts": {
     "prepare": "husky || true",

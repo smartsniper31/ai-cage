@@ -9,16 +9,13 @@
 #   4. The APK is available in Codemagic artifacts after ~10 minutes
 #
 # WORKFLOWS:
-#   android-apk        → Debug APK for direct install (free tier)
-#   android-release    → Signed release APK for distribution
+#   android-apk     → Debug APK for direct install (free tier)
+#   android-release → Signed release APK for distribution
 #
-# ARTIFACTS:
-#   - apps/mobile/android/app/build/outputs/apk/release/*.apk
-#
-# SECURITY:
-#   - No secrets stored in this file
-#   - Keystore (for release) stored in Codemagic environment variables
-#   - Zero network calls in the PII engine — verified by 202 tests
+# NOTES:
+#   - Project uses pnpm workspaces (not yarn or npm)
+#   - packageManager field in package.json declares pnpm@9.0.0
+#   - corepack is used to activate pnpm on Codemagic machines
 # =============================================================================
 
 workflows:
@@ -32,23 +29,20 @@ workflows:
       java: 17
 
     scripts:
-      # ── Step 1: Install pnpm ───────────────────────────────────────────────
-      - name: Install pnpm
+      # ── Step 1: Activate pnpm via corepack ────────────────────────────────
+      - name: Enable pnpm via corepack
         script: |
-          # Codemagic machines may already have pnpm — use it or install
-          if ! command -v pnpm &> /dev/null; then
-            npm install -g pnpm@9 --force
-          else
-            echo "pnpm already available: $(pnpm --version)"
-          fi
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm --version
 
-      # ── Step 2: Install all workspace dependencies ─────────────────────────
+      # ── Step 2: Install all workspace dependencies ────────────────────────
       - name: Install dependencies
         script: |
           cd $CM_BUILD_DIR
-          pnpm install --frozen-lockfile
+          pnpm install --no-frozen-lockfile
 
-      # ── Step 3: Build workspace packages (core + presidio-lite) ───────────
+      # ── Step 3: Build workspace packages ─────────────────────────────────
       - name: Build @ai-cage/presidio-lite
         script: |
           cd $CM_BUILD_DIR
@@ -59,35 +53,32 @@ workflows:
           cd $CM_BUILD_DIR
           pnpm --filter "@ai-cage/core" build
 
-      # ── Step 4: Run 202 tests — must pass before building ─────────────────
+      # ── Step 4: Run 202 tests ─────────────────────────────────────────────
       - name: Run 202 tests (zero regression policy)
         script: |
           cd $CM_BUILD_DIR
           pnpm test
 
-      # ── Step 5: TypeScript check on mobile ────────────────────────────────
+      # ── Step 5: TypeScript check ──────────────────────────────────────────
       - name: TypeScript type-check apps/mobile
         script: |
           cd $CM_BUILD_DIR/apps/mobile
           npx tsc --noEmit
 
-      # ── Step 6: Expo prebuild → generates android/ native project ─────────
-      - name: Expo prebuild (generates android/ native files)
+      # ── Step 6: Expo prebuild ─────────────────────────────────────────────
+      - name: Expo prebuild
         script: |
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
-      # ── Step 7: Build debug APK ────────────────────────────────────────────
+      # ── Step 7: Build debug APK ───────────────────────────────────────────
       - name: Build Android debug APK
         script: |
           cd $CM_BUILD_DIR/apps/mobile/android
           ./gradlew assembleDebug --no-daemon
 
     artifacts:
-      # Debug APK — directly installable on Android devices
       - apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-      # Build logs
-      - /tmp/xcodebuild_logs/*.log
 
     publishing:
       email:
@@ -97,35 +88,27 @@ workflows:
           success: true
           failure: true
 
-  # ── Workflow 2: Release APK (signed, for distribution) ────────────────────
+  # ── Workflow 2: Release APK (signed) ──────────────────────────────────────
   android-release:
     name: AI CAGE Android Release APK
     max_build_duration: 60
     environment:
       node: 20.11.0
       java: 17
-      # Keystore stored in Codemagic environment variables (not in code)
-      # Set these in Codemagic dashboard → Environment variables:
-      #   CM_KEYSTORE_PATH     → path to keystore file
-      #   CM_KEY_ALIAS         → key alias
-      #   CM_KEY_PASSWORD      → key password
-      #   CM_KEYSTORE_PASSWORD → keystore password
       vars:
         PACKAGE_NAME: "io.aicage.mobile"
 
     scripts:
-      - name: Install pnpm
+      - name: Enable pnpm via corepack
         script: |
-          if ! command -v pnpm &> /dev/null; then
-            npm install -g pnpm@9 --force
-          else
-            echo "pnpm already available: $(pnpm --version)"
-          fi
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm --version
 
       - name: Install dependencies
         script: |
           cd $CM_BUILD_DIR
-          pnpm install --frozen-lockfile
+          pnpm install --no-frozen-lockfile
 
       - name: Build workspace packages
         script: |
@@ -153,7 +136,6 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile/android
           ./gradlew assembleRelease --no-daemon
 
-      # ── Sign the APK if keystore is configured ─────────────────────────────
       - name: Sign APK
         script: |
           if [ -n "$CM_KEYSTORE_PATH" ]; then
@@ -166,9 +148,8 @@ workflows:
               -keypass "$CM_KEY_PASSWORD" \
               app/build/outputs/apk/release/app-release-unsigned.apk \
               "$CM_KEY_ALIAS"
-            echo "APK signed successfully"
           else
-            echo "No keystore configured — skipping signing (use debug APK for testing)"
+            echo "No keystore — skipping signing"
           fi
 
     artifacts:
