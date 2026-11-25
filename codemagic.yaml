@@ -1,21 +1,7 @@
 # =============================================================================
 # AI CAGE Mobile — Codemagic CI/CD Build Configuration
 # =============================================================================
-#
-# USAGE:
-#   1. Connect your GitHub repo (smartsniper31/ai-cage) to Codemagic
-#   2. Click "Start new build" → select workflow "android-apk"
-#   3. APK arrives by email to aicage.support@gmail.com after ~10 minutes
-#
-# NOTE ON PNPM MONOREPO + GRADLE:
-#   expo prebuild generates settings.gradle with dynamic node --print calls
-#   that resolve react-native paths. In pnpm monorepo, these return "null"
-#   because node_modules live at workspace root, not in apps/mobile.
-#   We use a Python script to patch settings.gradle after prebuild.
-# =============================================================================
-
 workflows:
-
   android-apk:
     name: AI CAGE Android APK
     max_build_duration: 60
@@ -45,99 +31,6 @@ workflows:
           cd $CM_BUILD_DIR
           pnpm --filter "@ai-cage/core" build
 
-      - name: Run 202 tests (zero regression policy)
-        script: |
-          cd $CM_BUILD_DIR
-          pnpm test
-
-      - name: TypeScript type-check apps/mobile
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile
-          npx tsc --noEmit
-
-      - name: Expo prebuild
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile
-          npx expo prebuild --platform android --clean
-
-      - name: Fix settings.gradle for pnpm monorepo
-        script: |
-          SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
-          ROOT_NM="$CM_BUILD_DIR/node_modules"
-
-          echo "=== BEFORE ==="
-          head -20 "$SETTINGS"
-
-          # Use Python to patch the Groovy file — more reliable than sed for multiline
-          python3 << PYEOF
-import re, os
-
-settings_path = "$SETTINGS"
-root_nm = "$ROOT_NM"
-
-gradle_plugin = root_nm + "/@react-native/gradle-plugin"
-rn_path = root_nm + "/react-native"
-
-with open(settings_path, 'r') as f:
-    content = f.read()
-
-# Pattern: includeBuild(new File(["node", "--print", "require.resolve('@react-native/gradle-plugin...)
-# Replace with: includeBuild("ACTUAL_PATH")
-patched = re.sub(
-    r'includeBuild\(\s*new File\(\s*\["node"[^\]]*\]\.execute\([^)]*\)\.text\.trim\(\)\s*\)',
-    lambda m: 'includeBuild("' + gradle_plugin + '")',
-    content
-)
-
-with open(settings_path, 'w') as f:
-    f.write(patched)
-
-print("Patch applied. Occurrences replaced:", len(re.findall(r'includeBuild\("' + re.escape(gradle_plugin) + '"', patched)))
-PYEOF
-
-          echo "=== AFTER ==="
-          head -20 "$SETTINGS"
-
-      - name: Build Android debug APK
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile/android
-          ./gradlew assembleDebug --no-daemon
-
-    artifacts:
-      - apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-
-    publishing:
-      email:
-        recipients:
-          - aicage.support@gmail.com
-        notify:
-          success: true
-          failure: true
-
-  android-release:
-    name: AI CAGE Android Release APK
-    max_build_duration: 60
-    environment:
-      node: 20.11.0
-      java: 17
-
-    scripts:
-      - name: Enable pnpm via corepack
-        script: |
-          corepack enable
-          corepack prepare pnpm@9.0.0 --activate
-
-      - name: Install dependencies
-        script: |
-          cd $CM_BUILD_DIR
-          pnpm install --no-frozen-lockfile
-
-      - name: Build workspace packages
-        script: |
-          cd $CM_BUILD_DIR
-          pnpm --filter "@ai-cage/presidio-lite" build
-          pnpm --filter "@ai-cage/core" build
-
       - name: Run 202 tests
         script: |
           cd $CM_BUILD_DIR
@@ -153,34 +46,24 @@ PYEOF
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
-      - name: Fix settings.gradle for pnpm monorepo
+      - name: Fix settings.gradle — patch @react-native/gradle-plugin path
         script: |
           SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
-          ROOT_NM="$CM_BUILD_DIR/node_modules"
-          python3 << PYEOF
-import re, os
-settings_path = "$SETTINGS"
-root_nm = "$ROOT_NM"
-gradle_plugin = root_nm + "/@react-native/gradle-plugin"
-with open(settings_path, 'r') as f:
-    content = f.read()
-patched = re.sub(
-    r'includeBuild\(\s*new File\(\s*\["node"[^\]]*\]\.execute\([^)]*\)\.text\.trim\(\)\s*\)',
-    lambda m: 'includeBuild("' + gradle_plugin + '")',
-    content
-)
-with open(settings_path, 'w') as f:
-    f.write(patched)
-print("Patched OK")
-PYEOF
+          PLUGIN="$CM_BUILD_DIR/node_modules/@react-native/gradle-plugin"
+          PATCH_SCRIPT="$CM_BUILD_DIR/apps/mobile/scripts/patch_settings.py"
+          echo "--- settings.gradle (before patch, first 25 lines) ---"
+          head -25 "$SETTINGS" || echo "(file not yet present)"
+          python3 "$PATCH_SCRIPT" "$SETTINGS" "$PLUGIN"
+          echo "--- settings.gradle (after patch, first 25 lines) ---"
+          head -25 "$SETTINGS"
 
-      - name: Build release APK
+      - name: Build Android debug APK
         script: |
           cd $CM_BUILD_DIR/apps/mobile/android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
     artifacts:
-      - apps/mobile/android/app/build/outputs/apk/release/*.apk
+      - apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
     publishing:
       email:
