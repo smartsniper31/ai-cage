@@ -42,7 +42,7 @@
           }
         }
       ],
-      "./src/native/withVpnPermissions"
+      "./src/native/withVpnPermissions.js"
     ],
     "extra": {
       "eas": {

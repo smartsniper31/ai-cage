@@ -65,7 +65,16 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           npx tsc --noEmit
 
-      # ── Step 6: Expo prebuild ─────────────────────────────────────────────
+      # ── Step 6: Compile Expo config plugin (TypeScript → JS) ─────────────
+      - name: Compile withVpnPermissions plugin
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx tsc --target ES2019 --module commonjs --moduleResolution node \
+            --esModuleInterop true --skipLibCheck true \
+            --outDir src/native src/native/withVpnPermissions.ts
+          echo "Plugin compiled: $(ls src/native/withVpnPermissions.js)"
+
+      # ── Step 7: Expo prebuild ─────────────────────────────────────────────
       - name: Expo prebuild
         script: |
           cd $CM_BUILD_DIR/apps/mobile
