@@ -4,23 +4,18 @@
 #
 # USAGE:
 #   1. Connect your GitHub repo (smartsniper31/ai-cage) to Codemagic
-#   2. Codemagic reads this file automatically
-#   3. Click "Start new build" → select workflow "android-apk"
-#   4. The APK is available in Codemagic artifacts after ~10 minutes
+#   2. Click "Start new build" → select workflow "android-apk"
+#   3. APK arrives by email to aicage.support@gmail.com after ~10 minutes
 #
-# WORKFLOWS:
-#   android-apk     → Debug APK for direct install (free tier)
-#   android-release → Signed release APK for distribution
-#
-# NOTES:
-#   - Project uses pnpm workspaces (not yarn or npm)
-#   - packageManager field in package.json declares pnpm@9.0.0
-#   - corepack is used to activate pnpm on Codemagic machines
+# NOTE ON PNPM MONOREPO + GRADLE:
+#   expo prebuild generates settings.gradle with dynamic node --print calls
+#   that resolve react-native paths. In pnpm monorepo, these return "null"
+#   because node_modules live at workspace root, not in apps/mobile.
+#   We use a Python script to patch settings.gradle after prebuild.
 # =============================================================================
 
 workflows:
 
-  # ── Workflow 1: Debug APK (free, no signing required) ─────────────────────
   android-apk:
     name: AI CAGE Android APK
     max_build_duration: 60
@@ -29,22 +24,17 @@ workflows:
       java: 17
 
     scripts:
-      # ── Step 1: Activate pnpm via corepack ────────────────────────────────
       - name: Enable pnpm via corepack
         script: |
           corepack enable
           corepack prepare pnpm@9.0.0 --activate
           pnpm --version
 
-      # ── Step 2: Install all workspace dependencies ────────────────────────
-      # public-hoist-pattern in .npmrc hoists React Native + Expo to root
-      # node_modules so Gradle can find them during prebuild
       - name: Install dependencies
         script: |
           cd $CM_BUILD_DIR
           pnpm install --no-frozen-lockfile
 
-      # ── Step 3: Build workspace packages ─────────────────────────────────
       - name: Build @ai-cage/presidio-lite
         script: |
           cd $CM_BUILD_DIR
@@ -55,65 +45,59 @@ workflows:
           cd $CM_BUILD_DIR
           pnpm --filter "@ai-cage/core" build
 
-      # ── Step 4: Run 202 tests ─────────────────────────────────────────────
       - name: Run 202 tests (zero regression policy)
         script: |
           cd $CM_BUILD_DIR
           pnpm test
 
-      # ── Step 5: TypeScript check ──────────────────────────────────────────
       - name: TypeScript type-check apps/mobile
         script: |
           cd $CM_BUILD_DIR/apps/mobile
           npx tsc --noEmit
 
-      # ── Step 7: Expo prebuild ─────────────────────────────────────────────
       - name: Expo prebuild
         script: |
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
-      # ── Step 8: Patch settings.gradle for pnpm monorepo ─────────────────
-      # expo prebuild generates settings.gradle with a node --print command
-      # that resolves react-native paths. In pnpm monorepo, this returns "null"
-      # because node_modules are at workspace root, not in apps/mobile.
-      # We patch the file to use an explicit path that works in both envs.
-      - name: Patch settings.gradle for pnpm monorepo
+      - name: Fix settings.gradle for pnpm monorepo
         script: |
           SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
-          echo "=== settings.gradle BEFORE patch ==="
-          cat "$SETTINGS"
-          echo "==="
+          ROOT_NM="$CM_BUILD_DIR/node_modules"
 
-          # Find react-native location
-          RN_PATH=$(node --print "require.resolve('react-native/package.json')" \
-            --experimental-vm-modules 2>/dev/null || \
-            node -e "console.log(require.resolve('react-native/package.json'))" 2>/dev/null || \
-            echo "")
-          RN_PATH="${RN_PATH%/package.json}"
-          echo "React Native found at: $RN_PATH"
+          echo "=== BEFORE ==="
+          head -20 "$SETTINGS"
 
-          if [ -z "$RN_PATH" ] || [ "$RN_PATH" = "null" ]; then
-            # Search in workspace root node_modules
-            RN_PATH="$CM_BUILD_DIR/node_modules/react-native"
-          fi
+          # Use Python to patch the Groovy file — more reliable than sed for multiline
+          python3 << PYEOF
+import re, os
 
-          RN_GRADLE_PLUGIN="$CM_BUILD_DIR/node_modules/@react-native/gradle-plugin"
+settings_path = "$SETTINGS"
+root_nm = "$ROOT_NM"
 
-          # Replace the dynamic node --print resolve with static paths
-          sed -i.bak \
-            "s|new File(\[\"node\", \"--print\", \"require.resolve('@react-native/gradle-plugin.*\").*\.execute.*|new File(\"$RN_GRADLE_PLUGIN\")|g" \
-            "$SETTINGS"
+gradle_plugin = root_nm + "/@react-native/gradle-plugin"
+rn_path = root_nm + "/react-native"
 
-          sed -i.bak2 \
-            "s|new File(\[\"node\", \"--print\", \"require.resolve('react-native/.*\").*\.execute.*|new File(\"$RN_PATH\")|g" \
-            "$SETTINGS"
+with open(settings_path, 'r') as f:
+    content = f.read()
 
-          echo "=== settings.gradle AFTER patch ==="
-          cat "$SETTINGS"
-          echo "==="
+# Pattern: includeBuild(new File(["node", "--print", "require.resolve('@react-native/gradle-plugin...)
+# Replace with: includeBuild("ACTUAL_PATH")
+patched = re.sub(
+    r'includeBuild\(\s*new File\(\s*\["node"[^\]]*\]\.execute\([^)]*\)\.text\.trim\(\)\s*\)',
+    lambda m: 'includeBuild("' + gradle_plugin + '")',
+    content
+)
 
-      # ── Step 9: Build debug APK ───────────────────────────────────────────
+with open(settings_path, 'w') as f:
+    f.write(patched)
+
+print("Patch applied. Occurrences replaced:", len(re.findall(r'includeBuild\("' + re.escape(gradle_plugin) + '"', patched)))
+PYEOF
+
+          echo "=== AFTER ==="
+          head -20 "$SETTINGS"
+
       - name: Build Android debug APK
         script: |
           cd $CM_BUILD_DIR/apps/mobile/android
@@ -130,22 +114,18 @@ workflows:
           success: true
           failure: true
 
-  # ── Workflow 2: Release APK (signed) ──────────────────────────────────────
   android-release:
     name: AI CAGE Android Release APK
     max_build_duration: 60
     environment:
       node: 20.11.0
       java: 17
-      vars:
-        PACKAGE_NAME: "io.aicage.mobile"
 
     scripts:
       - name: Enable pnpm via corepack
         script: |
           corepack enable
           corepack prepare pnpm@9.0.0 --activate
-          pnpm --version
 
       - name: Install dependencies
         script: |
@@ -173,30 +153,34 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
+      - name: Fix settings.gradle for pnpm monorepo
+        script: |
+          SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
+          ROOT_NM="$CM_BUILD_DIR/node_modules"
+          python3 << PYEOF
+import re, os
+settings_path = "$SETTINGS"
+root_nm = "$ROOT_NM"
+gradle_plugin = root_nm + "/@react-native/gradle-plugin"
+with open(settings_path, 'r') as f:
+    content = f.read()
+patched = re.sub(
+    r'includeBuild\(\s*new File\(\s*\["node"[^\]]*\]\.execute\([^)]*\)\.text\.trim\(\)\s*\)',
+    lambda m: 'includeBuild("' + gradle_plugin + '")',
+    content
+)
+with open(settings_path, 'w') as f:
+    f.write(patched)
+print("Patched OK")
+PYEOF
+
       - name: Build release APK
         script: |
           cd $CM_BUILD_DIR/apps/mobile/android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Sign APK
-        script: |
-          if [ -n "$CM_KEYSTORE_PATH" ]; then
-            cd $CM_BUILD_DIR/apps/mobile/android
-            jarsigner -verbose \
-              -sigalg SHA256withRSA \
-              -digestalg SHA-256 \
-              -keystore "$CM_KEYSTORE_PATH" \
-              -storepass "$CM_KEYSTORE_PASSWORD" \
-              -keypass "$CM_KEY_PASSWORD" \
-              app/build/outputs/apk/release/app-release-unsigned.apk \
-              "$CM_KEY_ALIAS"
-          else
-            echo "No keystore — skipping signing"
-          fi
-
     artifacts:
       - apps/mobile/android/app/build/outputs/apk/release/*.apk
-      - apps/mobile/android/app/build/outputs/apk/debug/*.apk
 
     publishing:
       email:
