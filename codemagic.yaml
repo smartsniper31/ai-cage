@@ -67,22 +67,47 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           npx tsc --noEmit
 
-      # ── Step 6: Compile Expo config plugin (TypeScript → JS) ─────────────
-      - name: Compile withVpnPermissions plugin
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile
-          npx tsc --target ES2019 --module commonjs --moduleResolution node \
-            --esModuleInterop true --skipLibCheck true \
-            --outDir src/native src/native/withVpnPermissions.ts
-          echo "Plugin compiled: $(ls src/native/withVpnPermissions.js)"
-
       # ── Step 7: Expo prebuild ─────────────────────────────────────────────
       - name: Expo prebuild
         script: |
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
-      # ── Step 7: Build debug APK ───────────────────────────────────────────
+      # ── Step 8: Fix React Native path for Gradle (pnpm monorepo) ─────────
+      # pnpm hoists react-native to workspace root node_modules.
+      # Gradle (settings.gradle) calls `require.resolve('react-native/...')`
+      # from android/ dir which cannot find it. We create a symlink so the
+      # resolve works correctly.
+      - name: Fix react-native path for Gradle
+        script: |
+          RN_PATH=$(cd $CM_BUILD_DIR && node -e "console.log(require.resolve('react-native/package.json').replace('/package.json',''))" 2>/dev/null || echo "")
+          if [ -z "$RN_PATH" ]; then
+            # Try from apps/mobile
+            RN_PATH=$(cd $CM_BUILD_DIR/apps/mobile && node -e "console.log(require.resolve('react-native/package.json').replace('/package.json',''))" 2>/dev/null || echo "")
+          fi
+          echo "React Native path: $RN_PATH"
+
+          # Create node_modules symlink in apps/mobile if react-native not there
+          MOBILE_RN="$CM_BUILD_DIR/apps/mobile/node_modules/react-native"
+          if [ ! -d "$MOBILE_RN" ]; then
+            mkdir -p "$CM_BUILD_DIR/apps/mobile/node_modules"
+            ln -sf "$RN_PATH" "$MOBILE_RN"
+            echo "Created symlink: $MOBILE_RN -> $RN_PATH"
+          else
+            echo "react-native already in apps/mobile/node_modules"
+          fi
+
+          # Also symlink @react-native which settings.gradle also needs
+          ROOT_NM="$CM_BUILD_DIR/node_modules"
+          MOBILE_NM="$CM_BUILD_DIR/apps/mobile/node_modules"
+          for pkg in "@react-native" "react" "metro" "metro-config" "metro-resolver" "@jest" "jest"; do
+            if [ -d "$ROOT_NM/$pkg" ] && [ ! -e "$MOBILE_NM/$pkg" ]; then
+              ln -sf "$ROOT_NM/$pkg" "$MOBILE_NM/$pkg"
+              echo "Symlinked: $pkg"
+            fi
+          done
+
+      # ── Step 9: Build debug APK ───────────────────────────────────────────
       - name: Build Android debug APK
         script: |
           cd $CM_BUILD_DIR/apps/mobile/android
