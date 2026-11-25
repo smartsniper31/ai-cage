@@ -1,0 +1,174 @@
+# =============================================================================
+# AI CAGE Mobile — Codemagic CI/CD Build Configuration
+# =============================================================================
+#
+# USAGE:
+#   1. Connect your GitHub repo (smartsniper31/ai-cage) to Codemagic
+#   2. Codemagic reads this file automatically
+#   3. Click "Start new build" → select workflow "android-apk"
+#   4. The APK is available in Codemagic artifacts after ~10 minutes
+#
+# WORKFLOWS:
+#   android-apk        → Debug APK for direct install (free tier)
+#   android-release    → Signed release APK for distribution
+#
+# ARTIFACTS:
+#   - apps/mobile/android/app/build/outputs/apk/release/*.apk
+#
+# SECURITY:
+#   - No secrets stored in this file
+#   - Keystore (for release) stored in Codemagic environment variables
+#   - Zero network calls in the PII engine — verified by 202 tests
+# =============================================================================
+
+workflows:
+
+  # ── Workflow 1: Debug APK (free, no signing required) ─────────────────────
+  android-apk:
+    name: AI CAGE Android APK
+    max_build_duration: 60
+    environment:
+      node: 20.11.0
+      java: 17
+
+    scripts:
+      # ── Step 1: Install pnpm ───────────────────────────────────────────────
+      - name: Install pnpm
+        script: |
+          npm install -g pnpm@9
+
+      # ── Step 2: Install all workspace dependencies ─────────────────────────
+      - name: Install dependencies
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm install --frozen-lockfile
+
+      # ── Step 3: Build workspace packages (core + presidio-lite) ───────────
+      - name: Build @ai-cage/presidio-lite
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm --filter "@ai-cage/presidio-lite" build
+
+      - name: Build @ai-cage/core
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm --filter "@ai-cage/core" build
+
+      # ── Step 4: Run 202 tests — must pass before building ─────────────────
+      - name: Run 202 tests (zero regression policy)
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm test
+
+      # ── Step 5: TypeScript check on mobile ────────────────────────────────
+      - name: TypeScript type-check apps/mobile
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx tsc --noEmit
+
+      # ── Step 6: Expo prebuild → generates android/ native project ─────────
+      - name: Expo prebuild (generates android/ native files)
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx expo prebuild --platform android --clean
+
+      # ── Step 7: Build debug APK ────────────────────────────────────────────
+      - name: Build Android debug APK
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/android
+          ./gradlew assembleDebug --no-daemon
+
+    artifacts:
+      # Debug APK — directly installable on Android devices
+      - apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      # Build logs
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - aicage.support@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ── Workflow 2: Release APK (signed, for distribution) ────────────────────
+  android-release:
+    name: AI CAGE Android Release APK
+    max_build_duration: 60
+    environment:
+      node: 20.11.0
+      java: 17
+      # Keystore stored in Codemagic environment variables (not in code)
+      # Set these in Codemagic dashboard → Environment variables:
+      #   CM_KEYSTORE_PATH     → path to keystore file
+      #   CM_KEY_ALIAS         → key alias
+      #   CM_KEY_PASSWORD      → key password
+      #   CM_KEYSTORE_PASSWORD → keystore password
+      vars:
+        PACKAGE_NAME: "io.aicage.mobile"
+
+    scripts:
+      - name: Install pnpm
+        script: npm install -g pnpm@9
+
+      - name: Install dependencies
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm --filter "@ai-cage/presidio-lite" build
+          pnpm --filter "@ai-cage/core" build
+
+      - name: Run 202 tests
+        script: |
+          cd $CM_BUILD_DIR
+          pnpm test
+
+      - name: TypeScript check
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx tsc --noEmit
+
+      - name: Expo prebuild
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx expo prebuild --platform android --clean
+
+      - name: Build release APK
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/android
+          ./gradlew assembleRelease --no-daemon
+
+      # ── Sign the APK if keystore is configured ─────────────────────────────
+      - name: Sign APK
+        script: |
+          if [ -n "$CM_KEYSTORE_PATH" ]; then
+            cd $CM_BUILD_DIR/apps/mobile/android
+            jarsigner -verbose \
+              -sigalg SHA256withRSA \
+              -digestalg SHA-256 \
+              -keystore "$CM_KEYSTORE_PATH" \
+              -storepass "$CM_KEYSTORE_PASSWORD" \
+              -keypass "$CM_KEY_PASSWORD" \
+              app/build/outputs/apk/release/app-release-unsigned.apk \
+              "$CM_KEY_ALIAS"
+            echo "APK signed successfully"
+          else
+            echo "No keystore configured — skipping signing (use debug APK for testing)"
+          fi
+
+    artifacts:
+      - apps/mobile/android/app/build/outputs/apk/release/*.apk
+      - apps/mobile/android/app/build/outputs/apk/debug/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - aicage.support@gmail.com
+        notify:
+          success: true
+          failure: true

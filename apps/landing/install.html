@@ -142,6 +142,7 @@
   <button class="tab" id="tab-edge"    onclick="switchBrowser('edge')">🔷 Edge</button>
   <button class="tab" id="tab-firefox" onclick="switchBrowser('firefox')">🦊 Firefox</button>
   <button class="tab" id="tab-desktop" onclick="switchBrowser('desktop')">🖥️ Desktop</button>
+  <button class="tab" id="tab-android" onclick="switchBrowser('android')">📱 Android</button>
 </div>
 
 <!-- WIZARD -->
@@ -414,6 +415,107 @@
   </div>
 
   <!-- ══════════════════════════════════════════════
+       ANDROID STEPS
+  ══════════════════════════════════════════════ -->
+  <div id="guide-android" style="display:none">
+
+    <div class="notice">
+      <span style="font-size:24px">📱</span>
+      <div><strong>Android — Direct APK install (2 min)</strong><br>
+        <span style="font-size:13px;color:#9a3412">AI CAGE Android uses a local VPN to protect all AI apps on your phone. No Google Play required — install the APK directly.</span>
+      </div>
+    </div>
+
+    <!-- Step 1: Download APK -->
+    <div class="step active" id="android-step-1">
+      <div class="step-header"><div class="step-num">1</div><div class="step-title">Download the AI CAGE APK</div></div>
+      <p class="step-body">Tap the button below to download the AI CAGE APK directly to your Android phone.</p>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin:12px 0;text-align:center">
+        <div style="font-size:14px;color:#15803d;font-weight:700;margin-bottom:12px">📱 AI CAGE for Android v0.6.0</div>
+        <a id="android-dl-btn"
+           href="https://github.com/smartsniper31/ai-cage/releases/download/v0.6.0/ai-cage-android-v0.6.0.apk"
+           download
+           class="main-btn" style="font-size:15px;padding:13px 24px;margin:0 auto;display:inline-flex;background:#15803d">
+          <span>⬇️</span><span>Download AI CAGE APK</span>
+        </a>
+        <div style="font-size:11px;color:#64748b;margin-top:8px">~15 MB · Android 8.0+ required</div>
+      </div>
+
+      <!-- QR Code for direct mobile download -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:12px 0;text-align:center">
+        <div style="font-size:12px;color:#64748b;margin-bottom:8px">📲 Or scan with your phone camera to download directly</div>
+        <div id="qr-placeholder" style="width:120px;height:120px;margin:0 auto;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#94a3b8">
+          QR code<br>coming soon
+        </div>
+      </div>
+
+      <div class="nav-btns"><button class="btn-next" onclick="nextStep('android',1,3)">Downloaded ✓ Next →</button></div>
+    </div>
+
+    <!-- Step 2: Enable Unknown Sources -->
+    <div class="step" id="android-step-2">
+      <div class="step-header"><div class="step-num">2</div><div class="step-title">Allow installation from unknown sources</div></div>
+      <p class="step-body">Android blocks APK installs by default. You need to allow it once for your browser or file manager.</p>
+
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 14px;margin:10px 0">
+        <div style="font-weight:800;font-size:13px;color:#856404;margin-bottom:8px">
+          ⚠️ Enable "Install unknown apps" — here's exactly how:
+        </div>
+        <div style="font-size:12px;color:#856404;line-height:1.8">
+          <strong>Android 8–13:</strong><br>
+          Settings → Apps → Special app access → Install unknown apps<br>
+          → Find your browser (Chrome/Firefox) → Enable<br><br>
+          <strong>Android 14+:</strong><br>
+          Settings → Security → More security settings → Install unknown apps<br>
+          → Find your browser → Enable<br><br>
+          <strong>Samsung:</strong><br>
+          Settings → Biometrics and security → Install unknown apps
+        </div>
+      </div>
+
+      <div class="tip"><span>💡</span><span>This setting applies only to the browser you use to download — it does not affect other apps.</span></div>
+
+      <div class="nav-btns">
+        <button class="btn-back" onclick="prevStep('android',2)">← Back</button>
+        <button class="btn-next" onclick="nextStep('android',2,3)">Done ✓ Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Install and activate VPN -->
+    <div class="step" id="android-step-3">
+      <div class="step-header"><div class="step-num done">✓</div><div class="step-title">Install AI CAGE and activate protection</div></div>
+      <p class="step-body">Open the downloaded APK file from your Downloads folder and tap <strong>Install</strong>.</p>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin:10px 0">
+        <div style="font-size:12px;color:#166534;line-height:1.8">
+          <strong>After installing:</strong><br>
+          1. Open AI CAGE from your app drawer<br>
+          2. Tap <strong>"Enable Protection"</strong> — Android will ask for VPN permission<br>
+          3. Tap <strong>"OK"</strong> to grant — this creates a local VPN on your device<br>
+          4. Install the security certificate when prompted (required for HTTPS)<br>
+          5. The green shield icon confirms protection is active 🔒
+        </div>
+      </div>
+
+      <div class="success-box">
+        <div class="banner">🔒 AI CAGE Android Active</div>
+        <div class="body">✅ All your AI apps (ChatGPT, Claude, Gemini, Meta AI...) are now protected. PII is caged before it leaves your phone.</div>
+      </div>
+
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:12px;color:#1e40af">
+        🔒 <strong>Privacy guarantee:</strong> The VPN is 100% local — no traffic leaves your device through AI CAGE servers. We only intercept requests to AI endpoints.
+      </div>
+
+      <div class="nav-btns">
+        <button class="btn-back" onclick="prevStep('android',3)">← Back</button>
+        <a href="index.html" class="btn-next" style="text-decoration:none;display:inline-block;text-align:center;background:#15803d">🏠 Back to Home</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════
        FAQ
   ══════════════════════════════════════════════ -->
   <div style="margin-top:36px;border-top:2px solid #e2e8f0;padding-top:28px">
@@ -500,6 +602,7 @@ const BROWSER_LABELS = {
   edge:    { icon:'🔷', name:'Microsoft Edge',   dl:'ai-cage-extension-v0.6.0-chrome.zip' },
   firefox: { icon:'🦊', name:'Mozilla Firefox',  dl:'ai-cage-extension-v0.6.0-firefox.zip' },
   desktop: { icon:'🖥️', name:'Windows Desktop',  dl:'' },
+  android: { icon:'📱', name:'Android Phone',    dl:'ai-cage-android-v0.6.0.apk' },
 };
 
 const BASE_URL = 'https://github.com/smartsniper31/ai-cage/releases/download/v0.6.0/';
@@ -511,16 +614,16 @@ document.getElementById('hero-btn-text').textContent = 'Download AI CAGE for ' +
 
 // ── Switch browser guide ─────────────────────────────────────────────────
 let currentBrowser = detectedBrowser;
-let currentSteps   = { chrome:1, edge:1, ff:1, desk:1 };
-let totalSteps     = { chrome:4, edge:4, ff:3, desk:3 };
+let currentSteps   = { chrome:1, edge:1, ff:1, desk:1, android:1 };
+let totalSteps     = { chrome:4, edge:4, ff:3, desk:3, android:3 };
 
 function switchBrowser(browser) {
   currentBrowser = browser;
-  ['chrome','edge','firefox','desktop'].forEach(b => {
+  ['chrome','edge','firefox','desktop','android'].forEach(b => {
     const t = document.getElementById('tab-'+b);
     if(t) t.classList.toggle('active', b === browser);
   });
-  ['chrome','firefox','desktop'].forEach(g => {
+  ['chrome','firefox','desktop','android'].forEach(g => {
     const el = document.getElementById('guide-'+g);
     if(el) el.style.display = 'none';
   });
@@ -589,7 +692,7 @@ function showDone() {
 
 function updateProgress(guide) {
   const step  = currentSteps[guide] || 1;
-  const total = (guide==='chrome'?4:guide==='ff'?3:3);
+  const total = (guide==='chrome'?4:guide==='ff'?3:guide==='android'?3:3);
   const pct   = Math.round((step/total)*100);
   document.getElementById('progress').style.width = pct+'%';
   updateDots(guide, step, total);
