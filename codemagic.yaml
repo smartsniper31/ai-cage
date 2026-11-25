@@ -42,6 +42,14 @@ workflows:
           cd $CM_BUILD_DIR
           pnpm install --no-frozen-lockfile
 
+      # ── Step 2b: Install mobile deps locally (required for Gradle/Expo) ───
+      # pnpm monorepo hoists modules to root — Gradle needs them in apps/mobile/
+      # shamefully-hoist in apps/mobile/.npmrc ensures node_modules are local
+      - name: Install mobile node_modules locally
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          pnpm install --no-frozen-lockfile
+
       # ── Step 3: Build workspace packages ─────────────────────────────────
       - name: Build @ai-cage/presidio-lite
         script: |
@@ -117,6 +125,11 @@ workflows:
       - name: Install dependencies
         script: |
           cd $CM_BUILD_DIR
+          pnpm install --no-frozen-lockfile
+
+      - name: Install mobile node_modules locally
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
           pnpm install --no-frozen-lockfile
 
       - name: Build workspace packages
