@@ -50,34 +50,125 @@ workflows:
         script: |
           set -e
           SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
+          MOBILE="$CM_BUILD_DIR/apps/mobile"
 
-          echo "=== settings.gradle BEFORE patch ==="
-          cat "$SETTINGS"
+          echo "=== Diagnostic: package locations ==="
+          # After the .npmrc fix, gradle-plugin should be at root node_modules.
+          # We try root first (fast path), then mobile dir (fallback for pnpm
+          # versions that don't hoist transitive deps despite the pattern).
+          PLUGIN=""
+          for SEARCH_DIR in "$CM_BUILD_DIR" "$MOBILE"; do
+            CANDIDATE=$(cd "$SEARCH_DIR" && node -e "
+              try {
+                process.stdout.write(
+                  require('path').dirname(
+                    require.resolve('@react-native/gradle-plugin/package.json')
+                  )
+                );
+              } catch(e) {
+                try {
+                  var rn = require.resolve('react-native/package.json');
+                  process.stdout.write(
+                    require('path').dirname(
+                      require.resolve('@react-native/gradle-plugin/package.json',
+                        { paths: [rn] })
+                    )
+                  );
+                } catch(e2) { process.stdout.write(''); }
+              }
+            " 2>/dev/null || true)
+            if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE" ]; then
+              PLUGIN="$CANDIDATE"
+              echo "  @react-native/gradle-plugin resolved from: $SEARCH_DIR"
+              echo "  path: $PLUGIN"
+              break
+            fi
+          done
 
-          # Resolve the real path of @react-native/gradle-plugin using node
-          # from the workspace root — works with pnpm virtual store because
-          # node resolves through .pnpm symlinks from CM_BUILD_DIR correctly.
-          PLUGIN=$(cd "$CM_BUILD_DIR" && node -e "const p=require.resolve('@react-native/gradle-plugin/package.json');const path=require('path');process.stdout.write(path.dirname(p));")
-
-          echo "Resolved plugin path: $PLUGIN"
-
-          if [ -z "$PLUGIN" ] || [ ! -d "$PLUGIN" ]; then
-            echo "ERROR: could not resolve @react-native/gradle-plugin — aborting"
+          if [ -z "$PLUGIN" ]; then
+            echo "ERROR: cannot locate @react-native/gradle-plugin in any search dir"
+            echo "Searched: $CM_BUILD_DIR, $MOBILE"
+            echo "pnpm virtual store contents:"
+            ls "$CM_BUILD_DIR/node_modules/.pnpm/" | grep gradle || echo "(none)"
             exit 1
           fi
 
-          # Rewrite settings.gradle with a clean, static includeBuild.
-          # The expo-generated file uses a dynamic node --print shell-exec that
-          # returns 'null' in a pnpm monorepo (hoisted to .pnpm virtual store).
-          printf 'pluginManagement { repositories { google(); mavenCentral() } }\n' > "$SETTINGS"
-          printf 'dependencyResolutionManagement { repositories { google(); mavenCentral() } }\n' >> "$SETTINGS"
-          printf "rootProject.name = 'ai-cage-mobile'\n" >> "$SETTINGS"
-          printf 'apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)\n' >> "$SETTINGS"
-          printf "include ':app'\n" >> "$SETTINGS"
-          printf 'includeBuild("%s")\n' "$PLUGIN" >> "$SETTINGS"
+          # Resolve expo and cli-platform-android (needed for autolinking)
+          EXPO_PKG=$(cd "$MOBILE" && node -e "
+            process.stdout.write(require('path').dirname(require.resolve('expo/package.json')));
+          ")
+          RNC_PKG=$(cd "$MOBILE" && node -e "
+            try {
+              var rn = require.resolve('react-native/package.json');
+              process.stdout.write(require('path').dirname(
+                require.resolve('@react-native-community/cli-platform-android/package.json',
+                  { paths: [rn] })
+              ));
+            } catch(e) {
+              process.stdout.write(require('path').dirname(
+                require.resolve('@react-native-community/cli-platform-android/package.json')
+              ));
+            }
+          ")
 
-          echo "=== settings.gradle AFTER patch ==="
+          echo "  expo:                 $EXPO_PKG"
+          echo "  cli-platform-android: $RNC_PKG"
+
+          echo "=== settings.gradle BEFORE ==="
           cat "$SETTINGS"
+
+          # Rewrite settings.gradle completely — the expo-generated version uses
+          # Groovy shell-exec (.execute(null, rootDir)) which always fails in a
+          # pnpm monorepo because rootDir=android/ has no node_modules/.
+          # We pre-resolve all paths in bash (where node resolution works) and
+          # write a static, deterministic settings.gradle.
+          #
+          # This template is equivalent to the expo-generated one for RN 0.74.x:
+          # - pluginManagement.includeBuild points to @react-native/gradle-plugin
+          # - plugins block loads com.facebook.react.settings
+          # - ReactSettingsExtension configures autolinking
+          # - autolinking.gradle from expo handles expo modules
+          # - native_modules.gradle from cli-platform-android handles RN modules
+          node -e "
+            var fs = require('fs');
+            var lines = [
+              'pluginManagement {',
+              '  includeBuild(\"' + '$PLUGIN' + '\")',
+              '  repositories { google(); mavenCentral() }',
+              '}',
+              'plugins { id(\"com.facebook.react.settings\") }',
+              '',
+              'extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->',
+              '  ex.autolinkLibrariesFromCommand()',
+              '}',
+              '',
+              \"rootProject.name = 'AI CAGE'\",
+              '',
+              'dependencyResolutionManagement {',
+              '  repositories { google(); mavenCentral() }',
+              '}',
+              '',
+              'apply from: new File(\"' + '$EXPO_PKG' + '\", \"../scripts/autolinking.gradle\");',
+              'useExpoModules()',
+              '',
+              'apply from: new File(\"' + '$RNC_PKG' + '\", \"../native_modules.gradle\");',
+              'applyNativeModulesSettingsGradle(settings)',
+              '',
+              \"include ':app'\",
+            ];
+            fs.writeFileSync('$SETTINGS', lines.join('\n') + '\n');
+            console.log('OK: settings.gradle rewritten (' + lines.length + ' lines)');
+          "
+
+          echo "=== settings.gradle AFTER ==="
+          cat "$SETTINGS"
+
+          # Sanity check: confirm no dynamic node calls remain
+          if grep -q '\.execute(null' "$SETTINGS"; then
+            echo "ERROR: dynamic .execute() still present after rewrite!"
+            exit 1
+          fi
+          echo "=== Patch complete ==="
 
       - name: Build Android debug APK
         script: |
