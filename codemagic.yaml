@@ -73,39 +73,45 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
-      # ── Step 8: Fix React Native path for Gradle (pnpm monorepo) ─────────
-      # pnpm hoists react-native to workspace root node_modules.
-      # Gradle (settings.gradle) calls `require.resolve('react-native/...')`
-      # from android/ dir which cannot find it. We create a symlink so the
-      # resolve works correctly.
-      - name: Fix react-native path for Gradle
+      # ── Step 8: Patch settings.gradle for pnpm monorepo ─────────────────
+      # expo prebuild generates settings.gradle with a node --print command
+      # that resolves react-native paths. In pnpm monorepo, this returns "null"
+      # because node_modules are at workspace root, not in apps/mobile.
+      # We patch the file to use an explicit path that works in both envs.
+      - name: Patch settings.gradle for pnpm monorepo
         script: |
-          RN_PATH=$(cd $CM_BUILD_DIR && node -e "console.log(require.resolve('react-native/package.json').replace('/package.json',''))" 2>/dev/null || echo "")
-          if [ -z "$RN_PATH" ]; then
-            # Try from apps/mobile
-            RN_PATH=$(cd $CM_BUILD_DIR/apps/mobile && node -e "console.log(require.resolve('react-native/package.json').replace('/package.json',''))" 2>/dev/null || echo "")
-          fi
-          echo "React Native path: $RN_PATH"
+          SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
+          echo "=== settings.gradle BEFORE patch ==="
+          cat "$SETTINGS"
+          echo "==="
 
-          # Create node_modules symlink in apps/mobile if react-native not there
-          MOBILE_RN="$CM_BUILD_DIR/apps/mobile/node_modules/react-native"
-          if [ ! -d "$MOBILE_RN" ]; then
-            mkdir -p "$CM_BUILD_DIR/apps/mobile/node_modules"
-            ln -sf "$RN_PATH" "$MOBILE_RN"
-            echo "Created symlink: $MOBILE_RN -> $RN_PATH"
-          else
-            echo "react-native already in apps/mobile/node_modules"
+          # Find react-native location
+          RN_PATH=$(node --print "require.resolve('react-native/package.json')" \
+            --experimental-vm-modules 2>/dev/null || \
+            node -e "console.log(require.resolve('react-native/package.json'))" 2>/dev/null || \
+            echo "")
+          RN_PATH="${RN_PATH%/package.json}"
+          echo "React Native found at: $RN_PATH"
+
+          if [ -z "$RN_PATH" ] || [ "$RN_PATH" = "null" ]; then
+            # Search in workspace root node_modules
+            RN_PATH="$CM_BUILD_DIR/node_modules/react-native"
           fi
 
-          # Also symlink @react-native which settings.gradle also needs
-          ROOT_NM="$CM_BUILD_DIR/node_modules"
-          MOBILE_NM="$CM_BUILD_DIR/apps/mobile/node_modules"
-          for pkg in "@react-native" "react" "metro" "metro-config" "metro-resolver" "@jest" "jest"; do
-            if [ -d "$ROOT_NM/$pkg" ] && [ ! -e "$MOBILE_NM/$pkg" ]; then
-              ln -sf "$ROOT_NM/$pkg" "$MOBILE_NM/$pkg"
-              echo "Symlinked: $pkg"
-            fi
-          done
+          RN_GRADLE_PLUGIN="$CM_BUILD_DIR/node_modules/@react-native/gradle-plugin"
+
+          # Replace the dynamic node --print resolve with static paths
+          sed -i.bak \
+            "s|new File(\[\"node\", \"--print\", \"require.resolve('@react-native/gradle-plugin.*\").*\.execute.*|new File(\"$RN_GRADLE_PLUGIN\")|g" \
+            "$SETTINGS"
+
+          sed -i.bak2 \
+            "s|new File(\[\"node\", \"--print\", \"require.resolve('react-native/.*\").*\.execute.*|new File(\"$RN_PATH\")|g" \
+            "$SETTINGS"
+
+          echo "=== settings.gradle AFTER patch ==="
+          cat "$SETTINGS"
+          echo "==="
 
       # ── Step 9: Build debug APK ───────────────────────────────────────────
       - name: Build Android debug APK
