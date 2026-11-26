@@ -182,15 +182,18 @@ if (idx !== -1) {
   console.log('[patch] app/build.gradle: removed previous AI CAGE block');
 }
 
+// IMPORTANT: Do NOT re-apply native_modules.gradle here.
+// expo prebuild already generates an `if (rnVersion < 0.75)` block at the
+// bottom of app/build.gradle that applies native_modules.gradle and calls
+// applyNativeModulesAppBuildGradle(project). Adding it again produces:
+//   "Cannot add task 'generatePackageList' as a task with that name already exists."
+// We only append BouncyCastle dependencies here.
 appBuild += '\n' +
   '// AI CAGE -- BouncyCastle for on-device MITM proxy CA (LocalCertManager)\n' +
   'dependencies {\n' +
   '    implementation "org.bouncycastle:bcpkix-jdk18on:1.78.1"\n' +
   '    implementation "org.bouncycastle:bcprov-jdk18on:1.78.1"\n' +
-  '}\n' +
-  '\n' +
-  '// AI CAGE -- app-level autolinking\n' +
-  'apply from: new File("' + rncDir + '", "native_modules.gradle"); applyNativeModulesAppBuildGradle(project)\n';
+  '}\n';
 
 writeFileSync(appBuildPath, appBuild);
 console.log('[patch] app/build.gradle written OK');
