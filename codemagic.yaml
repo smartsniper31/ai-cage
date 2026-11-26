@@ -118,7 +118,7 @@ workflows:
           # The correct template for RN 0.74.3 is the 4-line version from
           # react-native/template/android/settings.gradle — simple, no plugin block.
           printf "rootProject.name = 'AI CAGE'\n" > "$SETTINGS"
-          printf 'apply from: new File("%s", "../native_modules.gradle"); applyNativeModulesSettingsGradle(settings)\n' "$RNC_PKG" >> "$SETTINGS"
+          printf 'apply from: new File("%s", "native_modules.gradle"); applyNativeModulesSettingsGradle(settings)\n' "$RNC_PKG" >> "$SETTINGS"
           printf "include ':app'\n" >> "$SETTINGS"
           printf 'includeBuild("%s")\n' "$PLUGIN" >> "$SETTINGS"
 
