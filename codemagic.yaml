@@ -52,10 +52,13 @@ workflows:
           SETTINGS="$CM_BUILD_DIR/apps/mobile/android/settings.gradle"
           MOBILE="$CM_BUILD_DIR/apps/mobile"
 
-          echo "=== Diagnostic: package locations ==="
-          # After the .npmrc fix, gradle-plugin should be at root node_modules.
-          # We try root first (fast path), then mobile dir (fallback for pnpm
-          # versions that don't hoist transitive deps despite the pattern).
+          echo "=== settings.gradle BEFORE ==="
+          cat "$SETTINGS"
+          echo "=============================="
+
+          # Resolve @react-native/gradle-plugin — the directory that contains
+          # build.gradle.kts and settings.gradle.kts for the Gradle composite build.
+          # We try CM_BUILD_DIR first (after .npmrc hoist fix), then MOBILE as fallback.
           PLUGIN=""
           for SEARCH_DIR in "$CM_BUILD_DIR" "$MOBILE"; do
             CANDIDATE=$(cd "$SEARCH_DIR" && node -e "
@@ -79,24 +82,17 @@ workflows:
             " 2>/dev/null || true)
             if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE" ]; then
               PLUGIN="$CANDIDATE"
-              echo "  @react-native/gradle-plugin resolved from: $SEARCH_DIR"
-              echo "  path: $PLUGIN"
+              echo "  @react-native/gradle-plugin => $PLUGIN"
               break
             fi
           done
 
           if [ -z "$PLUGIN" ]; then
-            echo "ERROR: cannot locate @react-native/gradle-plugin in any search dir"
-            echo "Searched: $CM_BUILD_DIR, $MOBILE"
-            echo "pnpm virtual store contents:"
-            ls "$CM_BUILD_DIR/node_modules/.pnpm/" | grep gradle || echo "(none)"
+            echo "ERROR: cannot locate @react-native/gradle-plugin"
             exit 1
           fi
 
-          # Resolve expo and cli-platform-android (needed for autolinking)
-          EXPO_PKG=$(cd "$MOBILE" && node -e "
-            process.stdout.write(require('path').dirname(require.resolve('expo/package.json')));
-          ")
+          # Resolve @react-native-community/cli-platform-android for native_modules.gradle
           RNC_PKG=$(cd "$MOBILE" && node -e "
             try {
               var rn = require.resolve('react-native/package.json');
@@ -110,65 +106,25 @@ workflows:
               ));
             }
           ")
+          echo "  cli-platform-android  => $RNC_PKG"
 
-          echo "  expo:                 $EXPO_PKG"
-          echo "  cli-platform-android: $RNC_PKG"
-
-          echo "=== settings.gradle BEFORE ==="
-          cat "$SETTINGS"
-
-          # Rewrite settings.gradle completely — the expo-generated version uses
-          # Groovy shell-exec (.execute(null, rootDir)) which always fails in a
-          # pnpm monorepo because rootDir=android/ has no node_modules/.
-          # We pre-resolve all paths in bash (where node resolution works) and
-          # write a static, deterministic settings.gradle.
+          # Write the settings.gradle following the OFFICIAL react-native 0.74 template.
           #
-          # This template is equivalent to the expo-generated one for RN 0.74.x:
-          # - pluginManagement.includeBuild points to @react-native/gradle-plugin
-          # - plugins block loads com.facebook.react.settings
-          # - ReactSettingsExtension configures autolinking
-          # - autolinking.gradle from expo handles expo modules
-          # - native_modules.gradle from cli-platform-android handles RN modules
-          node -e "
-            var fs = require('fs');
-            var lines = [
-              'pluginManagement {',
-              '  includeBuild(\"' + '$PLUGIN' + '\")',
-              '  repositories { google(); mavenCentral() }',
-              '}',
-              'plugins { id(\"com.facebook.react.settings\") }',
-              '',
-              'extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->',
-              '  ex.autolinkLibrariesFromCommand()',
-              '}',
-              '',
-              \"rootProject.name = 'AI CAGE'\",
-              '',
-              'dependencyResolutionManagement {',
-              '  repositories { google(); mavenCentral() }',
-              '}',
-              '',
-              'apply from: new File(\"' + '$EXPO_PKG' + '\", \"../scripts/autolinking.gradle\");',
-              'useExpoModules()',
-              '',
-              'apply from: new File(\"' + '$RNC_PKG' + '\", \"../native_modules.gradle\");',
-              'applyNativeModulesSettingsGradle(settings)',
-              '',
-              \"include ':app'\",
-            ];
-            fs.writeFileSync('$SETTINGS', lines.join('\n') + '\n');
-            console.log('OK: settings.gradle rewritten (' + lines.length + ' lines)');
-          "
+          # IMPORTANT: We do NOT use pluginManagement + plugins{id("com.facebook.react.settings")}
+          # because that plugin does NOT exist in @react-native/gradle-plugin@0.74.x.
+          # It was introduced in RN 0.75+. Using it on 0.74 causes:
+          #   "Plugin [id: 'com.facebook.react.settings'] was not found"
+          #
+          # The correct template for RN 0.74.3 is the 4-line version from
+          # react-native/template/android/settings.gradle — simple, no plugin block.
+          printf "rootProject.name = 'AI CAGE'\n" > "$SETTINGS"
+          printf 'apply from: new File("%s", "../native_modules.gradle"); applyNativeModulesSettingsGradle(settings)\n' "$RNC_PKG" >> "$SETTINGS"
+          printf "include ':app'\n" >> "$SETTINGS"
+          printf 'includeBuild("%s")\n' "$PLUGIN" >> "$SETTINGS"
 
           echo "=== settings.gradle AFTER ==="
           cat "$SETTINGS"
-
-          # Sanity check: confirm no dynamic node calls remain
-          if grep -q '\.execute(null' "$SETTINGS"; then
-            echo "ERROR: dynamic .execute() still present after rewrite!"
-            exit 1
-          fi
-          echo "=== Patch complete ==="
+          echo "=============================="
 
       - name: Build Android debug APK
         script: |
