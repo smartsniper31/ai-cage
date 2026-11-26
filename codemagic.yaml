@@ -46,6 +46,31 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           npx expo prebuild --platform android --clean
 
+      - name: Restore custom Android files overwritten by expo prebuild
+        script: |
+          set -e
+          cd $CM_BUILD_DIR
+          # expo prebuild --clean regenerates the entire android/ directory,
+          # overwriting our custom files that are tracked in git:
+          #   - app/build.gradle   : our version uses BouncyCastle + no reactAndroidLibs catalog
+          #   - app/src/main/kotlin/**  : 7 Kotlin files for the VPN native module
+          #   - app/src/main/res/values/strings.xml : custom strings
+          #
+          # We restore them from git HEAD before Gradle runs.
+          git checkout HEAD -- \
+            apps/mobile/android/app/build.gradle \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/AiCageVpnService.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/AiEndpointMatcher.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/CageBridge.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/CageNativeModule.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/CageVpnModule.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/CageVpnPackage.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/LocalCertManager.kt \
+            apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/LocalMitmProxy.kt \
+            apps/mobile/android/app/src/main/res/values/strings.xml
+          echo "Custom Android files restored from git:"
+          git diff --name-only HEAD apps/mobile/android/ || true
+
       - name: Fix settings.gradle — patch @react-native/gradle-plugin path
         script: |
           set -e
