@@ -62,12 +62,21 @@ function isDynamicLine(l) {
          l.includes("new File(['node'");
 }
 
-// Classify what a block resolves to
+// Classify what a block resolves to.
+//
+// ORDER IS CRITICAL — more specific patterns must come before generic ones:
+//   - 'cli-platform-android' / 'native_modules.gradle' BEFORE 'react-native/package.json'
+//     because the RNC block contains require.resolve('react-native/package.json') as
+//     a {paths:[]} argument and would otherwise be misclassified as 'toml'.
+//   - 'gradle-plugin' first because it is unambiguous.
+//   - 'expo/package.json' before generic react-native checks.
 function classify(block) {
   if (block.includes('gradle-plugin')) return 'plugin';
+  // RNC must be tested before 'toml': the cli-platform-android block uses
+  // require.resolve('react-native/package.json') as a paths[] argument.
+  if (block.includes('cli-platform-android') || block.includes('native_modules.gradle')) return 'rnc';
   if (block.includes('autolinking.gradle') || block.includes("'expo/package.json'") || block.includes('"expo/package.json"')) return 'expo';
   if (block.includes('libs.versions.toml') || block.includes("'react-native/package.json'") || block.includes('"react-native/package.json"')) return 'toml';
-  if (block.includes('cli-platform-android') || block.includes('native_modules.gradle')) return 'rnc';
   return 'unknown';
 }
 
@@ -124,6 +133,13 @@ while (i < lines.length) {
     } else if (kind === 'rnc') {
       if (block.includes('apply from:')) {
         out.push(indent + 'apply from: new File("' + rncDir + '", "native_modules.gradle"); applyNativeModulesSettingsGradle(settings)');
+        // Consume the next line if it is a bare applyNativeModulesSettingsGradle(settings)
+        // call that was on a separate line in the original file — the patch already
+        // includes it inline above and would otherwise produce a duplicate.
+        if (i < lines.length && lines[i] && lines[i].trim() === 'applyNativeModulesSettingsGradle(settings)') {
+          console.log('[patch] consumed duplicate applyNativeModulesSettingsGradle line');
+          i++;
+        }
       } else {
         out.push(indent + '"' + rncDir + '"');
       }
