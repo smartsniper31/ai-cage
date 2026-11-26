@@ -1,0 +1,66 @@
+pluginManagement {
+  def version = providers.exec {
+    commandLine("node", "-e", "console.log(require('react-native/package.json').version);")
+  }.standardOutput.asText.get().trim()
+  def (_, reactNativeMinor, reactNativePatch) = version.split("-")[0].tokenize('.').collect { it.toInteger() }
+
+  includeBuild("c:\Users\frik\Desktop\stuff-final\AI CAGE\ai-cage\node_modules\.pnpm\@react-native+gradle-plugin@0.74.85\node_modules\@react-native\gradle-plugin")
+  if(reactNativeMinor == 74 && reactNativePatch <= 3){
+    includeBuild("react-settings-plugin")
+  }
+}
+
+plugins { id("com.facebook.react.settings") }
+
+def getRNMinorVersion() {
+  def version = providers.exec {
+    commandLine("node", "-e", "console.log(require('react-native/package.json').version);")
+  }.standardOutput.asText.get().trim()
+
+  def coreVersion = version.split("-")[0]
+  def (major, minor, patch) = coreVersion.tokenize('.').collect { it.toInteger() }
+
+  return minor
+}
+
+if (getRNMinorVersion() >= 75) {
+  extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
+    if (System.getenv('EXPO_UNSTABLE_CORE_AUTOLINKING') == '1') {
+      println('\u001B[32mUsing expo-modules-autolinking as core autolinking source\u001B[0m')
+      def command = [
+        'node',
+        '--no-warnings',
+        '--eval',
+        'require(require.resolve(\'expo-modules-autolinking\', { paths: [require.resolve(\'expo/package.json\')] }))(process.argv.slice(1))',
+        'react-native-config',
+        '--json',
+        '--platform',
+        'android'
+      ].toList()
+      ex.autolinkLibrariesFromCommand(command)
+    } else {
+      ex.autolinkLibrariesFromCommand()
+    }
+  }
+}
+
+rootProject.name = 'AI CAGE'
+
+dependencyResolutionManagement {
+  versionCatalogs {
+    reactAndroidLibs {
+      from(files("C:\Users\frik\Desktop\stuff-final\AI CAGE\ai-cage\node_modules\.pnpm\react-native@0.74.3_@babel+core@7.29.13_@babel+preset-env@7.29.14_@babel+core@7.29.13__@types+react@18.2.79_react@18.2.0\node_modules\react-native/gradle/libs.versions.toml"))
+    }
+  }
+}
+
+apply from: new File("C:\Users\frik\Desktop\stuff-final\AI CAGE\ai-cage\node_modules\.pnpm\expo@51.0.39_@babel+core@7.29.13_@babel+preset-env@7.29.14_@babel+core@7.29.13__react-native@_dzbkpxor25v7xdfg4o5jncsy4u\node_modules\expo", "scripts/autolinking.gradle");
+useExpoModules()
+
+if (getRNMinorVersion() < 75) {
+  from(files("C:\Users\frik\Desktop\stuff-final\AI CAGE\ai-cage\node_modules\.pnpm\react-native@0.74.3_@babel+core@7.29.13_@babel+preset-env@7.29.14_@babel+core@7.29.13__@types+react@18.2.79_react@18.2.0\node_modules\react-native/gradle/libs.versions.toml"))
+  applyNativeModulesSettingsGradle(settings)
+}
+
+include ':app'
+includeBuild("c:\Users\frik\Desktop\stuff-final\AI CAGE\ai-cage\node_modules\.pnpm\@react-native+gradle-plugin@0.74.85\node_modules\@react-native\gradle-plugin")

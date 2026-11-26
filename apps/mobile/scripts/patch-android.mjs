@@ -75,10 +75,15 @@ let i = 0;
 while (i < lines.length) {
   const line = lines[i];
 
-  // Skip the react-settings-plugin workaround (doesn't exist in our repo)
+  // Keep react-settings-plugin — required for RN 0.74.x (declares com.facebook.react.settings).
+  // expo prebuild generates android/react-settings-plugin/ alongside settings.gradle.
+  // This directory is committed to git and restored by CI before Gradle runs.
+  // DO NOT remove this includeBuild — removing it causes:
+  //   "Plugin [id: 'com.facebook.react.settings'] was not found"
   if (line.trim() === 'includeBuild("react-settings-plugin")' ||
       line.trim() === "includeBuild('react-settings-plugin')") {
-    console.log('[patch] removed react-settings-plugin (line ' + (i+1) + ')');
+    console.log('[patch] keeping react-settings-plugin includeBuild (required for RN 0.74.x)');
+    out.push(line);
     i++;
     continue;
   }

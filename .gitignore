@@ -53,3 +53,6 @@ apps/mobile/eas-build-*.json
 # It must NOT be tracked — the expo-generated version is needed for the
 # com.facebook.react plugin, BOM, and rootProject.ext.* variables.
 apps/mobile/android/app/build.gradle
+# android/app/src/main/java/ — expo-generated Java stubs, not our code.
+# Our Kotlin VPN sources are in src/main/kotlin/ and ARE tracked.
+apps/mobile/android/app/src/main/java/
