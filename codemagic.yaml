@@ -91,18 +91,34 @@ workflows:
           echo "Patching $APP_BUILD"
           echo "  cli-platform-android => $RNC_PKG"
 
-          # Remove any existing BouncyCastle lines (idempotent)
-          sed -i '/bouncycastle/d' "$APP_BUILD"
-
-          # Append BouncyCastle and autolinking app-level before the last closing brace
-          # Strategy: append at end of file — Groovy build.gradle accepts this.
-          printf '\n// AI CAGE — BouncyCastle for on-device MITM proxy CA\n' >> "$APP_BUILD"
-          printf 'dependencies {\n' >> "$APP_BUILD"
-          printf '    implementation "org.bouncycastle:bcpkix-jdk18on:1.78.1"\n' >> "$APP_BUILD"
-          printf '    implementation "org.bouncycastle:bcprov-jdk18on:1.78.1"\n' >> "$APP_BUILD"
-          printf '}\n' >> "$APP_BUILD"
-          printf '\n// AI CAGE — app-level autolinking\n' >> "$APP_BUILD"
-          printf 'apply from: new File("%s", "native_modules.gradle"); applyNativeModulesAppBuildGradle(project)\n' "$RNC_PKG" >> "$APP_BUILD"
+          # Use Node.js to patch app/build.gradle — avoids sed macOS/Linux incompatibility.
+          # (macOS BSD sed requires 'sed -i ""' while GNU sed uses 'sed -i' — both fail portably)
+          # Node: remove any existing BouncyCastle lines, then append our additions.
+          node -e "
+            var fs = require('fs');
+            var content = fs.readFileSync('$APP_BUILD', 'utf8');
+            // Remove any previously-appended BouncyCastle block (idempotent)
+            content = content.split('\n').filter(function(l) {
+              return l.indexOf('bouncycastle') === -1 &&
+                     l.indexOf('AI CAGE') === -1 &&
+                     l.indexOf('applyNativeModulesAppBuildGradle') === -1;
+            }).join('\n');
+            // Append BouncyCastle + app-level autolinking at end of file
+            var addition = [
+              '',
+              '// AI CAGE -- BouncyCastle for on-device MITM proxy CA (LocalCertManager)',
+              'dependencies {',
+              '    implementation \"org.bouncycastle:bcpkix-jdk18on:1.78.1\"',
+              '    implementation \"org.bouncycastle:bcprov-jdk18on:1.78.1\"',
+              '}',
+              '',
+              '// AI CAGE -- app-level autolinking',
+              'apply from: new File(\"$RNC_PKG\", \"native_modules.gradle\"); applyNativeModulesAppBuildGradle(project)',
+              '',
+            ].join('\n');
+            fs.writeFileSync('$APP_BUILD', content + addition);
+            console.log('OK: app/build.gradle patched');
+          "
 
           echo "=== app/build.gradle (last 20 lines) ==="
           tail -20 "$APP_BUILD"
