@@ -126,7 +126,8 @@ workflows:
             "$APP_BUILD" \
             "$PLUGIN" \
             "$RN_PKG" \
-            "$RNC_PKG"
+            "$RNC_PKG" \
+            "$EXPO_PKG"
 
           echo "=== settings.gradle AFTER patch ==="
           cat "$SETTINGS"

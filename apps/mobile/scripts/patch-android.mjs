@@ -4,117 +4,173 @@
  * Patches the expo-generated Android files for pnpm monorepo compatibility.
  *
  * Usage:
- *   node patch-android.mjs <settings.gradle> <app/build.gradle> <plugin_dir> <rn_dir> <rnc_dir>
- *
- * Arguments:
- *   settings.gradle  — path to android/settings.gradle
- *   app/build.gradle — path to android/app/build.gradle
- *   plugin_dir       — absolute path to @react-native/gradle-plugin
- *   rn_dir           — absolute path to react-native package
- *   rnc_dir          — absolute path to @react-native-community/cli-platform-android
+ *   node patch-android.mjs <settings.gradle> <app/build.gradle>
+ *                          <plugin_dir> <rn_dir> <rnc_dir> <expo_dir>
  */
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 
-import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+const args = process.argv.slice(2);
+const [settingsPath, appBuildPath, pluginDir, rnDir, rncDir, expoDir] = args;
 
-const [,, settingsPath, appBuildPath, pluginDir, rnDir, rncDir] = process.argv;
-
-if (!settingsPath || !appBuildPath || !pluginDir || !rnDir || !rncDir) {
-  console.error('Usage: node patch-android.mjs <settings> <app/build.gradle> <plugin_dir> <rn_dir> <rnc_dir>');
+if (args.length < 6) {
+  console.error('Usage: node patch-android.mjs <settings> <app/build.gradle> <plugin_dir> <rn_dir> <rnc_dir> <expo_dir>');
   process.exit(1);
 }
 
-// ── Patch 1: settings.gradle ─────────────────────────────────────────────────
-// expo prebuild generates settings.gradle with dynamic node --print calls
-// that return "null" in a pnpm monorepo (packages are in .pnpm virtual store,
-// not accessible via require.resolve() from android/).
-//
-// STRATEGY: surgical replacement — keep everything expo generated
-// (pluginManagement, versionCatalogs/reactAndroidLibs, ReactSettingsExtension,
-// autolinking.gradle, useExpoModules(), include ':app') but replace ONLY the
-// 4 dynamic .execute(null, rootDir) calls with pre-resolved absolute paths.
-
-let settings = readFileSync(settingsPath, 'utf8');
-
-// 1a. includeBuild for gradle-plugin (pluginManagement block)
-//     Matches: includeBuild(new File([...].execute(null, rootDir).text.trim()).getParentFile()...)
-settings = settings.replace(
-  /includeBuild\(new File\([\s\S]*?\.execute\(null,\s*rootDir\)\.text\.trim\(\)\)\.getParentFile\(\)(?:\.toString\(\))?\)/g,
-  `includeBuild("${pluginDir}")`
-);
-
-// 1b. includeBuild at the bottom (the one with { paths: [...] } variant)
-//     Same pattern — already covered by 1a but add explicit fallback
-settings = settings.replace(
-  /includeBuild\(new File\([\s\S]*?gradle-plugin[\s\S]*?\.execute\(null,\s*rootDir\)[\s\S]*?\)\)/g,
-  `includeBuild("${pluginDir}")`
-);
-
-// 1c. versionCatalogs reactAndroidLibs — libs.versions.toml path
-//     Matches: from(files(new File([...].execute(null, rootDir).text.trim(), "../gradle/libs.versions.toml")))
-settings = settings.replace(
-  /from\(files\(new File\([\s\S]*?\.execute\(null,\s*rootDir\)\.text\.trim\(\),\s*["']\.\.\/gradle\/libs\.versions\.toml["']\)\)\)/g,
-  `from(files("${rnDir}/gradle/libs.versions.toml"))`
-);
-
-// 1d. expo autolinking.gradle path
-//     Matches: apply from: new File([...].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle")
-settings = settings.replace(
-  /apply from: new File\([\s\S]*?expo[\s\S]*?\.execute\(null,\s*rootDir\)\.text\.trim\(\),\s*["']\.\.\/scripts\/autolinking\.gradle["']\)/g,
-  `apply from: new File("${rnDir}/../expo/scripts/autolinking.gradle")`
-);
-
-// 1e. Final check: replace any remaining .execute(null, rootDir) in includeBuild
-settings = settings.replace(
-  /includeBuild\(new File\([\s\S]*?\.execute\(null,\s*rootDir\)[\s\S]*?\)\)/g,
-  `includeBuild("${pluginDir}")`
-);
-
-console.log('[patch-android] settings.gradle: checking remaining issues...');
-if (settings.includes('.execute(null, rootDir)')) {
-  const lines = settings.split('\n').filter(l => l.includes('.execute(null, rootDir)'));
-  console.error('[patch-android] WARNING: unreplaced .execute(null, rootDir) remaining:');
-  lines.forEach(l => console.error('  ' + l.trim()));
-} else {
-  console.log('[patch-android] settings.gradle: all dynamic calls replaced ✓');
+// ── Validate paths ────────────────────────────────────────────────────────────
+const paths = { pluginDir, rnDir, rncDir, expoDir };
+for (const [name, dir] of Object.entries(paths)) {
+  if (!existsSync(dir)) {
+    console.error('[patch] ERROR: ' + name + ' does not exist: ' + dir);
+    process.exit(1);
+  }
 }
 
-writeFileSync(settingsPath, settings);
-console.log('[patch-android] settings.gradle written.');
+const autolinkGradle = expoDir + '/scripts/autolinking.gradle';
+const nativeModules  = rncDir + '/native_modules.gradle';
+const libsToml       = rnDir + '/gradle/libs.versions.toml';
 
-// ── Patch 2: app/build.gradle ────────────────────────────────────────────────
-// expo-generated app/build.gradle is correct (uses com.facebook.react plugin,
-// BOM, rootProject.ext.*). We only need to ADD:
-//   - BouncyCastle (for LocalCertManager MITM proxy CA)
-//   - app-level autolinking (applyNativeModulesAppBuildGradle)
-// We remove any previously-appended AI CAGE block first (idempotent).
+for (const [desc, p] of [['autolinking.gradle', autolinkGradle], ['native_modules.gradle', nativeModules], ['libs.versions.toml', libsToml]]) {
+  if (!existsSync(p)) {
+    console.error('[patch] ERROR: ' + desc + ' not found: ' + p);
+    process.exit(1);
+  }
+  console.log('[patch] confirmed: ' + desc + ' => ' + p);
+}
 
+// ── Patch 1: settings.gradle — surgical line-by-line replacement ─────────────
+//
+// expo prebuild generates settings.gradle with dynamic node --print calls:
+//   new File(["node","--print","require.resolve(...)"].execute(null,rootDir).text.trim())
+// These return "null" in pnpm monorepo (packages are in .pnpm virtual store,
+// not accessible from android/ at Gradle config time).
+//
+// We process line-by-line, collecting multi-line blocks, and replace each
+// dynamic expression with a pre-resolved absolute path.
+
+const rawSettings = readFileSync(settingsPath, 'utf8');
+console.log('[patch] settings.gradle BEFORE:\n' + rawSettings + '\n---');
+
+const lines = rawSettings.split('\n');
+const out = [];
+
+// Helper: does this line start a dynamic new File(["node"...]) block?
+function isDynamicLine(l) {
+  return l.includes('.execute(null, rootDir)') ||
+         l.includes('.execute(null,rootDir)') ||
+         l.includes('new File(["node"') ||
+         l.includes("new File(['node'");
+}
+
+// Classify what a block resolves to
+function classify(block) {
+  if (block.includes('gradle-plugin')) return 'plugin';
+  if (block.includes('autolinking.gradle') || block.includes("'expo/package.json'") || block.includes('"expo/package.json"')) return 'expo';
+  if (block.includes('libs.versions.toml') || block.includes("'react-native/package.json'") || block.includes('"react-native/package.json"')) return 'toml';
+  if (block.includes('cli-platform-android') || block.includes('native_modules.gradle')) return 'rnc';
+  return 'unknown';
+}
+
+let i = 0;
+while (i < lines.length) {
+  const line = lines[i];
+
+  // Skip the react-settings-plugin workaround (doesn't exist in our repo)
+  if (line.trim() === 'includeBuild("react-settings-plugin")' ||
+      line.trim() === "includeBuild('react-settings-plugin')") {
+    console.log('[patch] removed react-settings-plugin (line ' + (i+1) + ')');
+    i++;
+    continue;
+  }
+
+  if (isDynamicLine(line)) {
+    // Collect the full block until parens balance
+    let block = line;
+    let depth = 0;
+    for (const ch of line) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+    }
+    let j = i + 1;
+    while (depth > 0 && j < lines.length) {
+      block += '\n' + lines[j];
+      for (const ch of lines[j]) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+      }
+      j++;
+    }
+    i = j; // skip all consumed lines
+
+    const kind = classify(block);
+    const indent = line.match(/^(\s*)/)[1];
+
+    if (kind === 'plugin') {
+      out.push(indent + 'includeBuild("' + pluginDir + '")');
+    } else if (kind === 'expo') {
+      // Preserve the "apply from:" prefix if present, then useExpoModules stays
+      if (block.includes('apply from:')) {
+        out.push(indent + 'apply from: new File("' + expoDir + '", "scripts/autolinking.gradle");');
+      } else {
+        out.push(indent + '"' + expoDir + '/scripts/autolinking.gradle"');
+      }
+    } else if (kind === 'toml') {
+      out.push(indent + 'from(files("' + libsToml + '"))');
+    } else if (kind === 'rnc') {
+      if (block.includes('apply from:')) {
+        out.push(indent + 'apply from: new File("' + rncDir + '", "native_modules.gradle"); applyNativeModulesSettingsGradle(settings)');
+      } else {
+        out.push(indent + '"' + rncDir + '"');
+      }
+    } else {
+      console.error('[patch] WARNING: unknown dynamic block at line ' + (i - (block.split('\n').length) + 1) + ':');
+      console.error('  ' + block.split('\n')[0].trim());
+      out.push('// [patch] replaced unknown dynamic call');
+    }
+    continue;
+  }
+
+  out.push(line);
+  i++;
+}
+
+const patched = out.join('\n');
+
+// Final check
+const residual = out.filter(function(l) {
+  return l.includes('.execute(null, rootDir)') || l.includes('.execute(null,rootDir)');
+});
+if (residual.length > 0) {
+  console.error('[patch] ERROR: .execute(null, rootDir) still present:');
+  residual.forEach(function(l) { console.error('  ' + l.trim()); });
+  process.exit(1);
+}
+
+console.log('[patch] settings.gradle AFTER:\n' + patched + '\n---');
+writeFileSync(settingsPath, patched);
+console.log('[patch] settings.gradle written OK');
+
+// ── Patch 2: app/build.gradle — append BouncyCastle + autolinking ─────────────
 let appBuild = readFileSync(appBuildPath, 'utf8');
 
-// Remove previously-appended AI CAGE block if present (idempotency)
-const AI_CAGE_MARKER = '// AI CAGE --';
-const markerIdx = appBuild.indexOf(AI_CAGE_MARKER);
-if (markerIdx !== -1) {
-  appBuild = appBuild.slice(0, markerIdx).trimEnd() + '\n';
-  console.log('[patch-android] app/build.gradle: removed previous AI CAGE block.');
+// Idempotent: strip previous AI CAGE block
+const MARKER = '// AI CAGE --';
+const idx = appBuild.indexOf(MARKER);
+if (idx !== -1) {
+  appBuild = appBuild.slice(0, idx).trimEnd() + '\n';
+  console.log('[patch] app/build.gradle: removed previous AI CAGE block');
 }
 
-// Append BouncyCastle and app-level autolinking
-const addition = `
+appBuild += '\n' +
+  '// AI CAGE -- BouncyCastle for on-device MITM proxy CA (LocalCertManager)\n' +
+  'dependencies {\n' +
+  '    implementation "org.bouncycastle:bcpkix-jdk18on:1.78.1"\n' +
+  '    implementation "org.bouncycastle:bcprov-jdk18on:1.78.1"\n' +
+  '}\n' +
+  '\n' +
+  '// AI CAGE -- app-level autolinking\n' +
+  'apply from: new File("' + rncDir + '", "native_modules.gradle"); applyNativeModulesAppBuildGradle(project)\n';
 
-// AI CAGE -- BouncyCastle for on-device MITM proxy CA (LocalCertManager)
-// Required by LocalCertManager.kt to generate self-signed X.509 certificates
-// for the local HTTPS interception proxy. No network calls, no key export.
-dependencies {
-    implementation "org.bouncycastle:bcpkix-jdk18on:1.78.1"
-    implementation "org.bouncycastle:bcprov-jdk18on:1.78.1"
-}
-
-// AI CAGE -- app-level autolinking (registers VPN native module with RN)
-apply from: new File("${rncDir}", "native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
-`;
-
-writeFileSync(appBuildPath, appBuild + addition);
-console.log('[patch-android] app/build.gradle written.');
-
-console.log('[patch-android] Done.');
+writeFileSync(appBuildPath, appBuild);
+console.log('[patch] app/build.gradle written OK');
+console.log('[patch] Done.');
