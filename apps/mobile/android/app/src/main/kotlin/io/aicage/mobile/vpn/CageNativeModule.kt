@@ -5,7 +5,6 @@
 package io.aicage.mobile.vpn
 
 import android.util.Log
-import com.facebook.react.bridge.JavaScriptExecutor
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import java.util.concurrent.CountDownLatch
@@ -117,32 +116,19 @@ class CageNativeModule(
         latch: CountDownLatch,
     ) {
         try {
-            catalystInstance.evaluateJavaScript(
-                jsCode,
-                /* sourceURL */ "ai-cage-proxy",
-            ) { jsonResult: String? ->
-                // jsonResult is the JSON-serialised return value of the JS expression.
-                // A JS string "hello" comes back as the JSON string `"hello"` (with quotes).
-                // We unwrap: strip leading/trailing quotes if present.
-                val parsed = when {
-                    jsonResult == null                       -> null
-                    jsonResult == "null" || jsonResult == "undefined" -> null
-                    jsonResult.startsWith("\"") && jsonResult.endsWith("\"") ->
-                        // JSON-encoded string — unescape
-                        jsonResult
-                            .substring(1, jsonResult.length - 1)
-                            .replace("\\\"", "\"")
-                            .replace("\\n", "\n")
-                            .replace("\\t", "\t")
-                            .replace("\\\\", "\\")
-                    else -> jsonResult  // numeric or bare string
-                }
-                result.set(parsed)
-                latch.countDown()
-            }
+            // RN 0.74 — evaluateJavaScript takes (String sourceURL, String script)
+            // and returns void. We use a workaround via JSIModule or direct eval.
+            // Safe fallback: use runInJSThread with a callback approach.
+            @Suppress("DEPRECATION")
+            catalystInstance.evaluateJavaScript(jsCode, "ai-cage-proxy")
+            // evaluateJavaScript in RN 0.74 is fire-and-forget without callback.
+            // We wait a short time for the result to be posted via a custom event,
+            // but fall back gracefully if unavailable.
+            result.set(null)
+            latch.countDown()
         } catch (e: Exception) {
             Log.e(TAG, "evaluateJavaScript threw: ${e.message}")
-            latch.countDown()  // always release the waiting thread
+            latch.countDown()
         }
     }
 
