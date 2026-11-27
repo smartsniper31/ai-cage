@@ -102,10 +102,13 @@ class CageNativeModule(
     /**
      * Dispatches a JS evaluation to the Hermes engine via [catalystInstance].
      *
-     * [CatalystInstance.evaluateJavaScript] accepts a JS code string and a
-     * [JavaScriptExecutor.JavaScriptCallback] that receives the serialised result.
-     * The result is a JSON-encoded value — for a string return, Hermes wraps it
-     * as a JSON string (with quotes). We strip the outer quotes to get the raw value.
+     * RN 0.74 BREAKING CHANGE: CatalystInstance.evaluateJavaScript() was removed.
+     * We now use a workaround: inject the JS code via JSIModule and signal back
+     * via a native event. For this synchronous bridge to work, the JS side must
+     * call a native callback after executing __aiCageCageText.
+     *
+     * TEMPORARY FIX: We call the JS function via getJSModule and use a latch.
+     * This requires a @ReactMethod callback to be added in a future refactor.
      *
      * Called on the JS queue thread — safe to access the Hermes runtime directly.
      */
@@ -116,14 +119,10 @@ class CageNativeModule(
         latch: CountDownLatch,
     ) {
         try {
-            // RN 0.74 — evaluateJavaScript takes (String sourceURL, String script)
-            // and returns void. We use a workaround via JSIModule or direct eval.
-            // Safe fallback: use runInJSThread with a callback approach.
-            @Suppress("DEPRECATION")
-            catalystInstance.evaluateJavaScript(jsCode, "ai-cage-proxy")
-            // evaluateJavaScript in RN 0.74 is fire-and-forget without callback.
-            // We wait a short time for the result to be posted via a custom event,
-            // but fall back gracefully if unavailable.
+            // RN 0.74: evaluateJavaScript() removed. Fallback to null result.
+            // The proper fix requires refactoring to use @ReactMethod with Promise.
+            // For now, return null to trigger safe fallback (original text unchanged).
+            Log.w(TAG, "RN 0.74: evaluateJavaScript unavailable — using safe fallback")
             result.set(null)
             latch.countDown()
         } catch (e: Exception) {

@@ -137,7 +137,7 @@ class LocalMitmProxy(
             if (line.isEmpty()) break
         }
 
-        if (endpointMatcher.isAiEndpoint(host)) {
+        if (endpointMatcher.isAiEndpoint(host, "")) {
             // MITM: respond 200 and present our CA cert
             output.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
             output.flush()
