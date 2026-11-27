@@ -35,6 +35,17 @@ workflows:
   android-apk:
     name: AI CAGE Android APK
     max_build_duration: 60
+    
+    # Prevent duplicate builds — trigger only on master branch push
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'master'
+          include: true
+          source: true
+      cancel_previous_builds: true
+    
     environment:
       node: 20.11.0
       java: 17
