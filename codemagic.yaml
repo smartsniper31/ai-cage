@@ -171,6 +171,36 @@ workflows:
             apps/mobile/android/app/src/main/res/values/strings.xml
           echo "[patch] gradle.properties, Kotlin VPN sources and strings.xml restored."
 
+          # ── Safety check: verify critical Kotlin files are correct ──────────
+          echo "[safety] Verifying Kotlin compilation fixes..."
+          
+          # Check 1: LocalMitmProxy.kt must have 2-parameter isAiEndpoint calls
+          LOCAL_PROXY="$CM_BUILD_DIR/apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/LocalMitmProxy.kt"
+          if ! grep -q 'isAiEndpoint(host, "")' "$LOCAL_PROXY"; then
+            echo "[safety] ERROR: LocalMitmProxy.kt missing isAiEndpoint(host, \"\") fix"
+            exit 1
+          fi
+          if ! grep -q 'isAiEndpoint(url.host, url.path)' "$LOCAL_PROXY"; then
+            echo "[safety] ERROR: LocalMitmProxy.kt missing isAiEndpoint(url.host, url.path) fix"
+            exit 1
+          fi
+          
+          # Check 2: AiEndpointMatcher.kt must end with closing brace
+          ENDPOINT_MATCHER="$CM_BUILD_DIR/apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/AiEndpointMatcher.kt"
+          if ! tail -1 "$ENDPOINT_MATCHER" | grep -q '^}$'; then
+            echo "[safety] ERROR: AiEndpointMatcher.kt missing closing brace"
+            exit 1
+          fi
+          
+          # Check 3: CageNativeModule.kt must have RN 0.74 fallback
+          CAGE_MODULE="$CM_BUILD_DIR/apps/mobile/android/app/src/main/kotlin/io/aicage/mobile/vpn/CageNativeModule.kt"
+          if ! grep -q 'RN 0.74: evaluateJavaScript unavailable' "$CAGE_MODULE"; then
+            echo "[safety] ERROR: CageNativeModule.kt missing RN 0.74 evaluateJavaScript fallback"
+            exit 1
+          fi
+          
+          echo "[safety] All Kotlin compilation fixes verified ✓"
+
           # ── Step 2: resolve package paths from apps/mobile ──────────────────
           # NODE_PATH is set — require.resolve works for all packages.
           MOBILE="$CM_BUILD_DIR/apps/mobile"
